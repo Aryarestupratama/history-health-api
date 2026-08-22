@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\EnsureUserIsAdmin;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,4 +24,23 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        $exceptions->render(function (AuthorizationException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Email belum diverifikasi. Silakan cek email untuk verifikasi.',
+                    'error_code' => 'EMAIL_NOT_VERIFIED',
+                ], 403);
+            }
+        });
+
+        // Konsistensi format & error_code untuk token tidak ada/invalid.
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Unauthenticated. Token tidak valid atau tidak ditemukan.',
+                    'error_code' => 'UNAUTHENTICATED',
+                ], 401);
+            }
+        });
     })->create();
