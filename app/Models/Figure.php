@@ -22,8 +22,14 @@ class Figure extends Model
     protected function casts(): array
     {
         return [
-            'birth_date' => 'date',
-            'death_date' => 'date',
+            // Format eksplisit 'Y-m-d' agar toArray()/toJSON() (dipakai
+            // admin FigureController & FigureManager.jsx) mengeluarkan
+            // "1886-03-03" murni, bukan ISO datetime penuh
+            // ("...T16:52:48.000000Z") seperti default cast 'date' polos.
+            // FigureDetailResource tidak terdampak karena tetap memanggil
+            // ->toDateString() secara eksplisit.
+            'birth_date' => 'date:Y-m-d',
+            'death_date' => 'date:Y-m-d',
         ];
     }
 

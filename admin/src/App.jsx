@@ -9,7 +9,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import EraYearManager from './pages/EraYearManager';
 import SectionManager from './pages/SectionManager';
-import SectionEditor from './pages/SectionEditor';
+import SectionWorkspace from './pages/SectionWorkspace';
 import FigureManager from './pages/FigureManager';
 
 const NAV_ITEMS = [
@@ -121,10 +121,10 @@ export default function App() {
             }
           />
           <Route
-            path="/sections/:sectionId"
+            path="/sections/workspace/:yearId"
             element={
               <ProtectedRoute>
-                <Layout><SectionEditor /></Layout>
+                <Layout><SectionWorkspace /></Layout>
               </ProtectedRoute>
             }
           />

@@ -18,6 +18,30 @@ const EMPTY_FORM = {
   role_description: '',
 };
 
+const MONTHS_ID = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
+
+// Backend (Figure model) sekarang cast tanggal sebagai 'date:Y-m-d', jadi
+// harusnya sudah kirim "1886-03-03" murni. Tapi tetap di-slice defensif di
+// sini seandainya ada response lama/lain yang masih format ISO datetime
+// penuh ("...T16:52:48.000000Z") — <input type="date"> butuh persis
+// "YYYY-MM-DD" atau field-nya akan kosong.
+function toDateInputValue(value) {
+  if (!value) return '';
+  return String(value).slice(0, 10);
+}
+
+// Format tampilan list: "1886-03-03" -> "03 Maret 1886"
+function formatDateID(value) {
+  if (!value) return null;
+  const isoPart = String(value).slice(0, 10);
+  const [y, m, d] = isoPart.split('-').map(Number);
+  if (!y || !m || !d || !MONTHS_ID[m - 1]) return isoPart;
+  return `${String(d).padStart(2, '0')} ${MONTHS_ID[m - 1]} ${y}`;
+}
+
 export default function FigureManager() {
   const { confirm, dialog } = useConfirm();
 
@@ -80,8 +104,8 @@ export default function FigureManager() {
     setForm({
       name: figure.name || '',
       photo: figure.photo || '',
-      birth_date: figure.birth_date || '',
-      death_date: figure.death_date || '',
+      birth_date: toDateInputValue(figure.birth_date),
+      death_date: toDateInputValue(figure.death_date),
       family: figure.family || '',
       role_description: figure.role_description || '',
     });
@@ -211,7 +235,7 @@ export default function FigureManager() {
                     <p className="truncate font-medium">{figure.name}</p>
                     {(figure.birth_date || figure.death_date) && (
                       <p className="text-xs text-muted-foreground">
-                        {figure.birth_date || '?'} – {figure.death_date || '?'}
+                        {formatDateID(figure.birth_date) || '?'} – {formatDateID(figure.death_date) || '?'}
                       </p>
                     )}
                   </div>
