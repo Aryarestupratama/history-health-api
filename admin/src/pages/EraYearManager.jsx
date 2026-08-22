@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useConfirm } from '@/components/confirm-dialog';
+import { getEraAccent } from '@/config/branding';
 
 // Ubah "Masa Kolonial" -> "masa-kolonial"
 function generateSlug(text) {
@@ -288,6 +289,11 @@ export default function EraYearManager() {
                       className="min-w-0 flex-1 text-left"
                     >
                       <p className="truncate text-sm font-medium">
+                        <span
+                          className="mr-2 inline-block h-2 w-2 rounded-full align-middle"
+                          style={{ backgroundColor: getEraAccent(era.slug).hex }}
+                          title={getEraAccent(era.slug).label}
+                        />
                         <span className="text-muted-foreground">{era.order}.</span> {era.name}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">{era.slug}</p>

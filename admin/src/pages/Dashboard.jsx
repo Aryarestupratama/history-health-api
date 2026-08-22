@@ -9,18 +9,21 @@ const SHORTCUTS = [
     icon: Landmark,
     title: 'Kelola Era & Tahun',
     description: 'Atur 3 masa (Kolonial, Kemerdekaan, Modern) dan tahun-tahun wabah di dalamnya.',
+    accent: 'bg-secondary text-foreground',
   },
   {
     to: '/sections',
     icon: FileStack,
     title: 'Kelola Section',
     description: 'Susun informasi sejarah per tahun: blok konten, urutan, dan link kuis.',
+    accent: 'bg-secondary text-foreground',
   },
   {
     to: '/figures',
     icon: Users,
     title: 'Kelola Tokoh',
     description: 'Data tokoh sejarah untuk collectible card di aplikasi mobile.',
+    accent: 'bg-gamify/10 text-gamify',
   },
 ];
 
@@ -37,11 +40,11 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SHORTCUTS.map(({ to, icon: Icon, title, description }) => (
+        {SHORTCUTS.map(({ to, icon: Icon, title, description, accent }) => (
           <Link key={to} to={to}>
             <Card className="group h-full transition-shadow hover:shadow-md">
               <CardHeader>
-                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary">
+                <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${accent}`}>
                   <Icon className="h-4.5 w-4.5" />
                 </div>
                 <CardTitle className="flex items-center justify-between">

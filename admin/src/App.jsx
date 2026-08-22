@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react
 import { LayoutDashboard, Landmark, FileStack, Users, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { APP_NAME, APP_SHORT_INITIALS } from '@/config/branding';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import Login from './pages/Login';
@@ -37,9 +38,9 @@ function Layout({ children }) {
       <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col border-r bg-background">
         <div className="flex h-14 items-center gap-2 border-b px-5">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
-            HK
+            {APP_SHORT_INITIALS}
           </div>
-          <span className="text-sm font-semibold tracking-tight">Sejarah Kesehatan</span>
+          <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">

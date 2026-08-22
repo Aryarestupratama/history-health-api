@@ -6,42 +6,59 @@
 
 @layer base {
   :root {
-    /* ==== Design tokens — neutral/zinc base ====
-       Accent (--primary) sengaja netral dulu; tinggal ganti nilai HSL di sini
-       begitu color palette utama aplikasi (Design.md §5) final. */
+    /* ==== Design tokens — SEKALA color palette (Design.md §5.2) ====
+       Admin CMS tetap didominasi Ink/netral (§5.6): warna palette dipakai
+       selektif untuk badge status, tombol aksi, dan aksen gamifikasi —
+       bukan diterapkan penuh seperti di mobile app end-user. */
     --background: 0 0% 100%;
-    --foreground: 240 10% 12%;
+    --foreground: 0 0% 5%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 12%;
+    --card-foreground: 0 0% 5%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 12%;
+    --popover-foreground: 0 0% 5%;
 
-    --primary: 240 5.9% 12%;
+    /* Ink — primary/basis netral (tombol utama, judul) */
+    --primary: 0 0% 5%;
     --primary-foreground: 0 0% 98%;
 
     --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 12%;
+    --secondary-foreground: 0 0% 5%;
 
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
 
     --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 12%;
+    --accent-foreground: 0 0% 5%;
 
+    /* Destructive tetap merah standar, bukan Coral (lihat Design.md §5.2 catatan) */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --success: 142 71% 29%;
+    /* Green — sukses/progress, identitas era Kemerdekaan, badge Published/Selesai */
+    --success: 133 39% 48%;
     --success-foreground: 0 0% 98%;
 
-    --warning: 32 95% 44%;
-    --warning-foreground: 0 0% 98%;
+    /* Orange — CTA/warning, identitas era Kolonial, highlight rekomendasi */
+    --warning: 32 99% 61%;
+    --warning-foreground: 0 0% 10%;
+
+    /* Sky — aksen info, identitas era Modern */
+    --info: 193 93% 72%;
+    --info-foreground: 0 0% 10%;
+
+    /* Purple — aksen sekunder/gamifikasi (collectible card, badge unlock) */
+    --gamify: 250 94% 75%;
+    --gamify-foreground: 0 0% 98%;
+
+    /* Coral — aksen hangat selektif (bukan warna destructive) */
+    --highlight: 2 100% 78%;
+    --highlight-foreground: 0 0% 10%;
 
     --border: 240 5.9% 88%;
     --input: 240 5.9% 88%;
-    --ring: 240 5.9% 12%;
+    --ring: 0 0% 5%;
 
     --radius: 0.625rem;
   }

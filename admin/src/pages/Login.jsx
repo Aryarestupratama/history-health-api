@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { APP_NAME, APP_SHORT_INITIALS, APP_FULL_NAME } from '@/config/branding';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -38,10 +39,10 @@ export default function Login() {
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-            HK
+            {APP_SHORT_INITIALS}
           </div>
-          <CardTitle>Admin Login</CardTitle>
-          <CardDescription>Aplikasi Informasi Sejarah Kesehatan Indonesia</CardDescription>
+          <CardTitle>{APP_NAME} Admin</CardTitle>
+          <CardDescription>{APP_FULL_NAME}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, GripVertical, Plus, X, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, GripVertical, Plus, X, Pencil, Trash2, Users } from 'lucide-react';
 import api from '../api';
 import { cn } from '@/lib/utils';
+import { getEraAccent } from '@/config/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -211,7 +212,11 @@ export default function SectionEditor() {
             {section.is_published ? 'Published' : 'Draft'}
           </Badge>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ backgroundColor: getEraAccent(section.year?.era?.slug).hex }}
+          />
           {section.year?.era?.name} — {section.year?.year} ({section.year?.title})
         </p>
       </div>
@@ -339,8 +344,13 @@ export default function SectionEditor() {
         {/* ---------- TOKOH TERKAIT ---------- */}
         <Card>
           <CardHeader>
-            <CardTitle>Tokoh Terkait</CardTitle>
-            <CardDescription>CMS-05 — assign satu atau lebih tokoh ke section ini.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gamify/10 text-gamify">
+                <Users className="h-3.5 w-3.5" />
+              </span>
+              Tokoh Terkait
+            </CardTitle>
+            <CardDescription>CMS-05 — assign satu atau lebih tokoh ke section ini. Tokoh yang di-assign akan menjadi collectible card yang ter-unlock otomatis di aplikasi mobile.</CardDescription>
           </CardHeader>
           <CardContent>
             {figures.length === 0 ? (
