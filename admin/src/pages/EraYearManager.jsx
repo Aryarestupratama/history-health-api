@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import api from '../api';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { useConfirm } from '@/components/confirm-dialog';
 
 // Ubah "Masa Kolonial" -> "masa-kolonial"
 function generateSlug(text) {
@@ -12,6 +21,8 @@ function generateSlug(text) {
 }
 
 export default function EraYearManager() {
+  const { confirm, dialog } = useConfirm();
+
   const [eras, setEras] = useState([]);
   const [selectedEra, setSelectedEra] = useState(null);
   const [years, setYears] = useState([]);
@@ -120,7 +131,11 @@ export default function EraYearManager() {
   }
 
   async function handleDeleteEra(era) {
-    if (!confirm(`Hapus era "${era.name}"? Ini akan menghapus semua tahun & section di dalamnya.`)) return;
+    const ok = await confirm({
+      title: `Hapus era "${era.name}"?`,
+      description: 'Ini akan menghapus semua tahun & section di dalamnya. Tindakan ini tidak bisa dibatalkan.',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/admin/eras/${era.id}`);
       if (selectedEra?.id === era.id) setSelectedEra(null);
@@ -170,7 +185,11 @@ export default function EraYearManager() {
   }
 
   async function handleDeleteYear(year) {
-    if (!confirm(`Hapus tahun "${year.year} - ${year.title}"? Ini akan menghapus semua section di dalamnya.`)) return;
+    const ok = await confirm({
+      title: `Hapus tahun "${year.year} - ${year.title}"?`,
+      description: 'Ini akan menghapus semua section di dalamnya. Tindakan ini tidak bisa dibatalkan.',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/admin/years/${year.id}`);
       fetchYears(selectedEra.id);
@@ -183,165 +202,200 @@ export default function EraYearManager() {
   const sortedYearNumbers = [...years].map((y) => y.year).sort((a, b) => a - b);
 
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h2>Kelola Era & Tahun</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+    <div className="space-y-6">
+      {dialog}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Kelola Era & Tahun</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Atur 3 masa sejarah dan tahun-tahun wabah di dalamnya.
+        </p>
+      </div>
 
-      <div style={{ display: 'flex', gap: 32 }}>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* ---------- KOLOM ERA ---------- */}
-        <div style={{ flex: 1 }}>
-          <h3>Era</h3>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Era</CardTitle>
+            {!showEraForm && (
+              <Button size="sm" onClick={openAddEraForm}>
+                <Plus className="h-4 w-4" /> Tambah Era
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {showEraForm && (
+              <form onSubmit={handleEraSubmit} className="space-y-3 rounded-lg border bg-secondary/30 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{editingEraId ? 'Edit Era' : 'Era Baru'}</p>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={resetEraForm}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nama</Label>
+                  <Input value={eraForm.name} onChange={(e) => handleEraNameChange(e.target.value)} required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Slug (otomatis)</Label>
+                  <Input value={eraForm.slug} disabled className="bg-muted text-muted-foreground" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Deskripsi</Label>
+                  <Textarea
+                    value={eraForm.description}
+                    onChange={(e) => setEraForm({ ...eraForm, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Urutan (otomatis, bisa diubah)</Label>
+                  <Input
+                    type="number"
+                    value={eraForm.order}
+                    onChange={(e) => setEraForm({ ...eraForm, order: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button type="submit" size="sm">{editingEraId ? 'Update Era' : 'Tambah Era'}</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={resetEraForm}>Batal</Button>
+                </div>
+              </form>
+            )}
 
-          {!showEraForm && (
-            <button onClick={openAddEraForm} style={{ marginBottom: 12 }}>
-              + Tambah Era
-            </button>
-          )}
-
-          {showEraForm && (
-            <form onSubmit={handleEraSubmit} style={{ marginBottom: 16, border: '1px solid #ccc', padding: 12 }}>
-              <div>
-                <label>Nama: </label>
-                <input
-                  value={eraForm.name}
-                  onChange={(e) => handleEraNameChange(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label>Slug (otomatis): </label>
-                <input value={eraForm.slug} disabled style={{ background: '#f0f0f0', color: '#666' }} />
-              </div>
-              <div>
-                <label>Deskripsi: </label>
-                <textarea
-                  value={eraForm.description}
-                  onChange={(e) => setEraForm({ ...eraForm, description: e.target.value })}
-                />
-              </div>
-              <div>
-                <label>Urutan (otomatis, bisa diubah): </label>
-                <input
-                  type="number"
-                  value={eraForm.order}
-                  onChange={(e) => setEraForm({ ...eraForm, order: e.target.value })}
-                  required
-                />
-              </div>
-              <button type="submit">{editingEraId ? 'Update Era' : 'Tambah Era'}</button>
-              <button type="button" onClick={resetEraForm} style={{ marginLeft: 8 }}>
-                Batal
-              </button>
-            </form>
-          )}
-
-          {loadingEras ? (
-            <p>Memuat...</p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {eras.map((era) => (
-                <li
-                  key={era.id}
-                  style={{
-                    padding: 8,
-                    border: '1px solid #ddd',
-                    marginBottom: 6,
-                    background: selectedEra?.id === era.id ? '#eef' : 'white',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div onClick={() => setSelectedEra(era)}>
-                    <strong>{era.order}. {era.name}</strong> ({era.slug})
-                  </div>
-                  <button onClick={() => startEditEra(era)}>Edit</button>
-                  <button onClick={() => handleDeleteEra(era)} style={{ marginLeft: 6 }}>
-                    Hapus
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            {loadingEras ? (
+              <p className="text-sm text-muted-foreground">Memuat...</p>
+            ) : eras.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Belum ada era.</p>
+            ) : (
+              <ul className="space-y-2">
+                {eras.map((era) => (
+                  <li
+                    key={era.id}
+                    className={cn(
+                      'flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors',
+                      selectedEra?.id === era.id ? 'border-primary/40 bg-secondary' : 'hover:bg-secondary/50'
+                    )}
+                  >
+                    <button
+                      onClick={() => setSelectedEra(era)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate text-sm font-medium">
+                        <span className="text-muted-foreground">{era.order}.</span> {era.name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{era.slug}</p>
+                    </button>
+                    <div className="flex shrink-0 gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEditEra(era)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteEra(era)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
         {/* ---------- KOLOM YEAR ---------- */}
-        <div style={{ flex: 1 }}>
-          <h3>Tahun {selectedEra ? `— ${selectedEra.name}` : ''}</h3>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Tahun {selectedEra ? `— ${selectedEra.name}` : ''}</CardTitle>
+            {selectedEra && !showYearForm && (
+              <Button size="sm" onClick={openAddYearForm}>
+                <Plus className="h-4 w-4" /> Tambah Tahun
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!selectedEra ? (
+              <p className="text-sm text-muted-foreground">Pilih era di kiri dulu untuk melihat/menambah tahun.</p>
+            ) : (
+              <>
+                <div className="rounded-lg bg-secondary/50 px-3 py-2.5 text-sm">
+                  <span className="font-medium">Tahun yang sudah diinput:</span>{' '}
+                  {sortedYearNumbers.length === 0 ? (
+                    <span className="text-muted-foreground">belum ada</span>
+                  ) : (
+                    <span className="text-muted-foreground">{sortedYearNumbers.join(', ')}</span>
+                  )}
+                </div>
 
-          {!selectedEra ? (
-            <p style={{ color: '#888' }}>Pilih era di kiri dulu untuk melihat/menambah tahun.</p>
-          ) : (
-            <>
-              {/* Info tahun yang sudah diinput */}
-              <div style={{ background: '#f7f7f7', padding: 10, marginBottom: 12, fontSize: 14 }}>
-                <strong>Tahun yang sudah diinput di era ini:</strong>{' '}
-                {sortedYearNumbers.length === 0 ? (
-                  <span style={{ color: '#888' }}>belum ada</span>
-                ) : (
-                  <span>{sortedYearNumbers.join(', ')}</span>
+                {showYearForm && (
+                  <form onSubmit={handleYearSubmit} className="space-y-3 rounded-lg border bg-secondary/30 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{editingYearId ? 'Edit Tahun' : 'Tahun Baru'}</p>
+                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={resetYearForm}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Tahun</Label>
+                      <Input
+                        type="number"
+                        value={yearForm.year}
+                        onChange={(e) => setYearForm({ ...yearForm, year: e.target.value })}
+                        required
+                      />
+                      {yearForm.year && sortedYearNumbers.includes(Number(yearForm.year)) && editingYearId === null && (
+                        <p className="text-xs text-warning">⚠ Tahun ini sudah pernah diinput sebelumnya</p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Judul</Label>
+                      <Input
+                        value={yearForm.title}
+                        onChange={(e) => setYearForm({ ...yearForm, title: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button type="submit" size="sm">{editingYearId ? 'Update Tahun' : 'Tambah Tahun'}</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={resetYearForm}>Batal</Button>
+                    </div>
+                  </form>
                 )}
-              </div>
 
-              {!showYearForm && (
-                <button onClick={openAddYearForm} style={{ marginBottom: 12 }}>
-                  + Tambah Tahun
-                </button>
-              )}
-
-              {showYearForm && (
-                <form onSubmit={handleYearSubmit} style={{ marginBottom: 16, border: '1px solid #ccc', padding: 12 }}>
-                  <div>
-                    <label>Tahun: </label>
-                    <input
-                      type="number"
-                      value={yearForm.year}
-                      onChange={(e) => setYearForm({ ...yearForm, year: e.target.value })}
-                      required
-                    />
-                    {yearForm.year && sortedYearNumbers.includes(Number(yearForm.year)) && editingYearId === null && (
-                      <span style={{ color: 'orange', marginLeft: 8 }}>
-                        ⚠ Tahun ini sudah pernah diinput sebelumnya
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <label>Judul: </label>
-                    <input
-                      value={yearForm.title}
-                      onChange={(e) => setYearForm({ ...yearForm, title: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <button type="submit">{editingYearId ? 'Update Tahun' : 'Tambah Tahun'}</button>
-                  <button type="button" onClick={resetYearForm} style={{ marginLeft: 8 }}>
-                    Batal
-                  </button>
-                </form>
-              )}
-
-              {loadingYears ? (
-                <p>Memuat...</p>
-              ) : years.length === 0 ? (
-                <p style={{ color: '#888' }}>Belum ada tahun di era ini.</p>
-              ) : (
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  {[...years]
-                    .sort((a, b) => a.year - b.year)
-                    .map((year) => (
-                      <li key={year.id} style={{ padding: 8, border: '1px solid #ddd', marginBottom: 6 }}>
-                        <strong>{year.year}</strong> — {year.title}
-                        <button onClick={() => startEditYear(year)} style={{ marginLeft: 8 }}>
-                          Edit
-                        </button>
-                        <button onClick={() => handleDeleteYear(year)} style={{ marginLeft: 6 }}>
-                          Hapus
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </>
-          )}
-        </div>
+                {loadingYears ? (
+                  <p className="text-sm text-muted-foreground">Memuat...</p>
+                ) : years.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Belum ada tahun di era ini.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {[...years]
+                      .sort((a, b) => a.year - b.year)
+                      .map((year) => (
+                        <li key={year.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                          <p className="min-w-0 flex-1 truncate text-sm">
+                            <span className="font-medium">{year.year}</span>{' '}
+                            <span className="text-muted-foreground">— {year.title}</span>
+                          </p>
+                          <div className="flex shrink-0 gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEditYear(year)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteYear(year)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

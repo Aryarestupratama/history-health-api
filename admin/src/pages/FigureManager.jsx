@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
+import { Plus, X, Pencil, Trash2 } from 'lucide-react';
 import api from '../api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { useConfirm } from '@/components/confirm-dialog';
 
 const EMPTY_FORM = {
   name: '',
@@ -11,6 +19,8 @@ const EMPTY_FORM = {
 };
 
 export default function FigureManager() {
+  const { confirm, dialog } = useConfirm();
+
   const [figures, setFigures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -85,7 +95,11 @@ export default function FigureManager() {
   }
 
   async function handleDelete(figure) {
-    if (!confirm(`Hapus tokoh "${figure.name}"? Ini juga akan melepas relasinya dari semua section.`)) return;
+    const ok = await confirm({
+      title: `Hapus tokoh "${figure.name}"?`,
+      description: 'Ini juga akan melepas relasinya dari semua section. Tindakan ini tidak bisa dibatalkan.',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/admin/figures/${figure.id}`);
       fetchFigures();
@@ -95,117 +109,128 @@ export default function FigureManager() {
   }
 
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <h2>Kelola Tokoh</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+    <div className="space-y-6">
+      {dialog}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Kelola Tokoh</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Data tokoh sejarah untuk collectible card di aplikasi mobile.
+          </p>
+        </div>
+        {!showForm && (
+          <Button onClick={openAddForm}>
+            <Plus className="h-4 w-4" /> Tambah Tokoh
+          </Button>
+        )}
+      </div>
 
-      {!showForm && (
-        <button onClick={openAddForm} style={{ marginBottom: 12 }}>
-          + Tambah Tokoh
-        </button>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} style={{ marginBottom: 16, border: '1px solid #ccc', padding: 12, maxWidth: 480 }}>
-          <div>
-            <label>Nama: </label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              style={{ width: 300 }}
-              required
-            />
-          </div>
-          <div>
-            <label>Foto (link Google Drive): </label>
-            <input
-              value={form.photo}
-              onChange={(e) => setForm({ ...form, photo: e.target.value })}
-              placeholder="https://drive.google.com/file/d/FILE_ID/view..."
-              style={{ width: 300 }}
-            />
-          </div>
-          <div>
-            <label>Tanggal Lahir: </label>
-            <input
-              type="date"
-              value={form.birth_date}
-              onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
-            />
-          </div>
-          <div>
-            <label>Tanggal Wafat: </label>
-            <input
-              type="date"
-              value={form.death_date}
-              onChange={(e) => setForm({ ...form, death_date: e.target.value })}
-            />
-          </div>
-          <div>
-            <label>Keluarga: </label>
-            <textarea
-              value={form.family}
-              onChange={(e) => setForm({ ...form, family: e.target.value })}
-              rows={3}
-              style={{ width: 300 }}
-            />
-          </div>
-          <div>
-            <label>Peran dalam Dunia Kesehatan: </label>
-            <textarea
-              value={form.role_description}
-              onChange={(e) => setForm({ ...form, role_description: e.target.value })}
-              rows={4}
-              style={{ width: 300 }}
-              required
-            />
-          </div>
-          <button type="submit">{editingId ? 'Update Tokoh' : 'Tambah Tokoh'}</button>
-          <button type="button" onClick={resetForm} style={{ marginLeft: 8 }}>
-            Batal
-          </button>
-        </form>
+        <Card className="max-w-xl">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>{editingId ? 'Edit Tokoh' : 'Tokoh Baru'}</CardTitle>
+            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={resetForm}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Nama</Label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Foto (link Google Drive)</Label>
+                <Input
+                  value={form.photo}
+                  onChange={(e) => setForm({ ...form, photo: e.target.value })}
+                  placeholder="https://drive.google.com/file/d/FILE_ID/view..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Tanggal Lahir</Label>
+                  <Input
+                    type="date"
+                    value={form.birth_date}
+                    onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tanggal Wafat</Label>
+                  <Input
+                    type="date"
+                    value={form.death_date}
+                    onChange={(e) => setForm({ ...form, death_date: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Keluarga</Label>
+                <Textarea
+                  value={form.family}
+                  onChange={(e) => setForm({ ...form, family: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Peran dalam Dunia Kesehatan</Label>
+                <Textarea
+                  value={form.role_description}
+                  onChange={(e) => setForm({ ...form, role_description: e.target.value })}
+                  rows={4}
+                  required
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button type="submit">{editingId ? 'Update Tokoh' : 'Tambah Tokoh'}</Button>
+                <Button type="button" variant="outline" onClick={resetForm}>Batal</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
       {loading ? (
-        <p>Memuat...</p>
+        <p className="text-sm text-muted-foreground">Memuat...</p>
       ) : figures.length === 0 ? (
-        <p style={{ color: '#888' }}>Belum ada tokoh.</p>
+        <p className="text-sm text-muted-foreground">Belum ada tokoh.</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, maxWidth: 640 }}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {figures.map((figure) => (
-            <li key={figure.id} style={{ padding: 8, border: '1px solid #ddd', marginBottom: 6 }}>
-              <div>
-                <strong>{figure.name}</strong>
-                {(figure.birth_date || figure.death_date) && (
-                  <span style={{ color: '#888', marginLeft: 8, fontSize: 13 }}>
-                    ({figure.birth_date || '?'} – {figure.death_date || '?'})
-                  </span>
-                )}
-              </div>
-              {figure.role_description && (
-                <div
-                  style={{
-                    color: '#555',
-                    fontSize: 13,
-                    maxWidth: 500,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {figure.role_description}
+            <Card key={figure.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{figure.name}</p>
+                    {(figure.birth_date || figure.death_date) && (
+                      <p className="text-xs text-muted-foreground">
+                        {figure.birth_date || '?'} – {figure.death_date || '?'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(figure)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(figure)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-              )}
-              <div style={{ marginTop: 6 }}>
-                <button onClick={() => startEdit(figure)}>Edit</button>
-                <button onClick={() => handleDelete(figure)} style={{ marginLeft: 6 }}>
-                  Hapus
-                </button>
-              </div>
-            </li>
+                {figure.role_description && (
+                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{figure.role_description}</p>
+                )}
+              </CardContent>
+            </Card>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

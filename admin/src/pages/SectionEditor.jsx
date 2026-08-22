@@ -1,6 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, GripVertical, Plus, X, Pencil, Trash2 } from 'lucide-react';
 import api from '../api';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { useConfirm } from '@/components/confirm-dialog';
 
 const BLOCK_TYPES = [
   { value: 'text', label: 'Teks' },
@@ -33,6 +44,7 @@ function withSummaryLast(blocks) {
 export default function SectionEditor() {
   const { sectionId } = useParams();
   const navigate = useNavigate();
+  const { confirm, dialog } = useConfirm();
 
   const [section, setSection] = useState(null);
   const [blocks, setBlocks] = useState([]);
@@ -114,7 +126,8 @@ export default function SectionEditor() {
   }
 
   async function handleDeleteBlock(block) {
-    if (!confirm(`Hapus blok "${block.type}" ini?`)) return;
+    const ok = await confirm({ title: `Hapus blok "${block.type}" ini?` });
+    if (!ok) return;
     try {
       await api.delete(`/admin/sections/${sectionId}/content-blocks/${block.id}`);
       refetchBlocks();
@@ -180,163 +193,185 @@ export default function SectionEditor() {
     }
   }
 
-  if (loading) return <div style={{ padding: 24 }}>Memuat...</div>;
-  if (!section) return <div style={{ padding: 24 }}>Section tidak ditemukan.</div>;
+  if (loading) return <p className="text-sm text-muted-foreground">Memuat...</p>;
+  if (!section) return <p className="text-sm text-muted-foreground">Section tidak ditemukan.</p>;
 
   const hasSummary = blocks.some((b) => b.type === 'summary');
 
   return (
-    <div style={{ padding: 24, fontFamily: 'sans-serif' }}>
-      <button onClick={() => navigate('/sections')} style={{ marginBottom: 12 }}>
-        ← Kembali ke Kelola Section
-      </button>
-
-      <h2>{section.title}</h2>
-      <p style={{ color: '#666' }}>
-        {section.year?.era?.name} — {section.year?.year} ({section.year?.title}) &middot;{' '}
-        <span style={{ color: section.is_published ? '#070' : '#555' }}>
-          {section.is_published ? 'Published' : 'Draft'}
-        </span>
-      </p>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
-        {/* ---------- BLOK KONTEN ---------- */}
-        <div style={{ flex: 1.6 }}>
-          <h3>Blok Konten</h3>
-          <p style={{ fontSize: 13, color: '#888' }}>
-            Drag baris untuk mengurutkan. Blok "Rangkuman" otomatis dipaksa ke posisi terakhir (R-CMS-03).
-            {!hasSummary && ' Section wajib punya minimal 1 blok Rangkuman sebelum bisa di-publish (R-CMS-04).'}
-          </p>
-
-          {!showForm && (
-            <button onClick={openAddForm} style={{ marginBottom: 12 }}>
-              + Tambah Blok
-            </button>
-          )}
-
-          {showForm && (
-            <form onSubmit={handleSubmit} style={{ marginBottom: 16, border: '1px solid #ccc', padding: 12 }}>
-              <div>
-                <label>Tipe: </label>
-                <select
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value })}
-                  disabled={!!editingBlockId}
-                >
-                  {BLOCK_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label>Konten: </label>
-                {form.type === 'text' || form.type === 'summary' ? (
-                  <textarea
-                    value={form.content}
-                    onChange={(e) => setForm({ ...form, content: e.target.value })}
-                    rows={5}
-                    style={{ width: 360 }}
-                    required
-                  />
-                ) : (
-                  <input
-                    value={form.content}
-                    onChange={(e) => setForm({ ...form, content: e.target.value })}
-                    placeholder={contentPlaceholder(form.type)}
-                    style={{ width: 360 }}
-                    required
-                  />
-                )}
-              </div>
-              <button type="submit">{editingBlockId ? 'Update Blok' : 'Tambah Blok'}</button>
-              <button type="button" onClick={resetForm} style={{ marginLeft: 8 }}>
-                Batal
-              </button>
-            </form>
-          )}
-
-          {blocks.length === 0 ? (
-            <p style={{ color: '#888' }}>Belum ada blok konten.</p>
-          ) : (
-            <>
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {blocks.map((block, index) => (
-                  <li
-                    key={block.id}
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(index)}
-                    style={{
-                      padding: 8,
-                      border: '1px solid #ddd',
-                      marginBottom: 6,
-                      background: block.type === 'summary' ? '#fff8e1' : 'white',
-                      cursor: 'grab',
-                    }}
-                  >
-                    <div>
-                      <span style={{ cursor: 'grab', marginRight: 6 }}>⠿</span>
-                      <strong>{BLOCK_TYPES.find((t) => t.value === block.type)?.label || block.type}</strong>
-                      <span style={{ color: '#999', marginLeft: 8, fontSize: 12 }}>urutan: {block.order}</span>
-                    </div>
-                    <div
-                      style={{
-                        margin: '4px 0',
-                        color: '#555',
-                        fontSize: 13,
-                        maxWidth: 400,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {block.content}
-                    </div>
-                    <button onClick={() => startEdit(block)}>Edit</button>
-                    <button onClick={() => handleDeleteBlock(block)} style={{ marginLeft: 6 }}>
-                      Hapus
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <button onClick={saveOrder} disabled={savingOrder}>
-                {savingOrder ? 'Menyimpan urutan...' : 'Simpan Urutan'}
-              </button>
-            </>
-          )}
+    <div className="space-y-6">
+      {dialog}
+      <div>
+        <Button variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground" onClick={() => navigate('/sections')}>
+          <ArrowLeft className="h-4 w-4" /> Kembali ke Kelola Section
+        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">{section.title}</h1>
+          <Badge variant={section.is_published ? 'success' : 'secondary'}>
+            {section.is_published ? 'Published' : 'Draft'}
+          </Badge>
         </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {section.year?.era?.name} — {section.year?.year} ({section.year?.title})
+        </p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
+        {/* ---------- BLOK KONTEN ---------- */}
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle>Blok Konten</CardTitle>
+              <CardDescription className="mt-1">
+                Drag baris untuk mengurutkan. Blok "Rangkuman" otomatis dipaksa ke posisi terakhir (R-CMS-03).
+                {!hasSummary && ' Section wajib punya minimal 1 blok Rangkuman sebelum bisa di-publish (R-CMS-04).'}
+              </CardDescription>
+            </div>
+            {!showForm && (
+              <Button size="sm" onClick={openAddForm}>
+                <Plus className="h-4 w-4" /> Tambah
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {showForm && (
+              <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border bg-secondary/30 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{editingBlockId ? 'Edit Blok' : 'Blok Baru'}</p>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={resetForm}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tipe</Label>
+                  <Select
+                    value={form.type}
+                    onValueChange={(value) => setForm({ ...form, type: value })}
+                    disabled={!!editingBlockId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BLOCK_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Konten</Label>
+                  {form.type === 'text' || form.type === 'summary' ? (
+                    <Textarea
+                      value={form.content}
+                      onChange={(e) => setForm({ ...form, content: e.target.value })}
+                      rows={5}
+                      required
+                    />
+                  ) : (
+                    <Input
+                      value={form.content}
+                      onChange={(e) => setForm({ ...form, content: e.target.value })}
+                      placeholder={contentPlaceholder(form.type)}
+                      required
+                    />
+                  )}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button type="submit" size="sm">{editingBlockId ? 'Update Blok' : 'Tambah Blok'}</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={resetForm}>Batal</Button>
+                </div>
+              </form>
+            )}
+
+            {blocks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Belum ada blok konten.</p>
+            ) : (
+              <>
+                <ul className="space-y-2">
+                  {blocks.map((block, index) => (
+                    <li
+                      key={block.id}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDrop(index)}
+                      className={cn(
+                        'flex items-start gap-2 rounded-lg border p-3 cursor-grab active:cursor-grabbing',
+                        block.type === 'summary' ? 'border-warning/30 bg-warning/5' : 'bg-background'
+                      )}
+                    >
+                      <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {BLOCK_TYPES.find((t) => t.value === block.type)?.label || block.type}
+                          </span>
+                          <span className="text-xs text-muted-foreground">urutan: {block.order}</span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{block.content}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(block)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteBlock(block)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <Button onClick={saveOrder} disabled={savingOrder} size="sm">
+                  {savingOrder ? 'Menyimpan urutan...' : 'Simpan Urutan'}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* ---------- TOKOH TERKAIT ---------- */}
-        <div style={{ flex: 1 }}>
-          <h3>Tokoh Terkait (CMS-05)</h3>
-          {figures.length === 0 ? (
-            <p style={{ color: '#888' }}>
-              Belum ada data tokoh. Tambahkan dulu di <Link to="/figures">Kelola Tokoh</Link>.
-            </p>
-          ) : (
-            <>
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {figures.map((figure) => (
-                  <li key={figure.id} style={{ padding: '4px 0' }}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={assignedFigureIds.includes(figure.id)}
-                        onChange={() => toggleFigure(figure.id)}
-                      />{' '}
-                      {figure.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-              <button onClick={saveFigures}>Simpan Tokoh Terkait</button>
-            </>
-          )}
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Tokoh Terkait</CardTitle>
+            <CardDescription>CMS-05 — assign satu atau lebih tokoh ke section ini.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {figures.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Belum ada data tokoh. Tambahkan dulu di{' '}
+                <Link to="/figures" className="font-medium text-foreground underline underline-offset-2">
+                  Kelola Tokoh
+                </Link>.
+              </p>
+            ) : (
+              <>
+                <ul className="max-h-80 space-y-1 overflow-y-auto pr-1">
+                  {figures.map((figure) => (
+                    <li key={figure.id}>
+                      <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-secondary/50">
+                        <input
+                          type="checkbox"
+                          checked={assignedFigureIds.includes(figure.id)}
+                          onChange={() => toggleFigure(figure.id)}
+                          className="h-4 w-4 rounded border-input accent-foreground"
+                        />
+                        {figure.name}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <Button onClick={saveFigures} size="sm" className="mt-3">Simpan Tokoh Terkait</Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
