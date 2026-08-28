@@ -33,7 +33,7 @@ class ContentBlock extends Model
 
     /**
      * URL siap pakai (direct-view/embed) hasil parsing 'content' mentah,
-     * sesuai type block. Untuk 'text'/'summary', kembalikan null.
+     * sesuai type block. Untuk 'text', kembalikan null.
      */
     public function getResolvedUrlAttribute(): ?string
     {

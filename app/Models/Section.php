@@ -12,7 +12,7 @@ class Section extends Model
     protected $fillable = [
         'year_id',
         'title',
-        'quiz_link',
+        'order',
         'is_published',
     ];
 
@@ -20,6 +20,7 @@ class Section extends Model
     {
         return [
             'is_published' => 'boolean',
+            'order' => 'integer',
         ];
     }
 
@@ -31,11 +32,6 @@ class Section extends Model
     public function contentBlocks()
     {
         return $this->hasMany(ContentBlock::class)->orderBy('order');
-    }
-
-    public function figures()
-    {
-        return $this->belongsToMany(Figure::class, 'section_figure');
     }
 
     public function progress()

@@ -38,9 +38,14 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserProgress::class);
     }
 
-    public function cardUnlocks()
+    public function vaccineUnlocks()
     {
-        return $this->hasMany(UserCardUnlock::class);
+        return $this->hasMany(UserVaccineUnlock::class);
+    }
+
+    public function quizAttempts()
+    {
+        return $this->hasMany(UserQuizAttempt::class);
     }
 
     public function isAdmin(): bool

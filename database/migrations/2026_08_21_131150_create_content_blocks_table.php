@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('content_blocks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('section_id')->constrained('sections')->cascadeOnDelete();
-            $table->enum('type', ['text', 'image', 'video', 'pdf', 'summary']);
+            $table->enum('type', ['text', 'image', 'video', 'pdf']);
             $table->text('content');
             $table->integer('order')->default(0);
             $table->timestamps();

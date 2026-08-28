@@ -5,24 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class UserCardUnlock extends Model
+class UserQuizAttempt extends Model
 {
     use HasFactory;
 
-    protected $table = 'user_card_unlocks';
-
-    public $timestamps = false; // hanya punya unlocked_at
+    public $timestamps = false; // hanya punya completed_at
 
     protected $fillable = [
         'user_id',
-        'figure_id',
-        'unlocked_at',
+        'quiz_id',
+        'answers',
+        'completed_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'unlocked_at' => 'datetime',
+            'answers' => 'array',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -31,8 +31,8 @@ class UserCardUnlock extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function figure()
+    public function quiz()
     {
-        return $this->belongsTo(Figure::class);
+        return $this->belongsTo(Quiz::class);
     }
 }

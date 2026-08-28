@@ -16,7 +16,7 @@ class SectionSeeder extends Seeder
         $section1918 = Section::updateOrCreate(
             ['year_id' => $year1918->id, 'title' => 'Flu Spanyol di Hindia Belanda'],
             [
-                'quiz_link' => 'https://upresenter.com/quiz/dummy-1918',
+                'order' => 1,
                 'is_published' => true,
             ]
         );
@@ -38,17 +38,12 @@ class SectionSeeder extends Seeder
                 'content' => 'https://www.youtube.com/watch?v=CONTOH_VIDEO_ID',
                 'order' => 3,
             ],
-            [
-                'type' => 'summary',
-                'content' => 'Rangkuman: Flu Spanyol menjadi salah satu wabah terbesar yang memengaruhi kebijakan kesehatan publik di Hindia Belanda.',
-                'order' => 4,
-            ],
         ]);
 
         $section2020 = Section::updateOrCreate(
             ['year_id' => $year2020->id, 'title' => 'Pandemi COVID-19 di Indonesia'],
             [
-                'quiz_link' => 'https://upresenter.com/quiz/dummy-2020',
+                'order' => 1,
                 'is_published' => true,
             ]
         );
@@ -64,11 +59,6 @@ class SectionSeeder extends Seeder
                 'type' => 'pdf',
                 'content' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_PDF/view',
                 'order' => 2,
-            ],
-            [
-                'type' => 'summary',
-                'content' => 'Rangkuman: Pandemi COVID-19 mengubah banyak aspek kebijakan kesehatan dan kebiasaan masyarakat Indonesia.',
-                'order' => 3,
             ],
         ]);
     }

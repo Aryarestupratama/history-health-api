@@ -13,6 +13,7 @@ class Year extends Model
         'era_id',
         'year',
         'title',
+        'summary',
     ];
 
     public function era()
@@ -22,6 +23,16 @@ class Year extends Model
 
     public function sections()
     {
-        return $this->hasMany(Section::class);
+        return $this->hasMany(Section::class)->orderBy('order');
+    }
+
+    public function vaccines()
+    {
+        return $this->belongsToMany(Vaccine::class, 'year_vaccine');
+    }
+
+    public function quiz()
+    {
+        return $this->hasOne(Quiz::class);
     }
 }

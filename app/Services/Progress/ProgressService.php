@@ -4,18 +4,26 @@ namespace App\Services\Progress;
 
 use App\Models\Section;
 use App\Models\User;
-use App\Models\UserCardUnlock;
 use App\Models\UserProgress;
 use Illuminate\Support\Facades\DB;
 
 class ProgressService
 {
+    public function __construct(
+        private YearCompletionService $yearCompletionService,
+    ) {
+    }
+
     /**
-     * Catat section sebagai selesai dibaca oleh user, lalu unlock semua
-     * figure terkait section tsb (jika ada). Idempotent: jika sudah pernah
-     * completed, tidak membuat/mengubah apa pun (R-PROG-03).
+     * Catat section sebagai selesai dibaca oleh user. Idempotent: jika sudah
+     * pernah completed, tidak membuat/mengubah apa pun (R-PROG-03).
      *
-     * @return array{progress: UserProgress, newly_unlocked: \Illuminate\Support\Collection}
+     * Tidak lagi unlock vaccine langsung di sini — setelah progress dicatat,
+     * status "year completed" dievaluasi ulang (R-PROG-08) via
+     * YearCompletionService, karena unlock vaccine sekarang butuh SELURUH
+     * section + quiz year tsb selesai, bukan cuma satu section (R-VAC-01).
+     *
+     * @return array{progress: UserProgress, year_completed: bool, newly_unlocked_vaccines: \Illuminate\Support\Collection}
      */
     public function completeSection(User $user, Section $section): array
     {
@@ -27,30 +35,14 @@ class ProgressService
                 ['completed_at' => now()]
             );
 
-            $newlyUnlocked = collect();
+            $year = $section->year;
 
-            // Hanya jalankan unlock kalau progress ini baru dibuat barusan.
-            // Kalau sudah ada sebelumnya (pembacaan ulang), tidak perlu
-            // proses unlock lagi — figure yang relevan pasti sudah ter-unlock
-            // saat pertama kali completed (R-CARD-03: unlock cukup sekali).
-            if ($progress->wasRecentlyCreated) {
-                $figureIds = $section->figures()->pluck('figures.id');
-
-                foreach ($figureIds as $figureId) {
-                    $unlock = UserCardUnlock::firstOrCreate(
-                        ['user_id' => $user->id, 'figure_id' => $figureId],
-                        ['unlocked_at' => now()]
-                    );
-
-                    if ($unlock->wasRecentlyCreated) {
-                        $newlyUnlocked->push($unlock->figure_id);
-                    }
-                }
-            }
+            $newlyUnlockedVaccines = $this->yearCompletionService->checkAndUnlockVaccines($user, $year);
 
             return [
                 'progress' => $progress,
-                'newly_unlocked' => $newlyUnlocked,
+                'year_completed' => $newlyUnlockedVaccines->isNotEmpty() || $this->yearCompletionService->isCompleted($user, $year),
+                'newly_unlocked_vaccines' => $newlyUnlockedVaccines,
             ];
         });
     }
@@ -97,8 +89,6 @@ class ProgressService
 
         $lastEra = $lastProgress->section->year->era;
 
-        // Cari year berikutnya secara kronologis dalam era yang sama,
-        // yang punya section published, dan belum completed user.
         $nextYear = \App\Models\Year::where('era_id', $lastEra->id)
             ->where('year', '>', $lastProgress->section->year->year)
             ->whereHas('sections', fn ($q) => $q->published())
@@ -112,8 +102,6 @@ class ProgressService
             return ['type' => 'next_year', 'year' => $nextYear, 'era' => $lastEra];
         }
 
-        // R-PROG-05: fallback — era yang sama sudah tuntas semua,
-        // rekomendasikan era lain dengan progress paling rendah (rasio).
         $progressByEra = $this->progressByEra($user)
             ->filter(fn ($p) => $p['era']->id !== $lastEra->id && $p['total'] > 0)
             ->sortBy(fn ($p) => $p['total'] > 0 ? $p['completed'] / $p['total'] : 0);
@@ -121,7 +109,7 @@ class ProgressService
         $fallbackEra = $progressByEra->first();
 
         if (! $fallbackEra) {
-            return null; // semua era sudah tuntas atau tidak ada era lain
+            return null;
         }
 
         return ['type' => 'switch_era', 'era' => $fallbackEra['era']];

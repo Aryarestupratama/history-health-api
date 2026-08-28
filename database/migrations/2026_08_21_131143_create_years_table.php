@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('era_id')->constrained('eras')->cascadeOnDelete();
             $table->integer('year');
             $table->string('title');
+            $table->text('summary')->nullable(); // rangkuman wabah, pindah dari content_blocks (per section) ke sini (per wabah) — R-CMS-03/04 lama dihapus
             $table->timestamps();
 
             // Kombinasi era_id + year unique, sesuai catatan Schema.md

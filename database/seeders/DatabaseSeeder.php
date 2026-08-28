@@ -13,7 +13,8 @@ class DatabaseSeeder extends Seeder
             EraSeeder::class,
             YearSeeder::class,
             SectionSeeder::class,
-            FigureSeeder::class,
+            VaccineSeeder::class,
+            QuizSeeder::class,
         ]);
     }
 }
