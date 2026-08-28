@@ -25,14 +25,18 @@ Route::prefix('auth')->group(function () {
     Route::get('google/redirect', [AuthController::class, 'googleRedirect']);
     Route::get('google/callback', [AuthController::class, 'googleCallback']);
 
+    // Dipindah keluar dari group auth:sanctum karena link ini diklik dari email
+    // di browser (tidak membawa Sanctum token). Keamanannya dijamin oleh
+    // middleware 'signed' (expires + signature) dan validasi hash di controller.
+    Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->middleware(['signed'])
+        ->name('verification.verify');
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
 
         Route::post('email/verify/resend', [EmailVerificationController::class, 'resend']);
-        Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
-            ->middleware(['signed'])
-            ->name('verification.verify');
     });
 });
 
