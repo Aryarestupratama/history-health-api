@@ -16,7 +16,7 @@ class StoreSectionRequest extends FormRequest
         return [
             'year_id' => 'required|exists:years,id',
             'title' => 'required|string|max:255',
-            'quiz_link' => 'nullable|url',
+            'order' => 'nullable|integer|min:1', // jika kosong, auto-assign urutan berikutnya di controller
             // is_published TIDAK divalidasi di sini — section baru selalu draft dulu (R-ADMIN-03)
         ];
     }

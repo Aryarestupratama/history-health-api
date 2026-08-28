@@ -16,7 +16,7 @@ class UpdateSectionRequest extends FormRequest
         return [
             'year_id' => 'sometimes|required|exists:years,id',
             'title' => 'sometimes|required|string|max:255',
-            'quiz_link' => 'nullable|url',
+            'order' => 'sometimes|required|integer|min:1',
             'is_published' => 'sometimes|boolean',
         ];
     }

@@ -13,6 +13,14 @@ class SectionSeeder extends Seeder
         $year1918 = Year::where('year', 1918)->first();
         $year2020 = Year::where('year', 2020)->first();
 
+        $year1918->update([
+            'summary' => 'Wabah Flu Spanyol tahun 1918 menjadi salah satu pandemi paling mematikan yang pernah tercatat di Hindia Belanda, menewaskan ratusan ribu jiwa dan mengubah pendekatan sanitasi serta layanan kesehatan kolonial pada masa itu.',
+        ]);
+
+        $year2020->update([
+            'summary' => 'Pandemi COVID-19 yang masuk ke Indonesia pada awal 2020 mendorong transformasi besar dalam sistem kesehatan nasional, mulai dari protokol kesehatan masyarakat hingga percepatan pengembangan dan distribusi vaksin.',
+        ]);
+
         $section1918 = Section::updateOrCreate(
             ['year_id' => $year1918->id, 'title' => 'Flu Spanyol di Hindia Belanda'],
             [

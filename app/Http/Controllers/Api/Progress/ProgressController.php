@@ -29,7 +29,9 @@ class ProgressController extends Controller
                 ? 'Section marked as completed.'
                 : 'Section was already completed.',
             'completed_at' => $result['progress']->completed_at,
-            'newly_unlocked_figure_ids' => $result['newly_unlocked']->values(),
+            // R-VAC-01/02: unlock kini terjadi di level year (via YearCompletionService),
+            // bukan lagi langsung per section — lihat ProgressService::completeSection().
+            'newly_unlocked_vaccine_ids' => $result['newly_unlocked']->values(),
         ]);
     }
 }

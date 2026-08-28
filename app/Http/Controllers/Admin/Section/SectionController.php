@@ -5,17 +5,11 @@ namespace App\Http\Controllers\Admin\Section;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Section\StoreSectionRequest;
 use App\Http\Requests\Admin\Section\UpdateSectionRequest;
-use App\Http\Requests\Admin\Figure\AssignFiguresRequest;
 use App\Models\Section;
-use App\Services\Content\SectionOrderingService;
 use Illuminate\Http\Request;
 
 class SectionController extends Controller
 {
-    public function __construct(
-        protected SectionOrderingService $ordering
-    ) {}
-
     public function index(Request $request)
     {
         $query = Section::query()->with('year');
@@ -30,8 +24,14 @@ class SectionController extends Controller
 
     public function store(StoreSectionRequest $request)
     {
+        $data = $request->validated();
+
+        // R-SECT-01: sequential unlock bergantung pada `order`. Jika admin
+        // tidak mengisi manual, auto-assign urutan berikutnya dalam year tsb.
+        $data['order'] ??= Section::where('year_id', $data['year_id'])->max('order') + 1;
+
         $section = Section::create([
-            ...$request->validated(),
+            ...$data,
             'is_published' => false, // selalu draft saat dibuat (R-ADMIN-03)
         ]);
 
@@ -40,23 +40,15 @@ class SectionController extends Controller
 
     public function show(Section $section)
     {
-        return $section->load(['contentBlocks', 'figures', 'year.era']);
+        // R-SECT-05: admin selalu bisa melihat seluruh section apa pun status lock-nya.
+        return $section->load(['contentBlocks', 'year.era']);
     }
 
     public function update(UpdateSectionRequest $request, Section $section)
     {
-        $data = $request->validated();
-
-        // R-CMS-04: jika admin mencoba publish, cek dulu ada blok summary
-        if (($data['is_published'] ?? false) === true && !$section->is_published) {
-            $message = $this->ordering->publishValidationMessage($section);
-
-            if ($message) {
-                return response()->json(['message' => $message], 422);
-            }
-        }
-
-        $section->update($data);
+        // Tidak ada lagi syarat blok `summary` sebelum publish (R-CMS-03/04
+        // sudah dihapus). Publish section kini murni toggle is_published.
+        $section->update($request->validated());
 
         return $section;
     }
@@ -66,12 +58,5 @@ class SectionController extends Controller
         $section->delete();
 
         return response()->json(null, 204);
-    }
-
-    public function assignFigures(AssignFiguresRequest $request, Section $section)
-    {
-        $section->figures()->sync($request->input('figure_ids'));
-
-        return $section->load('figures');
     }
 }

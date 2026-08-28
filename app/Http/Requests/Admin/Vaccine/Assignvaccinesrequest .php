@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests\Admin\Figure;
+namespace App\Http\Requests\Admin\Year;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class AssignFiguresRequest extends FormRequest
+class AssignVaccinesRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,8 +14,8 @@ class AssignFiguresRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'figure_ids' => 'required|array',
-            'figure_ids.*' => 'required|integer|exists:figures,id',
+            'vaccine_ids' => 'present|array',
+            'vaccine_ids.*' => 'exists:vaccines,id',
         ];
     }
 }
