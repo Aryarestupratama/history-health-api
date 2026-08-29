@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Landmark, FileStack, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Landmark, FileStack, Syringe, HelpCircle, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { APP_NAME, APP_SHORT_INITIALS } from '@/config/branding';
@@ -10,13 +10,16 @@ import Dashboard from './pages/Dashboard';
 import EraYearManager from './pages/EraYearManager';
 import SectionManager from './pages/SectionManager';
 import SectionWorkspace from './pages/SectionWorkspace';
-import FigureManager from './pages/FigureManager';
+import VaccineManager from './pages/VaccineManager';
+import QuizManager from './pages/QuizManager';
 
+// "Tokoh" -> "Vaksin" (Architecture.md §4.8), tambah menu "Kuis" (Design.md §4)
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/eras', label: 'Era & Tahun', icon: Landmark },
   { to: '/sections', label: 'Section', icon: FileStack },
-  { to: '/figures', label: 'Tokoh', icon: Users },
+  { to: '/quizzes', label: 'Kuis', icon: HelpCircle },
+  { to: '/vaccines', label: 'Vaksin', icon: Syringe },
 ];
 
 function initials(name) {
@@ -129,10 +132,18 @@ export default function App() {
             }
           />
           <Route
-            path="/figures"
+            path="/quizzes"
             element={
               <ProtectedRoute>
-                <Layout><FigureManager /></Layout>
+                <Layout><QuizManager /></Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vaccines"
+            element={
+              <ProtectedRoute>
+                <Layout><VaccineManager /></Layout>
               </ProtectedRoute>
             }
           />

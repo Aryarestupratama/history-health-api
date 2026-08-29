@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Landmark, FileStack, Users, ArrowRight } from 'lucide-react';
+import { Landmark, FileStack, HelpCircle, Syringe, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
@@ -8,21 +8,28 @@ const SHORTCUTS = [
     to: '/eras',
     icon: Landmark,
     title: 'Kelola Era & Tahun',
-    description: 'Atur 3 masa (Kolonial, Kemerdekaan, Modern) dan tahun-tahun wabah di dalamnya.',
+    description: 'Atur 3 masa (Kolonial, Kemerdekaan, Modern), tahun-tahun wabah, dan rangkumannya.',
     accent: 'bg-secondary text-foreground',
   },
   {
     to: '/sections',
     icon: FileStack,
     title: 'Kelola Section',
-    description: 'Susun informasi sejarah per tahun: blok konten, urutan, dan link kuis.',
+    description: 'Susun informasi sejarah per tahun: blok konten & urutan (sequential unlock).',
     accent: 'bg-secondary text-foreground',
   },
   {
-    to: '/figures',
-    icon: Users,
-    title: 'Kelola Tokoh',
-    description: 'Data tokoh sejarah untuk collectible card di aplikasi mobile.',
+    to: '/quizzes',
+    icon: HelpCircle,
+    title: 'Kelola Kuis',
+    description: 'Kuis custom internal per wabah — maks. 5 soal, wajib dikerjakan, tanpa skor.',
+    accent: 'bg-secondary text-foreground',
+  },
+  {
+    to: '/vaccines',
+    icon: Syringe,
+    title: 'Kelola Vaksin',
+    description: 'Data vaksin untuk collectible card di aplikasi mobile.',
     accent: 'bg-gamify/10 text-gamify',
   },
 ];

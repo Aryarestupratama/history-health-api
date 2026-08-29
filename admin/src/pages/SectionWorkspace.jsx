@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, GripVertical, Plus, X, Pencil, Trash2, Users, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, GripVertical, Plus, X, Pencil, Trash2, Syringe, Eye, EyeOff, HelpCircle } from 'lucide-react';
 import api from '../api';
 import { cn } from '@/lib/utils';
 import { getEraAccent } from '@/config/branding';
@@ -14,12 +14,13 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useConfirm } from '@/components/confirm-dialog';
 
+// Tipe summary dihapus dari content_blocks (rangkuman sekarang di
+// years.summary, Rules.md R-YEAR-01 / Architecture.md §4.2).
 const BLOCK_TYPES = [
   { value: 'text', label: 'Teks' },
   { value: 'image', label: 'Gambar (link Google Drive)' },
   { value: 'video', label: 'Video (link YouTube)' },
   { value: 'pdf', label: 'PDF (link Google Drive)' },
-  { value: 'summary', label: 'Rangkuman' },
 ];
 
 function contentPlaceholder(type) {
@@ -34,20 +35,13 @@ function contentPlaceholder(type) {
   }
 }
 
-// Pastikan blok summary selalu di posisi terakhir sebelum dikirim ke backend (R-CMS-03).
-// Backend juga memvalidasi/menormalisasi ini — ini cuma cegah round-trip yang salah kirim.
-function withSummaryLast(blocks) {
-  const summaries = blocks.filter((b) => b.type === 'summary');
-  const rest = blocks.filter((b) => b.type !== 'summary');
-  return [...rest, ...summaries];
-}
-
-// Workspace gabungan: satu halaman per Tahun ("1 informasi"). Sidebar kiri
-// mengelola daftar Section di tahun ini. Kolom tengah menampilkan blok
-// konten HANYA milik section yang lagi dipilih di sidebar. Kolom kanan
-// (Tokoh Terkait) juga mengikuti section yang dipilih -- bukan digabung
-// se-tahun ataupun dipecah per-blok, karena relasi tokoh memang di level
-// section (section_figure pivot, lihat Schema.md).
+// Workspace gabungan: satu halaman per Tahun ("1 wabah"). Sidebar kiri
+// mengelola daftar Section di tahun ini (urutan = sequential unlock,
+// Architecture.md §4.7). Kolom tengah menampilkan blok konten HANYA milik
+// section yang lagi dipilih di sidebar. Kolom kanan sekarang berisi
+// Rangkuman Wabah (years.summary) + Vaksin Terkait (year_vaccine) + akses ke
+// Kelola Kuis — semuanya di level TAHUN, bukan lagi per-section, karena
+// relasi vaksin/kuis/rangkuman sudah naik level (Architecture.md §4.8).
 export default function SectionWorkspace() {
   const { yearId } = useParams();
   const navigate = useNavigate();
@@ -59,8 +53,13 @@ export default function SectionWorkspace() {
   const [selectedSectionId, setSelectedSectionId] = useState(null);
 
   const [blocks, setBlocks] = useState([]);
-  const [figures, setFigures] = useState([]);
-  const [assignedFigureIds, setAssignedFigureIds] = useState([]);
+
+  // ---- level TAHUN: rangkuman & vaksin (bukan lagi level section) ----
+  const [summaryDraft, setSummaryDraft] = useState('');
+  const [savingSummary, setSavingSummary] = useState(false);
+  const [vaccines, setVaccines] = useState([]);
+  const [assignedVaccineIds, setAssignedVaccineIds] = useState([]);
+  const [savingVaccines, setSavingVaccines] = useState(false);
 
   const [loadingContext, setLoadingContext] = useState(true);
   const [loadingSections, setLoadingSections] = useState(true);
@@ -68,7 +67,7 @@ export default function SectionWorkspace() {
   const [error, setError] = useState(null);
   const [savingOrder, setSavingOrder] = useState(false);
 
-  const [sectionForm, setSectionForm] = useState({ title: '', quiz_link: '' });
+  const [sectionForm, setSectionForm] = useState({ title: '' });
   const [editingSectionId, setEditingSectionId] = useState(null);
   const [showSectionForm, setShowSectionForm] = useState(false);
 
@@ -81,7 +80,7 @@ export default function SectionWorkspace() {
   useEffect(() => {
     loadYearContext();
     loadSections();
-    loadFigures();
+    loadVaccines();
     // reset seleksi & form saat pindah tahun
     setSelectedSectionId(null);
     resetSectionForm();
@@ -94,7 +93,6 @@ export default function SectionWorkspace() {
       loadSectionDetail(selectedSectionId);
     } else {
       setBlocks([]);
-      setAssignedFigureIds([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId]);
@@ -104,6 +102,9 @@ export default function SectionWorkspace() {
     try {
       const yearRes = await api.get(`/admin/years/${yearId}`);
       setYear(yearRes.data);
+      setSummaryDraft(yearRes.data.summary || '');
+      // YearController::show() sudah eager-load relasi `vaccines` (progress.md)
+      setAssignedVaccineIds((yearRes.data.vaccines || []).map((v) => v.id));
       const eraRes = await api.get(`/admin/eras/${yearRes.data.era_id}`);
       setEra(eraRes.data);
     } catch (err) {
@@ -130,24 +131,20 @@ export default function SectionWorkspace() {
     }
   }
 
-  async function loadFigures() {
+  async function loadVaccines() {
     try {
-      const res = await api.get('/admin/figures');
-      setFigures(res.data);
+      const res = await api.get('/admin/vaccines');
+      setVaccines(res.data);
     } catch (err) {
-      setError('Gagal memuat daftar tokoh.');
+      setError('Gagal memuat daftar vaksin.');
     }
   }
 
   async function loadSectionDetail(sectionId) {
     setLoadingSectionDetail(true);
     try {
-      const [sectionRes, blocksRes] = await Promise.all([
-        api.get(`/admin/sections/${sectionId}`),
-        api.get(`/admin/sections/${sectionId}/content-blocks`),
-      ]);
+      const blocksRes = await api.get(`/admin/sections/${sectionId}/content-blocks`);
       setBlocks([...blocksRes.data].sort((a, b) => a.order - b.order));
-      setAssignedFigureIds((sectionRes.data.figures || []).map((f) => f.id));
     } catch (err) {
       setError('Gagal memuat detail section.');
     } finally {
@@ -171,10 +168,12 @@ export default function SectionWorkspace() {
     e.preventDefault();
     setError(null);
     try {
-      const payload = { year_id: Number(yearId), title: sectionForm.title, quiz_link: sectionForm.quiz_link || null };
+      const payload = { year_id: Number(yearId), title: sectionForm.title };
       if (editingSectionId) {
         await api.put(`/admin/sections/${editingSectionId}`, payload);
       } else {
+        // `order` tidak dikirim -> backend auto-assign urutan berikutnya
+        // dalam year ini (SectionController::store(), progress.md)
         const res = await api.post('/admin/sections', payload);
         setSelectedSectionId(res.data.id);
       }
@@ -187,13 +186,13 @@ export default function SectionWorkspace() {
 
   function startEditSection(section) {
     setEditingSectionId(section.id);
-    setSectionForm({ title: section.title, quiz_link: section.quiz_link || '' });
+    setSectionForm({ title: section.title });
     setShowSectionForm(true);
   }
 
   function resetSectionForm() {
     setEditingSectionId(null);
-    setSectionForm({ title: '', quiz_link: '' });
+    setSectionForm({ title: '' });
     setShowSectionForm(false);
   }
 
@@ -212,13 +211,14 @@ export default function SectionWorkspace() {
     }
   }
 
-  // R-CMS-04: publish ditolak backend kalau belum ada blok summary — pesan error ditangkap dari response
+  // Publish section sekarang tidak lagi butuh blok summary (R-CMS-03/04
+  // sudah dihapus) — syarat "year completed" yang butuh kuis & rangkuman
+  // ada di level lain (R-QUIZ-05, R-PROG-07).
   async function togglePublish(section) {
     setError(null);
     try {
       await api.put(`/admin/sections/${section.id}`, {
         title: section.title,
-        quiz_link: section.quiz_link,
         is_published: !section.is_published,
       });
       loadSections();
@@ -273,7 +273,7 @@ export default function SectionWorkspace() {
     }
   }
 
-  // ---------- DRAG & DROP REORDER (R-CMS-02/03) ----------
+  // ---------- DRAG & DROP REORDER (R-CMS-02) ----------
   function handleDragStart(index) {
     dragIndex.current = index;
   }
@@ -291,14 +291,14 @@ export default function SectionWorkspace() {
     const [moved] = reordered.splice(from, 1);
     reordered.splice(index, 0, moved);
 
-    setBlocks(withSummaryLast(reordered));
+    setBlocks(reordered);
   }
 
   async function saveOrder() {
     setSavingOrder(true);
     setError(null);
     try {
-      const orderedIds = withSummaryLast(blocks).map((b) => b.id);
+      const orderedIds = blocks.map((b) => b.id);
       const res = await api.post(`/admin/sections/${selectedSectionId}/content-blocks/reorder`, {
         block_ids: orderedIds,
       });
@@ -311,28 +311,48 @@ export default function SectionWorkspace() {
     }
   }
 
-  // ---------- TOKOH TERKAIT (kanan, ikut section yang dipilih di sidebar) ----------
-  function toggleFigure(figureId) {
-    setAssignedFigureIds((prev) =>
-      prev.includes(figureId) ? prev.filter((id) => id !== figureId) : [...prev, figureId]
+  // ---------- RANGKUMAN WABAH (years.summary, R-YEAR-01) ----------
+  async function saveSummary() {
+    setSavingSummary(true);
+    setError(null);
+    try {
+      const res = await api.put(`/admin/years/${yearId}`, {
+        era_id: year.era_id,
+        year: year.year,
+        title: year.title,
+        summary: summaryDraft,
+      });
+      setYear(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal menyimpan rangkuman.');
+    } finally {
+      setSavingSummary(false);
+    }
+  }
+
+  // ---------- VAKSIN TERKAIT (year_vaccine, CMS-05) ----------
+  function toggleVaccine(vaccineId) {
+    setAssignedVaccineIds((prev) =>
+      prev.includes(vaccineId) ? prev.filter((id) => id !== vaccineId) : [...prev, vaccineId]
     );
   }
 
-  async function saveFigures() {
-    if (!selectedSectionId) return;
+  async function saveVaccines() {
+    setSavingVaccines(true);
     setError(null);
     try {
-      const res = await api.post(`/admin/sections/${selectedSectionId}/assign-figures`, {
-        figure_ids: assignedFigureIds,
+      const res = await api.post(`/admin/years/${yearId}/assign-vaccines`, {
+        vaccine_ids: assignedVaccineIds,
       });
-      setAssignedFigureIds((res.data.figures || []).map((f) => f.id));
+      setAssignedVaccineIds((res.data.vaccines || []).map((v) => v.id));
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan tokoh terkait.');
+      setError(err.response?.data?.message || 'Gagal menyimpan vaksin terkait.');
+    } finally {
+      setSavingVaccines(false);
     }
   }
 
   const selectedSection = sections.find((s) => s.id === selectedSectionId) || null;
-  const hasSummary = blocks.some((b) => b.type === 'summary');
   const accent = era ? getEraAccent(era.slug) : null;
 
   return (
@@ -345,17 +365,27 @@ export default function SectionWorkspace() {
         {loadingContext ? (
           <p className="text-sm text-muted-foreground">Memuat...</p>
         ) : (
-          <>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {year ? `${year.year} — ${year.title}` : `Tahun #${yearId}`}
-            </h1>
-            {era && (
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: accent.hex }} />
-                {era.name}
-              </p>
-            )}
-          </>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {year ? `${year.year} — ${year.title}` : `Tahun #${yearId}`}
+              </h1>
+              {era && (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: accent.hex }} />
+                  {era.name}
+                </p>
+              )}
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/quizzes?year=${yearId}`)}>
+              <HelpCircle className="h-4 w-4" /> Kelola Kuis
+              {year?.quiz && (
+                <Badge variant={year.quiz.is_published ? 'success' : 'secondary'} className="ml-1">
+                  {year.quiz.is_published ? 'Published' : 'Draft'}
+                </Badge>
+              )}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -393,17 +423,10 @@ export default function SectionWorkspace() {
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Link Kuis (opsional)</Label>
-                  <Input
-                    value={sectionForm.quiz_link}
-                    onChange={(e) => setSectionForm({ ...sectionForm, quiz_link: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
                 {!editingSectionId && (
                   <p className="text-xs text-muted-foreground">
-                    Section baru selalu draft (R-ADMIN-03). Publish setelah minimal 1 blok Rangkuman terisi (R-CMS-04).
+                    Section baru selalu draft (R-ADMIN-03) & otomatis mendapat urutan berikutnya
+                    (dasar sequential unlock, R-SECT-01).
                   </p>
                 )}
                 <div className="flex gap-2 pt-1">
@@ -429,6 +452,7 @@ export default function SectionWorkspace() {
                   >
                     <button onClick={() => setSelectedSectionId(section.id)} className="w-full text-left">
                       <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-xs font-mono text-muted-foreground">#{section.order}</span>
                         <p className="min-w-0 flex-1 truncate text-sm font-medium">{section.title}</p>
                         <Badge variant={section.is_published ? 'success' : 'secondary'} className="shrink-0">
                           {section.is_published ? 'Published' : 'Draft'}
@@ -461,8 +485,7 @@ export default function SectionWorkspace() {
               <CardDescription className="mt-1">
                 {!selectedSectionId
                   ? 'Pilih section di kiri untuk mengelola blok kontennya.'
-                  : 'Drag baris untuk mengurutkan. Blok "Rangkuman" otomatis dipaksa ke posisi terakhir (R-CMS-03).'}
-                {selectedSectionId && !hasSummary && ' Section wajib punya minimal 1 blok Rangkuman sebelum bisa di-publish (R-CMS-04).'}
+                  : 'Drag baris untuk mengurutkan (R-CMS-02).'}
               </CardDescription>
             </div>
             {selectedSectionId && !showBlockForm && (
@@ -505,7 +528,7 @@ export default function SectionWorkspace() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Konten</Label>
-                      {blockForm.type === 'text' || blockForm.type === 'summary' ? (
+                      {blockForm.type === 'text' ? (
                         <Textarea
                           value={blockForm.content}
                           onChange={(e) => setBlockForm({ ...blockForm, content: e.target.value })}
@@ -540,10 +563,7 @@ export default function SectionWorkspace() {
                           onDragStart={() => handleDragStart(index)}
                           onDragOver={handleDragOver}
                           onDrop={() => handleDrop(index)}
-                          className={cn(
-                            'flex items-start gap-2 rounded-lg border p-3 cursor-grab active:cursor-grabbing',
-                            block.type === 'summary' ? 'border-warning/30 bg-warning/5' : 'bg-background'
-                          )}
+                          className="flex items-start gap-2 rounded-lg border bg-background p-3 cursor-grab active:cursor-grabbing"
                         >
                           <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                           <div className="min-w-0 flex-1">
@@ -576,53 +596,81 @@ export default function SectionWorkspace() {
           </CardContent>
         </Card>
 
-        {/* ---------- KANAN: TOKOH TERKAIT — ikut section yang dipilih, bukan per-tahun/per-block ---------- */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gamify/10 text-gamify">
-                <Users className="h-3.5 w-3.5" />
-              </span>
-              Tokoh Terkait
-            </CardTitle>
-            <CardDescription>
-              {!selectedSectionId
-                ? 'Pilih section di kiri dulu.'
-                : `CMS-05 — tokoh untuk section "${selectedSection?.title}". Otomatis ter-unlock di app saat section ini selesai dibaca.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!selectedSectionId ? (
-              <p className="text-sm text-muted-foreground">—</p>
-            ) : figures.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Belum ada data tokoh. Tambahkan dulu di{' '}
-                <Link to="/figures" className="font-medium text-foreground underline underline-offset-2">
-                  Kelola Tokoh
-                </Link>.
-              </p>
-            ) : (
-              <>
-                <ul className="max-h-80 space-y-1 overflow-y-auto pr-1">
-                  {figures.map((figure) => (
-                    <li key={figure.id}>
-                      <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-secondary/50">
-                        <input
-                          type="checkbox"
-                          checked={assignedFigureIds.includes(figure.id)}
-                          onChange={() => toggleFigure(figure.id)}
-                          className="h-4 w-4 rounded border-input accent-foreground"
-                        />
-                        {figure.name}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-                <Button onClick={saveFigures} size="sm" className="mt-3">Simpan Tokoh Terkait</Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        {/* ---------- KANAN: RANGKUMAN WABAH & VAKSIN TERKAIT — level TAHUN ---------- */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Rangkuman Wabah</CardTitle>
+              <CardDescription>
+                years.summary (R-YEAR-01) — wajib terisi sebelum kuis tahun ini bisa di-publish (R-QUIZ-05).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loadingContext ? (
+                <p className="text-sm text-muted-foreground">Memuat...</p>
+              ) : (
+                <>
+                  <Textarea
+                    value={summaryDraft}
+                    onChange={(e) => setSummaryDraft(e.target.value)}
+                    rows={6}
+                    placeholder="Rangkuman wabah ini, ditampilkan setelah semua section selesai dibaca (INFO-04)..."
+                  />
+                  <Button size="sm" onClick={saveSummary} disabled={savingSummary}>
+                    {savingSummary ? 'Menyimpan...' : 'Simpan Rangkuman'}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gamify/10 text-gamify">
+                  <Syringe className="h-3.5 w-3.5" />
+                </span>
+                Vaksin Terkait
+              </CardTitle>
+              <CardDescription>
+                CMS-05 — vaksin untuk tahun ini (year_vaccine). Semua ter-unlock bersamaan saat status
+                &quot;year completed&quot; tercapai (R-VAC-01/02): seluruh section published selesai dibaca
+                DAN kuis tahun ini sudah dikerjakan.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {vaccines.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Belum ada data vaksin. Tambahkan dulu di{' '}
+                  <Link to="/vaccines" className="font-medium text-foreground underline underline-offset-2">
+                    Kelola Vaksin
+                  </Link>.
+                </p>
+              ) : (
+                <>
+                  <ul className="max-h-80 space-y-1 overflow-y-auto pr-1">
+                    {vaccines.map((vaccine) => (
+                      <li key={vaccine.id}>
+                        <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-secondary/50">
+                          <input
+                            type="checkbox"
+                            checked={assignedVaccineIds.includes(vaccine.id)}
+                            onChange={() => toggleVaccine(vaccine.id)}
+                            className="h-4 w-4 rounded border-input accent-foreground"
+                          />
+                          {vaccine.name}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button onClick={saveVaccines} size="sm" className="mt-3" disabled={savingVaccines}>
+                    {savingVaccines ? 'Menyimpan...' : 'Simpan Vaksin Terkait'}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

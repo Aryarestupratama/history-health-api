@@ -9,43 +9,22 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useConfirm } from '@/components/confirm-dialog';
 
+// Menggantikan FigureManager.jsx (Architecture.md §4.8 — collectible card:
+// tokoh -> vaksin). Field mengikuti migrasi `vaccines` (progress.md):
+// name, photo, manufacturer, disease_target, year_introduced, description.
 const EMPTY_FORM = {
   name: '',
   photo: '',
-  birth_date: '',
-  death_date: '',
-  family: '',
-  role_description: '',
+  manufacturer: '',
+  disease_target: '',
+  year_introduced: '',
+  description: '',
 };
 
-const MONTHS_ID = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-];
-
-// Backend (Figure model) sekarang cast tanggal sebagai 'date:Y-m-d', jadi
-// harusnya sudah kirim "1886-03-03" murni. Tapi tetap di-slice defensif di
-// sini seandainya ada response lama/lain yang masih format ISO datetime
-// penuh ("...T16:52:48.000000Z") — <input type="date"> butuh persis
-// "YYYY-MM-DD" atau field-nya akan kosong.
-function toDateInputValue(value) {
-  if (!value) return '';
-  return String(value).slice(0, 10);
-}
-
-// Format tampilan list: "1886-03-03" -> "03 Maret 1886"
-function formatDateID(value) {
-  if (!value) return null;
-  const isoPart = String(value).slice(0, 10);
-  const [y, m, d] = isoPart.split('-').map(Number);
-  if (!y || !m || !d || !MONTHS_ID[m - 1]) return isoPart;
-  return `${String(d).padStart(2, '0')} ${MONTHS_ID[m - 1]} ${y}`;
-}
-
-export default function FigureManager() {
+export default function VaccineManager() {
   const { confirm, dialog } = useConfirm();
 
-  const [figures, setFigures] = useState([]);
+  const [vaccines, setVaccines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -54,17 +33,17 @@ export default function FigureManager() {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    fetchFigures();
+    fetchVaccines();
   }, []);
 
-  async function fetchFigures() {
+  async function fetchVaccines() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/admin/figures');
-      setFigures(res.data);
+      const res = await api.get('/admin/vaccines');
+      setVaccines(res.data);
     } catch (err) {
-      setError('Gagal memuat daftar tokoh.');
+      setError('Gagal memuat daftar vaksin.');
     } finally {
       setLoading(false);
     }
@@ -82,32 +61,32 @@ export default function FigureManager() {
       const payload = {
         name: form.name,
         photo: form.photo || null,
-        birth_date: form.birth_date || null,
-        death_date: form.death_date || null,
-        family: form.family || null,
-        role_description: form.role_description,
+        manufacturer: form.manufacturer || null,
+        disease_target: form.disease_target,
+        year_introduced: form.year_introduced ? Number(form.year_introduced) : null,
+        description: form.description,
       };
       if (editingId) {
-        await api.put(`/admin/figures/${editingId}`, payload);
+        await api.put(`/admin/vaccines/${editingId}`, payload);
       } else {
-        await api.post('/admin/figures', payload);
+        await api.post('/admin/vaccines', payload);
       }
       resetForm();
-      fetchFigures();
+      fetchVaccines();
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan tokoh.');
+      setError(err.response?.data?.message || 'Gagal menyimpan vaksin.');
     }
   }
 
-  function startEdit(figure) {
-    setEditingId(figure.id);
+  function startEdit(vaccine) {
+    setEditingId(vaccine.id);
     setForm({
-      name: figure.name || '',
-      photo: figure.photo || '',
-      birth_date: toDateInputValue(figure.birth_date),
-      death_date: toDateInputValue(figure.death_date),
-      family: figure.family || '',
-      role_description: figure.role_description || '',
+      name: vaccine.name || '',
+      photo: vaccine.photo || '',
+      manufacturer: vaccine.manufacturer || '',
+      disease_target: vaccine.disease_target || '',
+      year_introduced: vaccine.year_introduced != null ? String(vaccine.year_introduced) : '',
+      description: vaccine.description || '',
     });
     setShowForm(true);
   }
@@ -118,17 +97,17 @@ export default function FigureManager() {
     setShowForm(false);
   }
 
-  async function handleDelete(figure) {
+  async function handleDelete(vaccine) {
     const ok = await confirm({
-      title: `Hapus tokoh "${figure.name}"?`,
-      description: 'Ini juga akan melepas relasinya dari semua section. Tindakan ini tidak bisa dibatalkan.',
+      title: `Hapus vaksin "${vaccine.name}"?`,
+      description: 'Ini juga akan melepas relasinya dari semua tahun (wabah) terkait. Tindakan ini tidak bisa dibatalkan.',
     });
     if (!ok) return;
     try {
-      await api.delete(`/admin/figures/${figure.id}`);
-      fetchFigures();
+      await api.delete(`/admin/vaccines/${vaccine.id}`);
+      fetchVaccines();
     } catch (err) {
-      setError('Gagal menghapus tokoh.');
+      setError('Gagal menghapus vaksin.');
     }
   }
 
@@ -137,14 +116,15 @@ export default function FigureManager() {
       {dialog}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Kelola Tokoh</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Kelola Vaksin</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Data tokoh sejarah untuk collectible card di aplikasi mobile.
+            Data vaksin untuk collectible card di aplikasi mobile. Assign ke tahun (wabah) dilakukan
+            di halaman workspace tahun (VAC-01–03).
           </p>
         </div>
         {!showForm && (
           <Button onClick={openAddForm}>
-            <Plus className="h-4 w-4" /> Tambah Tokoh
+            <Plus className="h-4 w-4" /> Tambah Vaksin
           </Button>
         )}
       </div>
@@ -158,7 +138,7 @@ export default function FigureManager() {
       {showForm && (
         <Card className="max-w-xl">
           <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>{editingId ? 'Edit Tokoh' : 'Tokoh Baru'}</CardTitle>
+            <CardTitle>{editingId ? 'Edit Vaksin' : 'Vaksin Baru'}</CardTitle>
             <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={resetForm}>
               <X className="h-3.5 w-3.5" />
             </Button>
@@ -166,7 +146,7 @@ export default function FigureManager() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Nama</Label>
+                <Label>Nama Vaksin</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
               <div className="space-y-1.5">
@@ -179,41 +159,41 @@ export default function FigureManager() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label>Tanggal Lahir</Label>
+                  <Label>Produsen</Label>
                   <Input
-                    type="date"
-                    value={form.birth_date}
-                    onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
+                    value={form.manufacturer}
+                    onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Tanggal Wafat</Label>
+                  <Label>Tahun Diperkenalkan</Label>
                   <Input
-                    type="date"
-                    value={form.death_date}
-                    onChange={(e) => setForm({ ...form, death_date: e.target.value })}
+                    type="number"
+                    value={form.year_introduced}
+                    onChange={(e) => setForm({ ...form, year_introduced: e.target.value })}
+                    placeholder="mis. 1955"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Keluarga</Label>
-                <Textarea
-                  value={form.family}
-                  onChange={(e) => setForm({ ...form, family: e.target.value })}
-                  rows={3}
+                <Label>Penyakit Target</Label>
+                <Input
+                  value={form.disease_target}
+                  onChange={(e) => setForm({ ...form, disease_target: e.target.value })}
+                  required
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Peran dalam Dunia Kesehatan</Label>
+                <Label>Deskripsi Peran dalam Sejarah Kesehatan</Label>
                 <Textarea
-                  value={form.role_description}
-                  onChange={(e) => setForm({ ...form, role_description: e.target.value })}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={4}
                   required
                 />
               </div>
               <div className="flex gap-2 pt-1">
-                <Button type="submit">{editingId ? 'Update Tokoh' : 'Tambah Tokoh'}</Button>
+                <Button type="submit">{editingId ? 'Update Vaksin' : 'Tambah Vaksin'}</Button>
                 <Button type="button" variant="outline" onClick={resetForm}>Batal</Button>
               </div>
             </form>
@@ -223,33 +203,35 @@ export default function FigureManager() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Memuat...</p>
-      ) : figures.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Belum ada tokoh.</p>
+      ) : vaccines.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Belum ada vaksin.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {figures.map((figure) => (
-            <Card key={figure.id}>
+          {vaccines.map((vaccine) => (
+            <Card key={vaccine.id}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{figure.name}</p>
-                    {(figure.birth_date || figure.death_date) && (
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateID(figure.birth_date) || '?'} – {formatDateID(figure.death_date) || '?'}
-                      </p>
+                    <p className="truncate font-medium">{vaccine.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {vaccine.disease_target}
+                      {vaccine.year_introduced ? ` · ${vaccine.year_introduced}` : ''}
+                    </p>
+                    {vaccine.manufacturer && (
+                      <p className="text-xs text-muted-foreground">{vaccine.manufacturer}</p>
                     )}
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(figure)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(vaccine)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(figure)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(vaccine)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
-                {figure.role_description && (
-                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{figure.role_description}</p>
+                {vaccine.description && (
+                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{vaccine.description}</p>
                 )}
               </CardContent>
             </Card>
