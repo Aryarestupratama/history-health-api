@@ -73,6 +73,22 @@ class SectionController extends Controller
 
         $ids = $request->input('section_ids');
 
+        // Guard eksplisit: tolak kalau ada section_id yang bukan milik year ini,
+        // daripada diam-diam di-skip (silent skip bikin bug frontend/drag-drop
+        // susah dilacak karena tidak ada sinyal error sama sekali).
+        $ownedCount = Section::where('year_id', $yearId)
+            ->whereIn('id', $ids)
+            ->count();
+
+        if ($ownedCount !== count($ids)) {
+            return response()->json([
+                'message' => 'Satu atau lebih section_id tidak ditemukan dalam year ini.',
+                'errors' => [
+                    'section_ids' => ['Semua section_id harus milik year yang sama dengan yang direorder.'],
+                ],
+            ], 422);
+        }
+
         DB::transaction(function () use ($ids, $yearId) {
             // Step 1: geser semua order ke angka besar dulu (hindari collision
             // dengan unique constraint saat swap di tengah proses)
@@ -83,7 +99,7 @@ class SectionController extends Controller
             // Step 2: assign order final sesuai urutan yang dikirim dari frontend
             foreach ($ids as $index => $sectionId) {
                 Section::where('id', $sectionId)
-                    ->where('year_id', $yearId) // guard: section harus milik year ini
+                    ->where('year_id', $yearId) // guard tambahan, sekarang jadi belt-and-suspenders
                     ->update(['order' => $index + 1]);
             }
         });
