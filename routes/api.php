@@ -54,6 +54,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     Route::apiResource('sections', AdminSectionController::class);
 
+    Route::put('years/{year}/sections/reorder', [AdminSectionController::class, 'reorder']);
+
     Route::get('sections/{section}/content-blocks', [ContentBlockController::class, 'index']);
     Route::post('sections/{section}/content-blocks', [ContentBlockController::class, 'store']);
     Route::patch('sections/{section}/content-blocks/{contentBlock}', [ContentBlockController::class, 'update']);

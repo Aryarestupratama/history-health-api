@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\Section\StoreSectionRequest;
 use App\Http\Requests\Admin\Section\UpdateSectionRequest;
 use App\Models\Section;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SectionController extends Controller
 {
@@ -19,21 +20,27 @@ class SectionController extends Controller
         }
 
         // Admin bisa lihat draft & published (R-ADMIN-03), tidak pakai scopePublished
-        return $query->get();
+        return $query->orderBy('order')->get();
     }
 
     public function store(StoreSectionRequest $request)
     {
         $data = $request->validated();
 
-        // R-SECT-01: sequential unlock bergantung pada `order`. Jika admin
-        // tidak mengisi manual, auto-assign urutan berikutnya dalam year tsb.
-        $data['order'] ??= Section::where('year_id', $data['year_id'])->max('order') + 1;
+        $section = DB::transaction(function () use ($data) {
+            // lockForUpdate() mencegah 2 request store() bersamaan
+            // membaca max('order') yang sama lalu insert dengan order yang sama
+            $maxOrder = Section::where('year_id', $data['year_id'])
+                ->lockForUpdate()
+                ->max('order');
 
-        $section = Section::create([
-            ...$data,
-            'is_published' => false, // selalu draft saat dibuat (R-ADMIN-03)
-        ]);
+            $data['order'] ??= ($maxOrder === null ? 1 : $maxOrder + 1);
+
+            return Section::create([
+                ...$data,
+                'is_published' => false, // selalu draft saat dibuat (R-ADMIN-03)
+            ]);
+        });
 
         return response()->json($section, 201);
     }
@@ -46,11 +53,44 @@ class SectionController extends Controller
 
     public function update(UpdateSectionRequest $request, Section $section)
     {
-        // Tidak ada lagi syarat blok `summary` sebelum publish (R-CMS-03/04
-        // sudah dihapus). Publish section kini murni toggle is_published.
-        $section->update($request->validated());
+        // 'order' sengaja TIDAK bisa diubah lewat endpoint ini.
+        // Reorder/drag-drop harus lewat endpoint reorder() di bawah,
+        // supaya tidak bentrok dengan unique constraint (year_id, order).
+        $data = $request->validated();
+        unset($data['order']);
+
+        $section->update($data);
 
         return $section;
+    }
+
+    public function reorder(Request $request, $yearId)
+    {
+        $request->validate([
+            'section_ids' => 'required|array',
+            'section_ids.*' => 'exists:sections,id',
+        ]);
+
+        $ids = $request->input('section_ids');
+
+        DB::transaction(function () use ($ids, $yearId) {
+            // Step 1: geser semua order ke angka besar dulu (hindari collision
+            // dengan unique constraint saat swap di tengah proses)
+            Section::where('year_id', $yearId)
+                ->whereIn('id', $ids)
+                ->update(['order' => DB::raw('`order` + 100000')]);
+
+            // Step 2: assign order final sesuai urutan yang dikirim dari frontend
+            foreach ($ids as $index => $sectionId) {
+                Section::where('id', $sectionId)
+                    ->where('year_id', $yearId) // guard: section harus milik year ini
+                    ->update(['order' => $index + 1]);
+            }
+        });
+
+        return response()->json(
+            Section::where('year_id', $yearId)->orderBy('order')->get()
+        );
     }
 
     public function destroy(Section $section)

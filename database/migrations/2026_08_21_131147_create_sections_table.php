@@ -15,6 +15,10 @@ return new class extends Migration
             $table->integer('order')->default(0); // urutan section dalam 1 year; menentukan section mana yang terbuka/terkunci (section N+1 baru terbuka jika section N sudah completed di user_progress)
             $table->boolean('is_published')->default(false);
             $table->timestamps();
+
+            // Cegah 2 section dalam year yang sama punya `order` sama —
+            // wajib untuk menjaga sequential unlock tetap unambiguous (R-SECT-01/02)
+            $table->unique(['year_id', 'order']);
         });
     }
 
