@@ -89,7 +89,13 @@ class QuizController extends Controller
 
         // R-QUIZ-07: opsi jawaban di-replace penuh saat diedit, lebih sederhana
         // daripada diff per-opsi dan cukup untuk kebutuhan admin CMS ini.
-        if ($question->type === 'multiple_choice' && $options !== null) {
+        // Jika tipe soal berubah jadi 'essay', opsi lama (peninggalan saat
+        // masih multiple_choice) juga wajib dibersihkan — bukan cuma saat
+        // options baru dikirim, supaya tidak ada opsi nyangkut di DB untuk
+        // soal yang sekarang bertipe essay.
+        if ($question->type !== 'multiple_choice') {
+            $question->options()->delete();
+        } elseif ($options !== null) {
             $question->options()->delete();
 
             foreach ($options as $index => $option) {

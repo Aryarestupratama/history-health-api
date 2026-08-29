@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api\Card;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\FigureCardResource;
-use App\Http\Resources\FigureDetailResource;
-use App\Models\Figure;
+use App\Http\Resources\VaccineCardResource;
+use App\Http\Resources\VaccineDetailResource;
+use App\Models\Vaccine;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -15,37 +15,37 @@ class CardController extends Controller
     {
         $user = $request->user();
 
-        $unlockedFigureIds = $user->cardUnlocks()->pluck('figure_id')->flip();
+        $unlockedVaccineIds = $user->vaccineUnlocks()->pluck('vaccine_id')->flip();
 
-        // R-CARD-04: figure yang belum unlock tetap muncul di list (siluet),
+        // R-VAC-04: vaccine yang belum unlock tetap muncul di list (siluet),
         // bukan disembunyikan.
-        $figures = Figure::orderBy('name')->get();
+        $vaccines = Vaccine::orderBy('name')->get();
 
-        $data = $figures->map(
-            fn ($figure) => (new FigureCardResource($figure))
-                ->withUnlockStatus($unlockedFigureIds->has($figure->id))
+        $data = $vaccines->map(
+            fn ($vaccine) => (new VaccineCardResource($vaccine))
+                ->withUnlockStatus($unlockedVaccineIds->has($vaccine->id))
         )->values();
 
         return response()->json([
             'data' => $data,
             'meta' => [
-                'total' => $figures->count(),
-                'unlocked' => $unlockedFigureIds->count(),
+                'total' => $vaccines->count(),
+                'unlocked' => $unlockedVaccineIds->count(),
             ],
         ]);
     }
 
-    public function show(Request $request, Figure $figure)
+    public function show(Request $request, Vaccine $vaccine)
     {
-        $isUnlocked = $request->user()->cardUnlocks()->where('figure_id', $figure->id)->exists();
+        $isUnlocked = $request->user()->vaccineUnlocks()->where('vaccine_id', $vaccine->id)->exists();
 
-        // R-CARD-02: detail hanya untuk yang sudah unlock.
+        // R-VAC: detail hanya untuk yang sudah unlock.
         // Diperlakukan sebagai 404 supaya konsisten dengan pola section draft
-        // di atas (tidak membedakan "tidak ada" vs "belum unlock" ke client).
+        // (tidak membedakan "tidak ada" vs "belum unlock" ke client).
         if (! $isUnlocked) {
             throw new NotFoundHttpException();
         }
 
-        return new FigureDetailResource($figure);
+        return new VaccineDetailResource($vaccine);
     }
 }

@@ -5,22 +5,78 @@ namespace App\Http\Controllers\Api\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SectionDetailResource;
 use App\Models\Section;
+use App\Models\User;
+use App\Services\Section\SectionAccessService;
+use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class SectionController extends Controller
 {
-    public function show(Section $section)
+    public function __construct(
+        private SectionAccessService $sectionAccessService,
+    ) {
+    }
+
+    public function show(Request $request, Section $section)
     {
         // R-CMS-01: section draft tidak boleh diakses non-admin.
-        // Karena route ini publik (guest+user biasa, bukan admin),
-        // draft section dianggap 404, bukan 403 — supaya tidak bocor
+        // Diperlakukan sebagai 404, bukan 403 — supaya tidak bocor
         // informasi bahwa section itu "ada tapi belum publish".
         if (! $section->is_published) {
             throw new NotFoundHttpException();
         }
 
-        $section->load(['contentBlocks', 'figures', 'year.era']);
+        $section->load(['contentBlocks', 'year.era', 'year.vaccines']);
 
-        return new SectionDetailResource($section);
+        $user = $this->resolveUser($request);
+
+        if (! $user) {
+            // R-SECT-03: guest hanya boleh akses section pertama (order
+            // terkecil) yang published di year tsb — tidak punya progress
+            // tersimpan sehingga tidak bisa dievaluasi sequential unlock.
+            $firstPublishedOrder = $section->year->sections()
+                ->published()
+                ->min('order');
+
+            if ($section->order !== $firstPublishedOrder) {
+                throw new NotFoundHttpException(
+                    'Section ini butuh login untuk diakses.'
+                );
+            }
+
+            return (new SectionDetailResource($section))->withLockStatus(false);
+        }
+
+        // R-SECT-02/04: user login — cek status lock sequential sebelum
+        // mengembalikan konten penuh.
+        $isLocked = ! $this->sectionAccessService->isUnlocked($user, $section);
+
+        return (new SectionDetailResource($section))->withLockStatus($isLocked);
+    }
+
+    /**
+     * Route ini publik (tanpa middleware auth:sanctum) supaya guest bisa
+     * akses tanpa token — tapi kalau ada token valid di header, kita tetap
+     * mau tahu siapa user-nya untuk cek sequential lock (R-SECT-02).
+     * Sanctum's guard resolution normalnya butuh middleware auth:sanctum
+     * (yang akan reject request tanpa token), jadi resolusi dilakukan
+     * manual di sini, bukan lewat $request->user().
+     */
+    private function resolveUser(Request $request): ?User
+    {
+        $token = $request->bearerToken();
+
+        if (! $token) {
+            return null;
+        }
+
+        $accessToken = PersonalAccessToken::findToken($token);
+
+        if (! $accessToken) {
+            return null;
+        }
+
+        return $accessToken->tokenable;
     }
 }

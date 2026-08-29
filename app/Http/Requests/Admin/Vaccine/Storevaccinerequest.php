@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Requests\Admin\Figure;
+namespace App\Http\Requests\Admin\Vaccine;
 
 use App\Rules\Content\ValidGoogleDriveLink;
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreFigureRequest extends FormRequest
+class StoreVaccineRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -17,10 +17,10 @@ class StoreFigureRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'photo' => ['nullable', 'string', new ValidGoogleDriveLink],
-            'birth_date' => 'nullable|date',
-            'death_date' => 'nullable|date|after_or_equal:birth_date',
-            'family' => 'nullable|string',
-            'role_description' => 'required|string',
+            'manufacturer' => 'nullable|string|max:255',
+            'disease_target' => 'required|string|max:255',
+            'year_introduced' => 'nullable|integer|min:1000|max:'.(date('Y') + 1),
+            'description' => 'required|string',
         ];
     }
 }

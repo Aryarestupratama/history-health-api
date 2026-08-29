@@ -7,31 +7,67 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class SectionDetailResource extends JsonResource
 {
+    private ?bool $isLocked = null;
+
+    /**
+     * Set status lock section ini untuk user yang sedang request (R-SECT-04).
+     * Dipanggil dari controller setelah cek via SectionAccessService.
+     * Untuk guest / endpoint publik, cukup jangan panggil ini — 'locked'
+     * akan null (tidak relevan, karena guest hanya pernah diberi section
+     * pertama yang published, lihat R-SECT-03).
+     */
+    public function withLockStatus(bool $isLocked): static
+    {
+        $this->isLocked = $isLocked;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
+        // Section terkunci: kembalikan response terbatas, tanpa content_blocks
+        // maupun daftar figures/vaccine terkait (R-SECT-04).
+        if ($this->isLocked === true) {
+            return [
+                'id' => $this->id,
+                'title' => $this->title,
+                'order' => $this->order,
+                'locked' => true,
+                'year' => $this->yearSummaryArray(),
+            ];
+        }
+
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'year' => [
-                'id' => $this->year->id,
-                'year' => $this->year->year,
-                'title' => $this->year->title,
-                'era' => [
-                    'id' => $this->year->era->id,
-                    'name' => $this->year->era->name,
-                    'slug' => $this->year->era->slug,
-                ],
-            ],
-            'quiz_link' => $this->quiz_link, // null → app sembunyikan tombol "Mulai Kuis" (R-CMS-07)
+            'order' => $this->order,
+            'locked' => false,
+            'year' => $this->yearSummaryArray(),
             'content_blocks' => ContentBlockResource::collection(
                 $this->contentBlocks->sortBy('order')->values()
             ),
-            // nama tokoh terkait saja — detail lengkap (foto, tanggal, dll)
-            // hanya dibuka lewat endpoint collectible card setelah unlock
-            'figures' => $this->figures->map(fn ($f) => [
-                'id' => $f->id,
-                'name' => $f->name,
+            // nama vaksin terkait saja — detail lengkap (foto, produsen, dll)
+            // hanya dibuka lewat endpoint collectible card setelah unlock.
+            // Catatan: relasi vaksin sekarang ada di level `year`, bukan
+            // `section` lagi — diambil dari $this->year->vaccines.
+            'vaccines' => $this->year->vaccines->map(fn ($v) => [
+                'id' => $v->id,
+                'name' => $v->name,
             ]),
+        ];
+    }
+
+    private function yearSummaryArray(): array
+    {
+        return [
+            'id' => $this->year->id,
+            'year' => $this->year->year,
+            'title' => $this->year->title,
+            'era' => [
+                'id' => $this->year->era->id,
+                'name' => $this->year->era->name,
+                'slug' => $this->year->era->slug,
+            ],
         ];
     }
 }

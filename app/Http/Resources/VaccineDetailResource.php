@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class FigureDetailResource extends JsonResource
+class VaccineDetailResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
@@ -13,10 +13,10 @@ class FigureDetailResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'photo_url' => $this->photo_url,
-            'birth_date' => $this->birth_date?->toDateString(),
-            'death_date' => $this->death_date?->toDateString(),
-            'family' => $this->family,
-            'role_description' => $this->role_description,
+            'manufacturer' => $this->manufacturer,
+            'disease_target' => $this->disease_target,
+            'year_introduced' => $this->year_introduced,
+            'description' => $this->description,
         ];
     }
 }

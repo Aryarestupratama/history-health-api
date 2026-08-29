@@ -15,10 +15,14 @@ class YearController extends Controller
         $years = $era->years()
             ->whereHas('sections', fn ($q) => $q->published())
             // Eager-load section published-nya sekalian (bukan cuma count)
-            // supaya Flutter dapet sectionId buat navigasi ke detail —
-            // select id/title/year_id secukupnya (year_id wajib ada, itu
-            // FK yang dipakai Eloquent buat nge-hydrate relasinya).
-            ->with(['sections' => fn ($q) => $q->published()->select('id', 'title', 'year_id')])
+            // supaya Flutter dapet sectionId + order buat navigasi ke detail
+            // dan indikator lock. 'order' ditambahkan (dipakai YearResource
+            // baru), 'quiz' juga di-load untuk status kuis di halaman
+            // Rangkuman Wabah (YearResource::quiz).
+            ->with([
+                'sections' => fn ($q) => $q->published()->select('id', 'title', 'order', 'year_id'),
+                'quiz',
+            ])
             ->orderBy('year') // kronologis, bukan urutan input admin
             ->get();
 
