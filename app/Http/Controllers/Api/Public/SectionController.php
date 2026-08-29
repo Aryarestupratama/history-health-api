@@ -31,26 +31,20 @@ class SectionController extends Controller
 
         $user = $this->resolveUser($request);
 
-        if (! $user) {
-            // R-SECT-03: guest hanya boleh akses section pertama (order
-            // terkecil) yang published di year tsb — tidak punya progress
-            // tersimpan sehingga tidak bisa dievaluasi sequential unlock.
-            $firstPublishedOrder = $section->year->sections()
-                ->published()
-                ->min('order');
-
-            if ($section->order !== $firstPublishedOrder) {
-                throw new NotFoundHttpException(
-                    'Section ini butuh login untuk diakses.'
-                );
-            }
-
-            return (new SectionDetailResource($section))->withLockStatus(false);
-        }
-
-        // R-SECT-02/04: user login — cek status lock sequential sebelum
-        // mengembalikan konten penuh.
+        // R-SECT-01/02/03/04: satu jalur cek lock untuk guest maupun user
+        // login, delegasi penuh ke SectionAccessService (guest = null user,
+        // service sudah tahu guest tidak dapat sequential unlock).
         $isLocked = ! $this->sectionAccessService->isUnlocked($user, $section);
+
+        if (! $user && $isLocked) {
+            // R-SECT-03: guest yang mencoba akses section selain yang
+            // pertama diarahkan ke ajakan login, bukan diberi response
+            // locked (section itu memang tidak boleh diketahui keberadaannya
+            // secara detail oleh guest).
+            throw new NotFoundHttpException(
+                'Section ini butuh login untuk diakses.'
+            );
+        }
 
         return (new SectionDetailResource($section))->withLockStatus($isLocked);
     }

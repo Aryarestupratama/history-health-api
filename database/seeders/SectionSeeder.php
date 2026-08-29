@@ -48,6 +48,31 @@ class SectionSeeder extends Seeder
             ],
         ]);
 
+        // Section kedua di year 1918 (order 2) — sengaja ditambahkan untuk
+        // menguji sequential unlock (R-SECT-01/02/03): guest & user yang
+        // belum menyelesaikan section pertama harus terkunci di sini.
+        $section1918b = Section::updateOrCreate(
+            ['year_id' => $year1918->id, 'title' => 'Dampak Flu Spanyol pada Layanan Kesehatan Kolonial'],
+            [
+                'order' => 2,
+                'is_published' => true,
+            ]
+        );
+
+        $section1918b->contentBlocks()->delete();
+        $section1918b->contentBlocks()->createMany([
+            [
+                'type' => 'text',
+                'content' => 'Pasca gelombang awal wabah, pemerintah kolonial mulai membenahi sistem sanitasi dan layanan kesehatan publik...',
+                'order' => 1,
+            ],
+            [
+                'type' => 'image',
+                'content' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_1918B/view',
+                'order' => 2,
+            ],
+        ]);
+
         $section2020 = Section::updateOrCreate(
             ['year_id' => $year2020->id, 'title' => 'Pandemi COVID-19 di Indonesia'],
             [
