@@ -5,7 +5,7 @@ import apiClient from "@/api"; // axios instance dgn interceptor token Sanctum
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import PhonePreview from "@/components/PhonePreview";
 import { ERA_ACCENTS } from "@/config/branding";
@@ -106,9 +106,13 @@ export default function WabahWorkspace() {
       return {
         screen: "quiz",
         data: {
-          totalQuestions: questions.length,
+          // Semua soal dikirim sekaligus (bukan cuma soal aktif) — preview
+          // HP menampilkan seluruh soal berurutan dalam 1 layar scrollable,
+          // selaras rencana model Flutter (form kuis in-app juga scrollable
+          // semua soal, bukan swipe per-soal). activeIndex tetap dikirim
+          // supaya preview bisa highlight soal yang sedang diedit di editor.
+          questions,
           activeIndex: activeQuestionIndex,
-          question: questions[activeQuestionIndex] ?? null,
         },
       };
     }
@@ -704,8 +708,13 @@ function QuizTab({ year, setYear, activeQuestionIndex, setActiveQuestionIndex })
             value={activeQuestion.type}
             onValueChange={(type) => updateQuestion(activeQuestion.id, { type })}
           >
-            <option value="multiple_choice">Pilihan ganda</option>
-            <option value="essay">Esai</option>
+            <SelectTrigger>
+              <SelectValue placeholder="Pilih tipe soal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="multiple_choice">Pilihan ganda</SelectItem>
+              <SelectItem value="essay">Esai</SelectItem>
+            </SelectContent>
           </Select>
 
           {activeQuestion.type === "multiple_choice" ? (

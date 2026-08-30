@@ -17,6 +17,7 @@ class UpdateYearRequest extends FormRequest
             'era_id' => 'sometimes|required|exists:eras,id',
             'year' => 'sometimes|required|integer',
             'title' => 'sometimes|required|string|max:255',
+            'summary' => 'sometimes|nullable|string',
         ];
     }
 }

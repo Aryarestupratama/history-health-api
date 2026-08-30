@@ -23,8 +23,22 @@ class ContentBlockController extends Controller
         // Urutan blok baru sekarang murni "tambahkan di akhir".
         $nextOrder = (int) $section->contentBlocks()->max('order') + 1;
 
+        $data = $request->validated();
+
+        // FIX: StoreContentBlockRequest sengaja bikin 'content' nullable,
+        // karena WabahWorkspace.jsx (addBlock()) membuat block skeleton dulu
+        // dengan content: "" sebelum diisi via updateBlock() (PATCH). Tapi
+        // Laravel punya middleware bawaan ConvertEmptyStringsToNull yang
+        // mengubah "" jadi null SEBELUM validasi -> lolos rule 'nullable',
+        // namun kolom `content` di DB (migration content_blocks) NOT NULL
+        // tanpa default -> insert null gagal dengan
+        // "SQLSTATE[23000]: Column 'content' cannot be null".
+        // Di-coerce balik ke string kosong di sini, tanpa perlu migration
+        // baru untuk mengubah kolom jadi nullable di DB.
+        $data['content'] = $data['content'] ?? '';
+
         $block = $section->contentBlocks()->create([
-            ...$request->validated(),
+            ...$data,
             'order' => $nextOrder,
         ]);
 

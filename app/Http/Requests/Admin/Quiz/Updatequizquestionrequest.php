@@ -15,12 +15,18 @@ class UpdateQuizQuestionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'question' => 'sometimes|required|string',
+            'question' => 'sometimes|nullable|string',
             'type' => 'sometimes|required|in:multiple_choice,essay',
             'correct_answer' => 'nullable|string',
 
             'options' => ['sometimes', 'array', 'min:2'],
-            'options.*.option_text' => 'required_with:options|string',
+
+            // FIX: 'nullable' (bukan 'required_with'). OptionsEditor::addOption()
+            // di WabahWorkspace.jsx menambah opsi baru dengan option_text: ""
+            // (diisi belakangan saat admin mengetik), dan ConvertEmptyStringsToNull
+            // mengubahnya jadi null sebelum validasi — sama pola dengan bug
+            // 'question' di StoreQuizQuestionRequest.
+            'options.*.option_text' => 'nullable|string',
             'options.*.is_correct' => 'boolean',
         ];
     }
@@ -28,6 +34,9 @@ class UpdateQuizQuestionRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
+            // Nama parameter route sudah benar: routes/api.php mendefinisikan
+            // 'quiz-questions/{question}', jadi $this->route('question') tepat
+            // (berbeda dari bug 'content_block' vs 'contentBlock' sebelumnya).
             $type = $this->input('type', $this->route('question')?->type);
 
             if ($type !== 'multiple_choice' || ! $this->has('options')) {

@@ -17,8 +17,17 @@ class StoreContentBlockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', Rule::in(['text', 'image', 'video', 'pdf', 'summary'])],
-            'content' => ['required', 'string', $this->contentRule()],
+            // Tipe 'summary' dihapus dari daftar valid — rangkuman sudah naik
+            // level ke years.summary (Schema.md revisi major, R-YEAR-01).
+            'type' => ['required', Rule::in(['text', 'image', 'video', 'pdf'])],
+
+            // 'nullable' (bukan 'required'): WabahWorkspace.jsx (addBlock())
+            // sengaja membuat block skeleton dengan content: "" dulu supaya
+            // dapat id, baru diisi belakangan lewat updateBlock() (PATCH).
+            // Kalau 'required', string kosong ditolak Laravel -> 422
+            // "The content field is required." setiap kali admin klik
+            // "+ Tambah Blok".
+            'content' => ['nullable', 'string', $this->contentRule()],
         ];
     }
 
@@ -28,6 +37,13 @@ class StoreContentBlockRequest extends FormRequest
     protected function contentRule()
     {
         return function ($attribute, $value, $fail) {
+            // Content kosong (block skeleton baru) tidak perlu divalidasi
+            // sebagai link Drive/YouTube — validasi link baru relevan begitu
+            // admin benar-benar mengisi content-nya (lewat PATCH/update).
+            if ($value === null || $value === '') {
+                return;
+            }
+
             $type = $this->input('type');
 
             if (in_array($type, ['image', 'pdf'])) {
@@ -35,7 +51,7 @@ class StoreContentBlockRequest extends FormRequest
             } elseif ($type === 'video') {
                 (new ValidYoutubeLink)->validate($attribute, $value, $fail);
             }
-            // type text/summary -> tidak perlu validasi link, bebas teks/HTML
+            // type text -> tidak perlu validasi link, bebas teks/HTML
         };
     }
 }

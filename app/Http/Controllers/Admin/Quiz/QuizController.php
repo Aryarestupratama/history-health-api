@@ -62,6 +62,15 @@ class QuizController extends Controller
         $options = $data['options'] ?? [];
         unset($data['options']);
 
+        // FIX: StoreQuizQuestionRequest sengaja bikin 'question' nullable
+        // (QuizTab::addQuestion() di WabahWorkspace.jsx mengirim question: ""
+        // dulu untuk skeleton soal, diisi belakangan via updateQuestion()).
+        // Middleware ConvertEmptyStringsToNull mengubah "" jadi null SEBELUM
+        // validasi -> lolos rule 'nullable', tapi kolom quiz_questions.question
+        // di DB NOT NULL tanpa default -> insert null gagal (pola identik
+        // dengan fix ContentBlockController::store() sebelumnya).
+        $data['question'] = $data['question'] ?? '';
+
         $data['order'] = $quiz->questions()->max('order') + 1;
 
         $question = $quiz->questions()->create($data);
@@ -69,7 +78,11 @@ class QuizController extends Controller
         if ($data['type'] === 'multiple_choice') {
             foreach ($options as $index => $option) {
                 $question->options()->create([
-                    'option_text' => $option['option_text'],
+                    // FIX: sama alasan seperti 'question' di atas —
+                    // option_text: "" dari addQuestion() jadi null via
+                    // middleware, sementara quiz_question_options.option_text
+                    // NOT NULL di DB.
+                    'option_text' => $option['option_text'] ?? '',
                     'is_correct' => $option['is_correct'] ?? false,
                     'order' => $index + 1,
                 ]);
@@ -84,6 +97,16 @@ class QuizController extends Controller
         $data = $request->validated();
         $options = $data['options'] ?? null;
         unset($data['options']);
+
+        // FIX: 'question' nullable di UpdateQuizQuestionRequest (sama alasan
+        // seperti store) — kalau field ini memang ikut dikirim di body PATCH
+        // tapi nilainya null (mis. admin sempat mengosongkan textarea), jangan
+        // sampai lolos ke DB sebagai null. Pakai array_key_exists, bukan
+        // isset/?? saja, supaya tidak menimpa 'question' dengan '' kalau field
+        // ini memang tidak ikut dikirim di request (PATCH partial update).
+        if (array_key_exists('question', $data)) {
+            $data['question'] = $data['question'] ?? '';
+        }
 
         $question->update($data);
 
@@ -100,7 +123,9 @@ class QuizController extends Controller
 
             foreach ($options as $index => $option) {
                 $question->options()->create([
-                    'option_text' => $option['option_text'],
+                    // FIX: option_text: "" dari OptionsEditor::addOption()
+                    // jadi null via middleware, kolom NOT NULL di DB.
+                    'option_text' => $option['option_text'] ?? '',
                     'is_correct' => $option['is_correct'] ?? false,
                     'order' => $index + 1,
                 ]);

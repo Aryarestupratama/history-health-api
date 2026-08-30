@@ -15,7 +15,17 @@ class StoreQuizQuestionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'question' => 'required|string',
+            // FIX: 'nullable' (bukan 'required'). WabahWorkspace.jsx
+            // (QuizTab::addQuestion()) sengaja membuat soal skeleton dengan
+            // question: "" dulu supaya dapat id, baru diisi teks belakangan
+            // via updateQuestion() (PATCH). Middleware bawaan Laravel
+            // ConvertEmptyStringsToNull mengubah "" jadi null SEBELUM
+            // validasi, jadi kalau tetap 'required' -> selalu 422
+            // "The question field is required." setiap kali admin klik
+            // "+ Soal" (pola identik dengan bug 'content' di
+            // StoreContentBlockRequest).
+            'question' => 'nullable|string',
+
             'type' => 'required|in:multiple_choice,essay',
             'correct_answer' => 'nullable|string', // referensi saja untuk essay, bukan grading (R-QUIZ-07)
 
@@ -25,7 +35,11 @@ class StoreQuizQuestionRequest extends FormRequest
                 'array',
                 'min:2',
             ],
-            'options.*.option_text' => 'required_with:options|string',
+
+            // FIX: 'nullable' (bukan 'required_with'). Sama alasan seperti
+            // 'question' di atas — addQuestion() mengirim option_text: ""
+            // untuk kedua opsi awal (diisi belakangan via OptionsEditor).
+            'options.*.option_text' => 'nullable|string',
             'options.*.is_correct' => 'boolean',
         ];
     }

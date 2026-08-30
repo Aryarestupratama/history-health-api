@@ -238,47 +238,74 @@ function SummaryScreen({ data, accent }) {
 }
 
 /* --------------------------------------------------------------- Quiz tab */
-// data: { totalQuestions, activeIndex, question: { question, type, options: [{ optionText }] } }
+// data: { questions: [{ id, question, type, options: [{ option_text, is_correct }] }], activeIndex }
+//
+// Semua soal ditampilkan berurutan dalam 1 layar scrollable (bukan 1 soal
+// per layar dengan navigasi index) — selaras rencana model Flutter yang
+// juga scrollable form, bukan swipe per-soal. `activeIndex` dipakai untuk
+// highlight soal yang sedang diedit admin di editor kiri, supaya preview
+// tetap kasih konteks "lagi ngedit yang mana".
 
 function QuizScreen({ data, accent }) {
-  const q = data?.question;
+  const questions = data?.questions ?? [];
+  const activeIndex = data?.activeIndex;
+
   return (
     <div>
       <p className="mb-3 text-xs font-medium text-zinc-400">
-        Soal {data?.activeIndex != null ? data.activeIndex + 1 : "?"} dari {data?.totalQuestions ?? 0}
+        {questions.length} soal
       </p>
 
-      {!q ? (
+      {questions.length === 0 ? (
         <p className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
           Belum ada soal
         </p>
       ) : (
-        <>
-          <p className="mb-4 text-sm font-medium leading-relaxed text-zinc-900">
-            {q.question || <span className="text-zinc-300">Teks soal kosong</span>}
-          </p>
+        <div className="space-y-5">
+          {questions.map((q, i) => (
+            <div
+              key={q.id ?? i}
+              className="rounded-xl p-3 transition"
+              style={i === activeIndex ? { boxShadow: `0 0 0 2px ${accent}` } : undefined}
+            >
+              <p className="mb-2 text-xs font-semibold" style={{ color: accent }}>
+                Soal {i + 1}
+              </p>
+              <p className="mb-3 text-sm font-medium leading-relaxed text-zinc-900">
+                {q.question || <span className="text-zinc-300">Teks soal kosong</span>}
+              </p>
 
-          {q.type === "multiple_choice" ? (
-            <div className="space-y-2">
-              {(q.options ?? []).length === 0 && (
-                <p className="text-xs text-zinc-300">Belum ada opsi jawaban</p>
-              )}
-              {(q.options ?? []).map((opt, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-lg border border-zinc-100 p-2.5 text-sm text-zinc-700">
-                  <span
-                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
-                    style={{ borderColor: accent }}
-                  />
-                  {opt.optionText || <span className="text-zinc-300">Opsi kosong</span>}
+              {q.type === "multiple_choice" ? (
+                <div className="space-y-2">
+                  {(q.options ?? []).length === 0 && (
+                    <p className="text-xs text-zinc-300">Belum ada opsi jawaban</p>
+                  )}
+                  {(q.options ?? []).map((opt, oi) => (
+                    <div
+                      key={oi}
+                      className="flex items-center gap-2 rounded-lg border border-zinc-100 p-2.5 text-sm text-zinc-700"
+                    >
+                      <span
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
+                        style={{ borderColor: accent }}
+                      />
+                      {/* FIX: API balikin 'option_text' (snake_case, lihat
+                          Schema.md & QuizController), sebelumnya kode di
+                          sini baca 'optionText' (camelCase) yang selalu
+                          undefined -> opsi kelihatan "kosong" terus walau
+                          sudah diisi teksnya di editor. */}
+                      {opt.option_text || <span className="text-zinc-300">Opsi kosong</span>}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="rounded-lg border border-zinc-100 p-3 text-xs text-zinc-300">
+                  Jawaban esai (input teks bebas)
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="rounded-lg border border-zinc-100 p-3 text-xs text-zinc-300">
-              Jawaban esai (input teks bebas)
-            </div>
-          )}
-        </>
+          ))}
+        </div>
       )}
 
       <button

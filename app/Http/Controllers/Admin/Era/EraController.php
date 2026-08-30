@@ -11,7 +11,7 @@ class EraController extends Controller
 {
     public function index()
     {
-        return Era::orderBy('order')->get();
+        return Era::withCount('years')->orderBy('order')->get();
     }
 
     public function store(StoreEraRequest $request)

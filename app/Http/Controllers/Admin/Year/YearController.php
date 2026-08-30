@@ -13,7 +13,9 @@ class YearController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Year::query()->orderBy('year');
+        $query = Year::query()
+            ->with(['quiz:id,year_id,is_published'])
+            ->orderBy('year');
 
         if ($request->filled('era_id')) {
             $query->where('era_id', $request->input('era_id'));
