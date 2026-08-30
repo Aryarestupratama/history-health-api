@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Layers, Syringe, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Layers, Syringe, ShieldCheck, Settings, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { APP_NAME, APP_SHORT_INITIALS } from '@/config/branding';
@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import EraYearManager from './pages/EraYearManager';
 import VaccineManager from './pages/VaccineManager';
+import AdminManager from './pages/AdminManager';
 import StudioEraYearPicker from './pages/StudioEraYearPicker';
 import WabahWorkspace from './pages/WabahWorkspace';
 
@@ -16,10 +17,13 @@ import WabahWorkspace from './pages/WabahWorkspace';
 // Vaksin. "Era & Tahun" turun jadi housekeeping sekunder (jarang dipakai),
 // dipisah dari nav utama. Menggantikan menu lama Section/Kuis yang sekarang
 // jadi 3 tab di dalam Content Studio (WabahWorkspace).
+// Kelola Admin ditambahkan (sesi ini) -- akses seluruh admin (R-ADMIN-01),
+// jadi tetap di nav utama, bukan housekeeping.
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/studio', label: 'Content Studio', icon: Layers },
   { to: '/vaccines', label: 'Kelola Vaksin', icon: Syringe },
+  { to: '/admins', label: 'Kelola Admin', icon: ShieldCheck },
 ];
 
 const SECONDARY_NAV_ITEMS = [{ to: '/eras', label: 'Era & Tahun', icon: Settings }];
@@ -152,6 +156,16 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Layout><VaccineManager /></Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Kelola Admin (baru) -- CRUD akun admin (R-ADMIN-01/02). */}
+          <Route
+            path="/admins"
+            element={
+              <ProtectedRoute>
+                <Layout><AdminManager /></Layout>
               </ProtectedRoute>
             }
           />

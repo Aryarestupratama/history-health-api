@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
 
+use App\Http\Controllers\Admin\AdminUser\AdminUserController;
 use App\Http\Controllers\Admin\ContentBlock\ContentBlockController;
 use App\Http\Controllers\Admin\Era\EraController as AdminEraController;
 use App\Http\Controllers\Admin\Vaccine\VaccineController as AdminVaccineController;
@@ -46,6 +47,11 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::apiResource('eras', AdminEraController::class);
     Route::apiResource('years', AdminYearController::class);
     Route::apiResource('vaccines', AdminVaccineController::class);
+
+    // Kelola Akun Admin (baru) -- CRUD terbatas ke user dengan role=admin,
+    // reuse tabel `users` yang sudah ada (tidak perlu tabel baru). Guard
+    // self-delete & last-admin-delete ada di AdminUserController.
+    Route::apiResource('admins', AdminUserController::class)->only(['index', 'store', 'update', 'destroy']);
 
     // CMS-05: assign vaccine ke year (naik level dari section -> figure lama).
     // NB: method assignVaccines() perlu ditambahkan ke YearController Anda —

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, Trash2, GripVertical, Eye, EyeOff, Save } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save } from "lucide-react";
 import apiClient from "@/api"; // axios instance dgn interceptor token Sanctum
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,10 +27,75 @@ export default function WabahWorkspace() {
   const [activeSectionId, setActiveSectionId] = useState(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
 
+  // Status simpan per tab ("idle" | "dirty" | "saving" | "saved" | "error").
+  // Dipakai HANYA untuk tombol Simpan (enable/disable + label) di masing-masing
+  // tab -- bukan indikator "belum disimpan" per field (lihat state di bawah).
+  const [tabStatus, setTabStatus] = useState({ section: "idle", summary: "idle", quiz: "idle" });
+
+  function setStatusFor(tabKey, status) {
+    setTabStatus((prev) => ({ ...prev, [tabKey]: status }));
+  }
+
+  // ------------------------------------------------------------------
+  // Field-level dirty tracking -- SENGAJA dinaikkan ke level workspace
+  // (bukan local state di masing-masing komponen Tab). Alasan: render di
+  // bawah cuma me-mount 1 komponen tab yang aktif, jadi kalau state dirty
+  // ini disimpan di dalam komponen Tab itu sendiri, pindah tab akan
+  // meng-unmount komponennya dan menghapus state tsb -- padahal datanya
+  // di `year` masih belum benar-benar tersimpan ke backend. Akibatnya
+  // badge "belum disimpan" akan salah/hilang begitu admin balik lagi ke
+  // tab tsb, walau perubahannya sebenarnya masih pending.
+  //
+  // - sectionTitleDirty: Set<sectionId>  -- section mana yang judulnya berubah
+  // - sectionBlockDirty: Set<blockId>    -- blok konten mana yang isinya berubah
+  // - summaryDirty / vaccinesDirty: boolean, independen satu sama lain
+  // - quizFieldDirty: Map<questionId, Set<fieldName>>
+  const [sectionTitleDirty, setSectionTitleDirty] = useState(new Set());
+  const [sectionBlockDirty, setSectionBlockDirty] = useState(new Set());
+  const [summaryDirty, setSummaryDirty] = useState(false);
+  const [vaccinesDirty, setVaccinesDirty] = useState(false);
+  const [quizFieldDirty, setQuizFieldDirty] = useState(new Map());
+
+  const hasAnyUnsaved =
+    sectionTitleDirty.size > 0 ||
+    sectionBlockDirty.size > 0 ||
+    summaryDirty ||
+    vaccinesDirty ||
+    quizFieldDirty.size > 0;
+
+  function resetAllDirty() {
+    setSectionTitleDirty(new Set());
+    setSectionBlockDirty(new Set());
+    setSummaryDirty(false);
+    setVaccinesDirty(false);
+    setQuizFieldDirty(new Map());
+  }
+
+  // Dipanggil dari mana pun yang mau berpindah keluar workspace ini
+  // (breadcrumb ganti tahun/era) -- true berarti boleh lanjut.
+  function confirmDiscardIfUnsaved(message) {
+    if (!hasAnyUnsaved) return true;
+    return confirm(
+      message ?? "Ada perubahan yang belum disimpan di workspace ini. Tetap pindah dan buang perubahan?"
+    );
+  }
+
   useEffect(() => {
     loadYear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yearId]);
+
+  // Peringatan browser native saat admin coba menutup/reload tab sementara
+  // ada perubahan belum disimpan (di luar jangkauan konfirmasi in-app).
+  useEffect(() => {
+    function handleBeforeUnload(e) {
+      if (!hasAnyUnsaved) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasAnyUnsaved]);
 
   // YearController::show() cuma eager-load sections/vaccines/quiz (tanpa nested
   // contentBlocks/questions.options) — fetch content_blocks terpisah saat
@@ -54,10 +119,32 @@ export default function WabahWorkspace() {
     const { data } = await apiClient.get(`/admin/years/${yearId}`);
     setYear(data);
     setActiveSectionId(data.sections?.[0]?.id ?? null);
+    setTabStatus({ section: "idle", summary: "idle", quiz: "idle" });
+    resetAllDirty();
     setLoading(false);
   }
 
   const eraAccent = ERA_ACCENTS?.[year?.era?.slug]?.hex;
+
+  // Section aktif dianggap "punya perubahan belum disimpan" kalau judulnya
+  // ada di sectionTitleDirty ATAU salah satu bloknya ada di sectionBlockDirty.
+  function isSectionDirty(sectionId) {
+    if (sectionTitleDirty.has(sectionId)) return true;
+    const section = year?.sections?.find((s) => s.id === sectionId);
+    return (section?.content_blocks ?? []).some((b) => sectionBlockDirty.has(b.id));
+  }
+
+  function selectSection(id) {
+    if (id === activeSectionId) return;
+    if (
+      isSectionDirty(activeSectionId) &&
+      !confirm("Ada perubahan di section ini yang belum disimpan. Pindah section dan buang perubahan?")
+    ) {
+      return;
+    }
+    setStatusFor("section", "idle");
+    setActiveSectionId(id);
+  }
 
   const previewProps = useMemo(() => {
     if (!year) return { screen: null, data: null };
@@ -126,14 +213,14 @@ export default function WabahWorkspace() {
 
   return (
     <div className="flex h-full flex-col">
-      <Breadcrumb year={year} />
+      <Breadcrumb year={year} confirmDiscardIfUnsaved={confirmDiscardIfUnsaved} />
 
       <div className="flex border-b border-zinc-100 px-6">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`relative px-4 py-3 text-sm font-medium transition ${
+            className={`relative flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition ${
               activeTab === t.key ? "text-zinc-900" : "text-zinc-400 hover:text-zinc-600"
             }`}
           >
@@ -155,17 +242,38 @@ export default function WabahWorkspace() {
               year={year}
               setYear={setYear}
               activeSectionId={activeSectionId}
-              setActiveSectionId={setActiveSectionId}
+              setActiveSectionId={selectSection}
               eraAccent={eraAccent}
+              status={tabStatus.section}
+              setStatus={(s) => setStatusFor("section", s)}
+              titleDirty={sectionTitleDirty}
+              setTitleDirty={setSectionTitleDirty}
+              blockDirty={sectionBlockDirty}
+              setBlockDirty={setSectionBlockDirty}
             />
           )}
-          {activeTab === "summary" && <SummaryVaccineTab year={year} setYear={setYear} />}
+          {activeTab === "summary" && (
+            <SummaryVaccineTab
+              year={year}
+              setYear={setYear}
+              status={tabStatus.summary}
+              setStatus={(s) => setStatusFor("summary", s)}
+              summaryDirty={summaryDirty}
+              setSummaryDirty={setSummaryDirty}
+              vaccinesDirty={vaccinesDirty}
+              setVaccinesDirty={setVaccinesDirty}
+            />
+          )}
           {activeTab === "quiz" && (
             <QuizTab
               year={year}
               setYear={setYear}
               activeQuestionIndex={activeQuestionIndex}
               setActiveQuestionIndex={setActiveQuestionIndex}
+              status={tabStatus.quiz}
+              setStatus={(s) => setStatusFor("quiz", s)}
+              dirtyFields={quizFieldDirty}
+              setDirtyFields={setQuizFieldDirty}
             />
           )}
         </div>
@@ -180,7 +288,7 @@ export default function WabahWorkspace() {
 
 /* ------------------------------------------------------------- Breadcrumb */
 
-function Breadcrumb({ year }) {
+function Breadcrumb({ year, confirmDiscardIfUnsaved }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [siblingYears, setSiblingYears] = useState(null);
@@ -191,6 +299,29 @@ function Breadcrumb({ year }) {
       setSiblingYears(data.sort((a, b) => a.year - b.year));
     }
     setOpen((o) => !o);
+  }
+
+  function goToStudioPicker() {
+    if (
+      !confirmDiscardIfUnsaved(
+        "Ada perubahan yang belum disimpan di tahun ini. Ganti masa (era) dan buang perubahan?"
+      )
+    )
+      return;
+    navigate("/studio");
+  }
+
+  function goToYear(y) {
+    if (y.id === year.id) {
+      setOpen(false);
+      return;
+    }
+    if (
+      !confirmDiscardIfUnsaved("Ada perubahan yang belum disimpan di tahun ini. Ganti tahun dan buang perubahan?")
+    )
+      return;
+    setOpen(false);
+    navigate(`/studio/${y.id}`);
   }
 
   return (
@@ -210,7 +341,7 @@ function Breadcrumb({ year }) {
       {open && (
         <div className="absolute left-6 top-full z-20 mt-1 w-64 rounded-xl border border-zinc-100 bg-white p-2 shadow-lg">
           <button
-            onClick={() => navigate("/studio")}
+            onClick={goToStudioPicker}
             className="mb-1 block w-full rounded-lg px-2 py-1.5 text-left text-xs text-zinc-400 hover:bg-zinc-50"
           >
             ← Ganti masa (era) lain
@@ -218,10 +349,7 @@ function Breadcrumb({ year }) {
           {(siblingYears ?? []).map((y) => (
             <button
               key={y.id}
-              onClick={() => {
-                setOpen(false);
-                navigate(`/studio/${y.id}`);
-              }}
+              onClick={() => goToYear(y)}
               className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm ${
                 y.id === year.id ? "bg-zinc-100 font-medium text-zinc-900" : "text-zinc-600 hover:bg-zinc-50"
               }`}
@@ -235,14 +363,70 @@ function Breadcrumb({ year }) {
   );
 }
 
+/* --------------------------------------------------------------- SaveButton */
+// Tombol Simpan generik dipakai di ketiga tab, styling & label mengikuti
+// status ("idle" | "dirty" | "saving" | "saved" | "error") supaya admin
+// selalu tahu kapan perubahan benar-benar terkirim ke backend.
+
+function SaveButton({ status, onClick }) {
+  const config =
+    {
+      idle: { label: "Simpan", variant: "outline" },
+      dirty: { label: "Simpan", variant: "default" },
+      saving: { label: "Menyimpan…", variant: "default" },
+      saved: { label: "Tersimpan", variant: "outline" },
+      error: { label: "Gagal, coba lagi", variant: "destructive" },
+    }[status] ?? { label: "Simpan", variant: "outline" };
+
+  return (
+    <Button size="sm" variant={config.variant} onClick={onClick} disabled={status === "saving"}>
+      <Save size={12} /> {config.label}
+    </Button>
+  );
+}
+
+/* ------------------------------------------------------ UnsavedFieldBadge */
+// Indikator kecil "Belum disimpan" yang ditempel LANGSUNG di sebelah field
+// yang perubahannya belum terkirim ke backend -- pengganti dot generik di
+// tab bar. Dipakai konsisten di ketiga tab supaya admin tahu persis field
+// mana yang masih pending, bukan cuma "ada sesuatu yang berubah di tab ini".
+function UnsavedFieldBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-600">
+      <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+      Belum disimpan
+    </span>
+  );
+}
+
 /* -------------------------------------------------------- Tab: Section & Blok */
 
-function SectionBlokTab({ year, setYear, activeSectionId, setActiveSectionId, eraAccent }) {
+function SectionBlokTab({
+  year,
+  setYear,
+  activeSectionId,
+  setActiveSectionId,
+  eraAccent,
+  status,
+  setStatus,
+  titleDirty,
+  setTitleDirty,
+  blockDirty,
+  setBlockDirty,
+}) {
   const activeSection = year.sections?.find((s) => s.id === activeSectionId);
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
 
   const orderedSections = (year.sections ?? []).slice().sort((a, b) => a.order - b.order);
+
+  function isSectionDirty(sectionId) {
+    if (titleDirty.has(sectionId)) return true;
+    const section = year.sections.find((s) => s.id === sectionId);
+    return (section?.content_blocks ?? []).some((b) => blockDirty.has(b.id));
+  }
+
+  const activeSectionDirty = activeSectionId != null && isSectionDirty(activeSectionId);
 
   function handleDrop(targetId) {
     if (dragId == null || dragId === targetId) {
@@ -256,6 +440,8 @@ function SectionBlokTab({ year, setYear, activeSectionId, setActiveSectionId, er
     const [moved] = list.splice(fromIdx, 1);
     list.splice(toIdx, 0, moved);
     // re-assign `order` sesuai posisi baru, lalu persist ke backend (R-SECT-01)
+    // -- ini aksi diskrit (drag-drop), bukan field ketikan, jadi tetap
+    // langsung tersimpan seperti semula (tidak ikut tombol Simpan).
     const reindexed = list.map((s, i) => ({ ...s, order: i + 1 }));
     reorderSections(reindexed);
     setDragId(null);
@@ -288,12 +474,16 @@ function SectionBlokTab({ year, setYear, activeSectionId, setActiveSectionId, er
     }));
   }
 
-  async function saveSectionTitle(id, title) {
+  // Judul section sekarang cuma diubah di state lokal saat mengetik --
+  // dikirim ke backend hanya saat admin klik tombol Simpan
+  // (handleSaveSection), bukan lagi PUT di setiap keystroke.
+  function editSectionTitle(id, title) {
     setYear({
       ...year,
       sections: year.sections.map((s) => (s.id === id ? { ...s, title } : s)),
     });
-    await apiClient.put(`/admin/sections/${id}`, { title });
+    setTitleDirty((prev) => new Set(prev).add(id));
+    setStatus("dirty");
   }
 
   async function togglePublish(section) {
@@ -316,6 +506,60 @@ function SectionBlokTab({ year, setYear, activeSectionId, setActiveSectionId, er
     const rest = year.sections.filter((s) => s.id !== id);
     setYear({ ...year, sections: rest });
     setActiveSectionId(rest[0]?.id ?? null);
+    setTitleDirty((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function markBlockDirty(blockId) {
+    setBlockDirty((prev) => new Set(prev).add(blockId));
+    setStatus("dirty");
+  }
+
+  async function handleSaveSection() {
+    if (!activeSection) return;
+    setStatus("saving");
+    try {
+      if (titleDirty.has(activeSection.id)) {
+        await apiClient.put(`/admin/sections/${activeSection.id}`, { title: activeSection.title });
+      }
+
+      const blocksToSave = (activeSection.content_blocks ?? []).filter((b) => blockDirty.has(b.id));
+      const updatedBlocks = await Promise.all(
+        blocksToSave.map((b) =>
+          apiClient
+            .patch(`/admin/sections/${activeSection.id}/content-blocks/${b.id}`, { content: b.content })
+            .then(({ data }) => data)
+        )
+      );
+
+      setYear((prev) => ({
+        ...prev,
+        sections: prev.sections.map((s) => {
+          if (s.id !== activeSection.id) return s;
+          const merged = (s.content_blocks ?? []).map(
+            (b) => updatedBlocks.find((u) => u.id === b.id) ?? b
+          );
+          return { ...s, content_blocks: merged };
+        }),
+      }));
+      setTitleDirty((prev) => {
+        const next = new Set(prev);
+        next.delete(activeSection.id);
+        return next;
+      });
+      setBlockDirty((prev) => {
+        const next = new Set(prev);
+        blocksToSave.forEach((b) => next.delete(b.id));
+        return next;
+      });
+      setStatus("saved");
+    } catch (e) {
+      setStatus("error");
+      alert(e?.response?.data?.message ?? "Gagal menyimpan section.");
+    }
   }
 
   return (
@@ -347,76 +591,103 @@ function SectionBlokTab({ year, setYear, activeSectionId, setActiveSectionId, er
                 setDragId(null);
                 setDragOverId(null);
               }}
-              className={dragOverId === s.id && dragId !== s.id ? "border-t-2" : ""}
-              style={dragOverId === s.id && dragId !== s.id ? { borderColor: eraAccent } : undefined}
+              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-sm transition ${
+                activeSectionId === s.id ? "border-zinc-900 bg-zinc-50" : "border-transparent hover:bg-zinc-50"
+              } ${dragOverId === s.id && dragId !== s.id ? "border-dashed" : ""} ${
+                dragId === s.id ? "opacity-40" : ""
+              }`}
             >
+              <GripVertical size={14} className="shrink-0 cursor-grab text-zinc-300 active:cursor-grabbing" />
               <button
                 onClick={() => setActiveSectionId(s.id)}
-                className={`flex w-full cursor-grab items-center gap-2 rounded-lg px-3 py-2 text-left text-sm active:cursor-grabbing ${
-                  activeSectionId === s.id ? "bg-zinc-100 font-medium text-zinc-900" : "text-zinc-500 hover:bg-zinc-50"
-                } ${dragId === s.id ? "opacity-40" : ""}`}
+                className="flex-1 truncate text-left"
+                title={s.title}
               >
-                <GripVertical size={14} className="shrink-0 text-zinc-300" />
-                <span className="flex-1 truncate">{s.title}</span>
-                {s.is_published ? (
-                  <Badge variant="success">Published</Badge>
-                ) : (
-                  <Badge variant="secondary">Draft</Badge>
-                )}
+                {s.title}
               </button>
+              {isSectionDirty(s.id) && (
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange-400"
+                  title="Ada field belum disimpan di section ini"
+                />
+              )}
+              <Badge variant={s.is_published ? "default" : "secondary"} className="shrink-0 text-[10px]">
+                {s.is_published ? "Published" : "Draft"}
+              </Badge>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[11px] leading-relaxed text-zinc-400">
-          Drag ikon <GripVertical size={10} className="inline" /> untuk reorder — urutan menentukan sequential
-          unlock (R-SECT-01).
-        </p>
       </div>
 
-      {/* Editor blok konten untuk section aktif */}
-      <div>
+      {/* Editor section aktif */}
+      <div className="space-y-4">
         {!activeSection ? (
-          <EmptyPanel text="Pilih atau buat section untuk mulai mengedit" />
+          <EmptyPanel text="Belum ada section. Tambahkan section baru di sidebar kiri." />
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
+          <>
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Judul Section</p>
+                {titleDirty.has(activeSection.id) && <UnsavedFieldBadge />}
+              </div>
               <Input
                 value={activeSection.title}
-                onChange={(e) => saveSectionTitle(activeSection.id, e.target.value)}
-                className="text-base font-medium"
+                onChange={(e) => editSectionTitle(activeSection.id, e.target.value)}
+                placeholder="Judul section…"
               />
-              <Button variant="outline" size="sm" onClick={() => togglePublish(activeSection)}>
-                {activeSection.is_published ? <EyeOff size={14} /> : <Eye size={14} />}
-                {activeSection.is_published ? "Unpublish" : "Publish"}
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => deleteSection(activeSection.id)}>
-                <Trash2 size={14} className="text-red-500" />
-              </Button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Blok Konten
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => togglePublish(activeSection)}>
+                  {activeSection.is_published ? "Unpublish" : "Publish"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => deleteSection(activeSection.id)}>
+                  <Trash2 size={14} className="text-red-500" /> Hapus section
+                </Button>
+              </div>
             </div>
 
             <ContentBlockEditor
               section={activeSection}
-              onChange={(blocks) => {
+              blocks={activeSection.content_blocks ?? []}
+              dirtyBlockIds={blockDirty}
+              markDirty={markBlockDirty}
+              onChange={(blocks) =>
                 setYear({
                   ...year,
                   sections: year.sections.map((s) =>
                     s.id === activeSection.id ? { ...s, content_blocks: blocks } : s
                   ),
-                });
-              }}
+                })
+              }
             />
-          </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+              {activeSectionDirty && (
+                <span className="mr-auto text-[11px] text-zinc-400">
+                  Ada perubahan belum disimpan di section ini
+                </span>
+              )}
+              <SaveButton status={status} onClick={handleSaveSection} />
+            </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function ContentBlockEditor({ section, onChange }) {
-  const blocks = section.content_blocks ?? [];
-  const orderedBlocks = blocks.slice().sort((a, b) => a.order - b.order);
+/* ---------------------------------------------------- ContentBlockEditor */
+
+function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChange }) {
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+
+  const orderedBlocks = (blocks ?? []).slice().sort((a, b) => a.order - b.order);
 
   async function addBlock(type) {
     const { data } = await apiClient.post(`/admin/sections/${section.id}/content-blocks`, {
@@ -426,11 +697,12 @@ function ContentBlockEditor({ section, onChange }) {
     onChange([...blocks, data]);
   }
 
-  async function updateBlock(id, content) {
-    // PATCH, bukan PUT — sesuai ContentBlockController::update di routes/api.php
-    onChange(blocks.map((b) => (b.id === id ? { ...b, content, resolved_url: undefined } : b)));
-    const { data } = await apiClient.patch(`/admin/sections/${section.id}/content-blocks/${id}`, { content });
-    onChange(blocks.map((b) => (b.id === id ? data : b)));
+  // Isi blok sekarang cuma diubah di state lokal saat mengetik -- dikirim
+  // ke backend saat admin klik tombol Simpan (lihat
+  // SectionBlokTab::handleSaveSection), bukan lagi PATCH di setiap keystroke.
+  function updateBlock(id, content) {
+    onChange(blocks.map((b) => (b.id === id ? { ...b, content } : b)));
+    markDirty?.(id);
   }
 
   async function removeBlock(id) {
@@ -463,52 +735,58 @@ function ContentBlockEditor({ section, onChange }) {
 
   return (
     <div className="space-y-3">
-      {orderedBlocks.map((b) => (
-        <div
-          key={b.id}
-          draggable
-          onDragStart={() => setDragId(b.id)}
-          onDragOver={(e) => {
-            e.preventDefault();
-            if (dragOverId !== b.id) setDragOverId(b.id);
-          }}
-          onDragLeave={() => setDragOverId((cur) => (cur === b.id ? null : cur))}
-          onDrop={(e) => {
-            e.preventDefault();
-            handleDrop(b.id);
-          }}
-          onDragEnd={() => {
-            setDragId(null);
-            setDragOverId(null);
-          }}
-          className={`rounded-lg border p-3 transition ${
-            dragOverId === b.id && dragId !== b.id ? "border-zinc-900" : "border-zinc-100"
-          } ${dragId === b.id ? "opacity-40" : ""}`}
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <span className="flex cursor-grab items-center gap-1 active:cursor-grabbing">
-              <GripVertical size={14} className="text-zinc-300" />
-              <Badge variant="secondary">{b.type}</Badge>
-            </span>
-            <Button variant="ghost" size="icon" onClick={() => removeBlock(b.id)}>
-              <Trash2 size={14} className="text-red-500" />
-            </Button>
+      {orderedBlocks.map((b) => {
+        const isDirty = dirtyBlockIds?.has(b.id);
+        return (
+          <div
+            key={b.id}
+            draggable
+            onDragStart={() => setDragId(b.id)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (dragOverId !== b.id) setDragOverId(b.id);
+            }}
+            onDragLeave={() => setDragOverId((cur) => (cur === b.id ? null : cur))}
+            onDrop={(e) => {
+              e.preventDefault();
+              handleDrop(b.id);
+            }}
+            onDragEnd={() => {
+              setDragId(null);
+              setDragOverId(null);
+            }}
+            className={`rounded-lg border p-3 transition ${
+              isDirty ? "border-orange-300" : "border-zinc-100"
+            } ${dragOverId === b.id && dragId !== b.id ? "border-zinc-900" : ""} ${
+              dragId === b.id ? "opacity-40" : ""
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <span className="flex cursor-grab items-center gap-1.5 active:cursor-grabbing">
+                <GripVertical size={14} className="text-zinc-300" />
+                <Badge variant="secondary">{b.type}</Badge>
+                {isDirty && <UnsavedFieldBadge />}
+              </span>
+              <Button variant="ghost" size="icon" onClick={() => removeBlock(b.id)}>
+                <Trash2 size={14} className="text-red-500" />
+              </Button>
+            </div>
+            {b.type === "text" ? (
+              <Textarea
+                defaultValue={b.content}
+                placeholder="Tulis teks konten…"
+                onChange={(e) => updateBlock(b.id, e.target.value)}
+              />
+            ) : (
+              <Input
+                defaultValue={b.content}
+                placeholder={b.type === "video" ? "Link YouTube (unlisted)" : "Link Google Drive"}
+                onChange={(e) => updateBlock(b.id, e.target.value)}
+              />
+            )}
           </div>
-          {b.type === "text" ? (
-            <Textarea
-              defaultValue={b.content}
-              placeholder="Tulis teks konten…"
-              onChange={(e) => updateBlock(b.id, e.target.value)}
-            />
-          ) : (
-            <Input
-              defaultValue={b.content}
-              placeholder={b.type === "video" ? "Link YouTube (unlisted)" : "Link Google Drive"}
-              onChange={(e) => updateBlock(b.id, e.target.value)}
-            />
-          )}
-        </div>
-      ))}
+        );
+      })}
 
       <div className="flex gap-2">
         {["text", "image", "video", "pdf"].map((t) => (
@@ -523,57 +801,85 @@ function ContentBlockEditor({ section, onChange }) {
 
 /* -------------------------------------------------------- Tab: Rangkuman & Vaksin */
 
-function SummaryVaccineTab({ year, setYear }) {
+function SummaryVaccineTab({
+  year,
+  setYear,
+  status,
+  setStatus,
+  summaryDirty,
+  setSummaryDirty,
+  vaccinesDirty,
+  setVaccinesDirty,
+}) {
   const [allVaccines, setAllVaccines] = useState([]);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     apiClient.get("/admin/vaccines").then(({ data }) => setAllVaccines(data));
   }, []);
 
-  async function saveSummary(summary) {
+  function editSummary(summary) {
     setYear({ ...year, summary });
+    setSummaryDirty(true);
+    setStatus("dirty");
   }
 
-  async function persistSummary() {
-    setSaving(true);
-    await apiClient.put(`/admin/years/${year.id}`, { summary: year.summary });
-    setSaving(false);
-  }
-
-  async function toggleVaccine(vaccine) {
+  function toggleVaccine(vaccine) {
     const selected = (year.vaccines ?? []).some((v) => v.id === vaccine.id);
-    const nextIds = selected
-      ? year.vaccines.filter((v) => v.id !== vaccine.id).map((v) => v.id)
-      : [...(year.vaccines ?? []).map((v) => v.id), vaccine.id];
+    const nextVaccines = selected
+      ? (year.vaccines ?? []).filter((v) => v.id !== vaccine.id)
+      : [...(year.vaccines ?? []), vaccine];
+    setYear({ ...year, vaccines: nextVaccines });
+    setVaccinesDirty(true);
+    setStatus("dirty");
+  }
 
-    const { data } = await apiClient.post(`/admin/years/${year.id}/assign-vaccines`, {
-      vaccine_ids: nextIds,
-    });
-    setYear({ ...year, vaccines: data.vaccines });
+  async function handleSave() {
+    setStatus("saving");
+    try {
+      if (summaryDirty) {
+        await apiClient.put(`/admin/years/${year.id}`, { summary: year.summary });
+      }
+      if (vaccinesDirty) {
+        const { data } = await apiClient.post(`/admin/years/${year.id}/assign-vaccines`, {
+          vaccine_ids: (year.vaccines ?? []).map((v) => v.id),
+        });
+        setYear((prev) => ({ ...prev, vaccines: data.vaccines }));
+      }
+      setSummaryDirty(false);
+      setVaccinesDirty(false);
+      setStatus("saved");
+    } catch (e) {
+      setStatus("error");
+      alert(e?.response?.data?.message ?? "Gagal menyimpan rangkuman/vaksin.");
+    }
   }
 
   return (
     <div className="space-y-8">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          Rangkuman Wabah (years.summary)
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Rangkuman Wabah (years.summary)
+          </p>
+          {summaryDirty && <UnsavedFieldBadge />}
+        </div>
         <Textarea
           rows={6}
           value={year.summary ?? ""}
-          onChange={(e) => saveSummary(e.target.value)}
-          onBlur={persistSummary}
+          onChange={(e) => editSummary(e.target.value)}
           placeholder="Tulis rangkuman wabah ini…"
         />
         <p className="mt-1 text-[11px] text-zinc-400">
-          {saving ? "Menyimpan…" : "Tersimpan otomatis saat keluar dari field ini."} Wajib terisi sebelum kuis
-          bisa di-publish (R-QUIZ-05).
+          Wajib terisi sebelum kuis bisa di-publish (R-QUIZ-05). Klik tombol Simpan di bawah untuk menyimpan
+          perubahan rangkuman & vaksin sekaligus.
         </p>
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Vaksin Terkait</p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Vaksin Terkait</p>
+          {vaccinesDirty && <UnsavedFieldBadge />}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           {allVaccines.map((v) => {
             const checked = (year.vaccines ?? []).some((yv) => yv.id === v.id);
@@ -596,15 +902,30 @@ function SummaryVaccineTab({ year, setYear }) {
           )}
         </div>
       </div>
+
+      <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+        <SaveButton status={status} onClick={handleSave} />
+      </div>
     </div>
   );
 }
 
 /* -------------------------------------------------------------- Tab: Kuis */
 
-function QuizTab({ year, setYear, activeQuestionIndex, setActiveQuestionIndex }) {
+function QuizTab({
+  year,
+  setYear,
+  activeQuestionIndex,
+  setActiveQuestionIndex,
+  status,
+  setStatus,
+  dirtyFields,
+  setDirtyFields,
+}) {
   const quiz = year.quiz;
   const questions = quiz?.questions ?? [];
+
+  const dirtyQuestionIds = new Set(dirtyFields.keys());
 
   // GET /admin/years/{year}/quiz — QuizController::show() firstOrCreate quiz
   // dan load('questions.options'). YearController::show() sendiri cuma load
@@ -631,21 +952,35 @@ function QuizTab({ year, setYear, activeQuestionIndex, setActiveQuestionIndex })
     setActiveQuestionIndex(questions.length);
   }
 
-  async function updateQuestion(id, patch) {
+  function markFieldDirty(questionId, fieldName) {
+    setDirtyFields((prev) => {
+      const next = new Map(prev);
+      const fields = new Set(next.get(questionId) ?? []);
+      fields.add(fieldName);
+      next.set(questionId, fields);
+      return next;
+    });
+    setStatus("dirty");
+  }
+
+  // Perubahan soal (teks, tipe, opsi, referensi jawaban esai) sekarang cuma
+  // diubah di state lokal -- dikirim ke backend saat admin klik tombol
+  // Simpan (handleSaveQuiz), bukan lagi PATCH di setiap keystroke.
+  function updateQuestion(id, patch, fieldName) {
     const nextQuestions = questions.map((q) => (q.id === id ? { ...q, ...patch } : q));
     setYear({ ...year, quiz: { ...quiz, questions: nextQuestions } });
-    // PATCH /admin/quiz-questions/{question} — tidak nested di bawah quiz (routes/api.php)
-    const { data } = await apiClient.patch(`/admin/quiz-questions/${id}`, patch);
-    setYear((prev) => ({
-      ...prev,
-      quiz: { ...prev.quiz, questions: prev.quiz.questions.map((q) => (q.id === id ? data : q)) },
-    }));
+    markFieldDirty(id, fieldName);
   }
 
   async function deleteQuestion(id) {
     await apiClient.delete(`/admin/quiz-questions/${id}`);
     setYear({ ...year, quiz: { ...quiz, questions: questions.filter((q) => q.id !== id) } });
     setActiveQuestionIndex(0);
+    setDirtyFields((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   async function togglePublish() {
@@ -660,11 +995,44 @@ function QuizTab({ year, setYear, activeQuestionIndex, setActiveQuestionIndex })
     }
   }
 
+  async function handleSaveQuiz() {
+    if (dirtyFields.size === 0) {
+      setStatus("saved");
+      return;
+    }
+    setStatus("saving");
+    try {
+      await Promise.all(
+        Array.from(dirtyFields.keys()).map((id) => {
+          const q = questions.find((qq) => qq.id === id);
+          if (!q) return Promise.resolve();
+          return apiClient.patch(`/admin/quiz-questions/${id}`, {
+            question: q.question,
+            type: q.type,
+            options: q.options,
+            correct_answer: q.correct_answer,
+          });
+        })
+      );
+      setDirtyFields(new Map());
+      setStatus("saved");
+    } catch (e) {
+      setStatus("error");
+      alert(e?.response?.data?.message ?? "Gagal menyimpan soal.");
+    }
+  }
+
+  function selectQuestion(i) {
+    if (i === activeQuestionIndex) return;
+    setActiveQuestionIndex(i);
+  }
+
   if (!quiz) {
     return <EmptyPanel text="Memuat kuis…" />;
   }
 
   const activeQuestion = questions[activeQuestionIndex];
+  const activeDirtyFields = activeQuestion ? dirtyFields.get(activeQuestion.id) ?? new Set() : new Set();
 
   return (
     <div className="space-y-4">
@@ -676,8 +1044,8 @@ function QuizTab({ year, setYear, activeQuestionIndex, setActiveQuestionIndex })
           <Button variant="outline" size="sm" onClick={addQuestion} disabled={questions.length >= 5}>
             <Plus size={12} /> Soal
           </Button>
-          <Button size="sm" onClick={togglePublish}>
-            <Save size={12} /> {quiz.is_published ? "Unpublish" : "Publish"}
+          <Button size="sm" variant="outline" onClick={togglePublish}>
+            {quiz.is_published ? "Unpublish" : "Publish"}
           </Button>
         </div>
       </div>
@@ -686,48 +1054,80 @@ function QuizTab({ year, setYear, activeQuestionIndex, setActiveQuestionIndex })
         {questions.map((q, i) => (
           <button
             key={q.id}
-            onClick={() => setActiveQuestionIndex(i)}
-            className={`h-8 w-8 rounded-full text-xs font-medium ${
+            onClick={() => selectQuestion(i)}
+            className={`relative h-8 w-8 rounded-full text-xs font-medium ${
               activeQuestionIndex === i ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"
             }`}
           >
             {i + 1}
+            {dirtyQuestionIds.has(q.id) && (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-orange-400"
+                title="Ada field belum disimpan di soal ini"
+              />
+            )}
           </button>
         ))}
       </div>
 
       {activeQuestion && (
         <div className="space-y-3 rounded-lg border border-zinc-100 p-4">
-          <Textarea
-            value={activeQuestion.question}
-            placeholder="Tulis soal…"
-            onChange={(e) => updateQuestion(activeQuestion.id, { question: e.target.value })}
-          />
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-[11px] font-medium text-zinc-400">Teks soal</p>
+              {activeDirtyFields.has("question") && <UnsavedFieldBadge />}
+            </div>
+            <Textarea
+              value={activeQuestion.question}
+              placeholder="Tulis soal…"
+              onChange={(e) => updateQuestion(activeQuestion.id, { question: e.target.value }, "question")}
+            />
+          </div>
 
-          <Select
-            value={activeQuestion.type}
-            onValueChange={(type) => updateQuestion(activeQuestion.id, { type })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih tipe soal" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="multiple_choice">Pilihan ganda</SelectItem>
-              <SelectItem value="essay">Esai</SelectItem>
-            </SelectContent>
-          </Select>
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-[11px] font-medium text-zinc-400">Tipe soal</p>
+              {activeDirtyFields.has("type") && <UnsavedFieldBadge />}
+            </div>
+            <Select
+              value={activeQuestion.type}
+              onValueChange={(type) => updateQuestion(activeQuestion.id, { type }, "type")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih tipe soal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="multiple_choice">Pilihan ganda</SelectItem>
+                <SelectItem value="essay">Esai</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {activeQuestion.type === "multiple_choice" ? (
-            <OptionsEditor
-              question={activeQuestion}
-              onChange={(options) => updateQuestion(activeQuestion.id, { options })}
-            />
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-[11px] font-medium text-zinc-400">Opsi jawaban</p>
+                {activeDirtyFields.has("options") && <UnsavedFieldBadge />}
+              </div>
+              <OptionsEditor
+                question={activeQuestion}
+                onChange={(options) => updateQuestion(activeQuestion.id, { options }, "options")}
+              />
+            </div>
           ) : (
-            <Input
-              value={activeQuestion.correct_answer ?? ""}
-              placeholder="Referensi jawaban (opsional, bukan untuk grading)"
-              onChange={(e) => updateQuestion(activeQuestion.id, { correct_answer: e.target.value })}
-            />
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-[11px] font-medium text-zinc-400">Referensi jawaban (esai)</p>
+                {activeDirtyFields.has("correct_answer") && <UnsavedFieldBadge />}
+              </div>
+              <Input
+                value={activeQuestion.correct_answer ?? ""}
+                placeholder="Referensi jawaban (opsional, bukan untuk grading)"
+                onChange={(e) =>
+                  updateQuestion(activeQuestion.id, { correct_answer: e.target.value }, "correct_answer")
+                }
+              />
+            </div>
           )}
 
           <Button variant="ghost" size="sm" onClick={() => deleteQuestion(activeQuestion.id)}>
@@ -735,6 +1135,10 @@ function QuizTab({ year, setYear, activeQuestionIndex, setActiveQuestionIndex })
           </Button>
         </div>
       )}
+
+      <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+        <SaveButton status={status} onClick={handleSaveQuiz} />
+      </div>
     </div>
   );
 }
