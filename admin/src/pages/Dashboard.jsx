@@ -1,36 +1,40 @@
 import { Link } from 'react-router-dom';
-import { Landmark, FileStack, HelpCircle, Syringe, ArrowRight } from 'lucide-react';
+import { Landmark, Layers, ShieldCheck, Syringe, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
+// Route disamakan dengan App.jsx (Design.md §4): /sections & /quizzes lama
+// sudah digantikan /studio (Content Studio, 3 tab). Warna dibedakan per
+// shortcut sesuai domainnya -- bukan abu-abu semua -- supaya Dashboard
+// langsung terasa "berwarna" seperti mockup, tapi tetap selektif per §5.6.
 const SHORTCUTS = [
   {
-    to: '/eras',
-    icon: Landmark,
-    title: 'Kelola Era & Tahun',
-    description: 'Atur 3 masa (Kolonial, Kemerdekaan, Modern), tahun-tahun wabah, dan rangkumannya.',
-    accent: 'bg-secondary text-foreground',
-  },
-  {
-    to: '/sections',
-    icon: FileStack,
-    title: 'Kelola Section',
-    description: 'Susun informasi sejarah per tahun: blok konten & urutan (sequential unlock).',
-    accent: 'bg-secondary text-foreground',
-  },
-  {
-    to: '/quizzes',
-    icon: HelpCircle,
-    title: 'Kelola Kuis',
-    description: 'Kuis custom internal per wabah — maks. 5 soal, wajib dikerjakan, tanpa skor.',
-    accent: 'bg-secondary text-foreground',
+    to: '/studio',
+    icon: Layers,
+    title: 'Content Studio',
+    description: 'Susun 1 wabah lengkap: section & blok, rangkuman, vaksin terkait, dan kuis dalam 1 alur.',
+    accent: 'bg-warning/10 text-warning',
   },
   {
     to: '/vaccines',
     icon: Syringe,
     title: 'Kelola Vaksin',
-    description: 'Data vaksin untuk collectible card di aplikasi mobile.',
+    description: 'Data master vaksin untuk collectible card di aplikasi mobile.',
     accent: 'bg-gamify/10 text-gamify',
+  },
+  {
+    to: '/admins',
+    icon: ShieldCheck,
+    title: 'Kelola Admin',
+    description: 'Tambah atau kelola akun admin lain (akses setara, tanpa sub-level).',
+    accent: 'bg-info/10 text-info',
+  },
+  {
+    to: '/eras',
+    icon: Landmark,
+    title: 'Kelola Era & Tahun',
+    description: 'Housekeeping: atur 3 masa (Kolonial, Kemerdekaan, Modern) dan tahun-tahun wabah.',
+    accent: 'bg-secondary text-foreground',
   },
 ];
 

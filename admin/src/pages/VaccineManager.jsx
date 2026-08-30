@@ -123,7 +123,7 @@ export default function VaccineManager() {
           </p>
         </div>
         {!showForm && (
-          <Button onClick={openAddForm}>
+          <Button onClick={openAddForm} className="bg-gamify text-white hover:bg-gamify/90">
             <Plus className="h-4 w-4" /> Tambah Vaksin
           </Button>
         )}
@@ -193,7 +193,9 @@ export default function VaccineManager() {
                 />
               </div>
               <div className="flex gap-2 pt-1">
-                <Button type="submit">{editingId ? 'Update Vaksin' : 'Tambah Vaksin'}</Button>
+                <Button type="submit" className="bg-gamify text-white hover:bg-gamify/90">
+                  {editingId ? 'Update Vaksin' : 'Tambah Vaksin'}
+                </Button>
                 <Button type="button" variant="outline" onClick={resetForm}>Batal</Button>
               </div>
             </form>
@@ -208,7 +210,7 @@ export default function VaccineManager() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {vaccines.map((vaccine) => (
-            <Card key={vaccine.id}>
+            <Card key={vaccine.id} className="border-l-4 border-l-gamify">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">

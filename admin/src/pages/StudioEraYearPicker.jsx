@@ -8,6 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { ERA_ACCENTS } from "@/config/branding";
 
 /**
+ * Class Tailwind solid per era untuk card di EraGrid (Design.md — mockup
+ * "Informasi Sejarah": card Kolonial/Kemerdekaan/Modern full-color, bukan
+ * cuma dot aksen). Ditulis statis (bukan template string dinamis) supaya
+ * class-nya ke-detect Tailwind JIT scanner.
+ */
+const ERA_CARD_STYLES = {
+  kolonial: "bg-warning text-warning-foreground",
+  kemerdekaan: "bg-success text-success-foreground",
+  modern: "bg-info text-info-foreground",
+};
+const DEFAULT_ERA_CARD_STYLE = "bg-primary text-primary-foreground";
+
+/**
  * Entry point Content Studio (Design.md §4.1):
  *   Pilih Era (grid card) -> Pilih Tahun (grid card + quick-create inline)
  *   -> submit tahun baru langsung masuk ke WabahWorkspace tahun tsb.
@@ -90,26 +103,22 @@ function EraGrid({ eras, onSelect }) {
   return (
     <div className="grid grid-cols-3 gap-4">
       {eras.map((era) => {
-        const accent = ERA_ACCENTS?.[era.slug]?.hex ?? "#0C0C0C";
+        const cardStyle = ERA_CARD_STYLES[era.slug] ?? DEFAULT_ERA_CARD_STYLE;
         return (
           <button
             key={era.id}
             onClick={() => onSelect(era)}
-            className="group flex flex-col justify-between rounded-2xl border border-zinc-100 p-5 text-left transition hover:shadow-md"
+            className={`group flex flex-col justify-between rounded-2xl p-5 text-left shadow-sm transition hover:shadow-md hover:-translate-y-0.5 ${cardStyle}`}
           >
             <div>
-              <span
-                className="mb-3 inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: accent }}
-              />
-              <h3 className="text-base font-semibold text-zinc-900">{era.name}</h3>
+              <h3 className="text-base font-semibold">{era.name}</h3>
               {era.description && (
-                <p className="mt-1 line-clamp-2 text-xs text-zinc-500">{era.description}</p>
+                <p className="mt-1 line-clamp-2 text-xs opacity-80">{era.description}</p>
               )}
             </div>
-            <div className="mt-4 flex items-center justify-between text-xs text-zinc-400">
+            <div className="mt-4 flex items-center justify-between text-xs opacity-80">
               <span>{era.years_count ?? "—"} tahun</span>
-              <ChevronRight size={16} className="text-zinc-300 transition group-hover:translate-x-0.5" />
+              <ChevronRight size={16} className="transition group-hover:translate-x-0.5" />
             </div>
           </button>
         );
@@ -153,7 +162,8 @@ function YearGrid({ era, years, loading, onSelect, onCreate }) {
             <button
               key={y.id}
               onClick={() => onSelect(y)}
-              className="flex flex-col items-start gap-1 rounded-xl border border-zinc-100 p-4 text-left transition hover:shadow-md"
+              className="flex flex-col items-start gap-1 rounded-xl border border-l-4 border-zinc-100 p-4 text-left transition hover:shadow-md"
+              style={{ borderLeftColor: accent }}
             >
               <span className="text-xs font-medium text-zinc-400">{y.year}</span>
               <span className="line-clamp-2 text-sm font-medium text-zinc-900">{y.title}</span>

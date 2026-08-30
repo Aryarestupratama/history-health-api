@@ -38,7 +38,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-secondary/40 px-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
-          <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+          <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-warning via-gamify to-info text-sm font-bold text-white shadow-sm">
             {APP_SHORT_INITIALS}
           </div>
           <CardTitle>{APP_NAME} Admin</CardTitle>

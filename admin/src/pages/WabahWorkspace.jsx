@@ -221,8 +221,9 @@ export default function WabahWorkspace() {
             key={t.key}
             onClick={() => setActiveTab(t.key)}
             className={`relative flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition ${
-              activeTab === t.key ? "text-zinc-900" : "text-zinc-400 hover:text-zinc-600"
+              activeTab === t.key ? "" : "text-zinc-400 hover:text-zinc-600"
             }`}
+            style={activeTab === t.key ? { color: eraAccent } : undefined}
           >
             {t.label}
             {activeTab === t.key && (
@@ -292,6 +293,7 @@ function Breadcrumb({ year, confirmDiscardIfUnsaved }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [siblingYears, setSiblingYears] = useState(null);
+  const eraAccent = ERA_ACCENTS?.[year?.era?.slug]?.hex ?? "#0C0C0C";
 
   async function toggle() {
     if (!open && !siblingYears) {
@@ -330,6 +332,7 @@ function Breadcrumb({ year, confirmDiscardIfUnsaved }) {
         onClick={toggle}
         className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
       >
+        <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: eraAccent }} />
         <span>{year.era?.name}</span>
         <span className="text-zinc-300">/</span>
         <span className="font-medium text-zinc-900">
@@ -1056,7 +1059,7 @@ function QuizTab({
             key={q.id}
             onClick={() => selectQuestion(i)}
             className={`relative h-8 w-8 rounded-full text-xs font-medium ${
-              activeQuestionIndex === i ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"
+              activeQuestionIndex === i ? "bg-gamify text-white" : "bg-zinc-100 text-zinc-500"
             }`}
           >
             {i + 1}

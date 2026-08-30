@@ -16,14 +16,15 @@ import { PALETTE, ERA_ACCENTS } from "@/config/branding";
  */
 export default function PhonePreview({ screen, data, eraSlug }) {
   const accent = ERA_ACCENTS?.[eraSlug]?.hex ?? PALETTE.ink;
+  const eraLabel = ERA_ACCENTS?.[eraSlug]?.label ?? null;
 
   return (
     <div className="sticky top-4 flex flex-col items-center">
       <PhoneFrame>
         <StatusBar />
         <div className="flex-1 overflow-y-auto px-4 pb-6 pt-3" style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
-          {screen === "roadmap" && <RoadmapScreen data={data} accent={accent} />}
-          {screen === "section-detail" && <SectionDetailScreen data={data} accent={accent} />}
+          {screen === "roadmap" && <RoadmapScreen data={data} accent={accent} eraLabel={eraLabel} />}
+          {screen === "section-detail" && <SectionDetailScreen data={data} accent={accent} eraLabel={eraLabel} />}
           {screen === "summary" && <SummaryScreen data={data} accent={accent} />}
           {screen === "quiz" && <QuizScreen data={data} accent={accent} />}
           {!screen && <EmptyState />}
@@ -66,10 +67,18 @@ function EmptyState() {
 /* ------------------------------------------------------------- Roadmap tab */
 // data: { yearTitle, yearNumber, sections: [{ id, title, order, isPublished, locked }], activeId? }
 
-function RoadmapScreen({ data, accent }) {
+function RoadmapScreen({ data, accent, eraLabel }) {
   const sections = data?.sections ?? [];
   return (
     <div>
+      {eraLabel && (
+        <span
+          className="mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+          style={{ backgroundColor: `${accent}26`, color: accent }}
+        >
+          {eraLabel}
+        </span>
+      )}
       <p className="text-xs font-medium text-zinc-400">{data?.yearNumber ?? "—"}</p>
       <h2 className="mb-4 text-lg font-semibold text-zinc-900">{data?.yearTitle || "Judul wabah"}</h2>
 
@@ -124,10 +133,18 @@ function RoadmapScreen({ data, accent }) {
 /* -------------------------------------------------------- Section detail */
 // data: { sectionTitle, blocks: [{ id, type: 'text'|'image'|'video'|'pdf', content, resolvedUrl }] }
 
-function SectionDetailScreen({ data, accent }) {
+function SectionDetailScreen({ data, accent, eraLabel }) {
   const blocks = data?.blocks ?? [];
   return (
     <div>
+      {eraLabel && (
+        <span
+          className="mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+          style={{ backgroundColor: `${accent}26`, color: accent }}
+        >
+          {eraLabel}
+        </span>
+      )}
       <h2 className="mb-3 text-base font-semibold text-zinc-900">{data?.sectionTitle || "Judul section"}</h2>
       {blocks.length === 0 && (
         <p className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">

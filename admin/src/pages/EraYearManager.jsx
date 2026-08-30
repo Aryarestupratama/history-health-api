@@ -279,16 +279,15 @@ export default function EraYearManager() {
             const accent = getEraAccent(era.slug);
 
             return (
-              <Card key={era.id} className={cn(isExpanded && 'sm:col-span-2 xl:col-span-3')}>
+              <Card
+                key={era.id}
+                className={cn('border-l-4', isExpanded && 'sm:col-span-2 xl:col-span-3')}
+                style={{ borderLeftColor: accent.hex }}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <button onClick={() => toggleExpand(era)} className="min-w-0 flex-1 text-left">
                       <p className="flex items-center gap-2 truncate font-medium">
-                        <span
-                          className="inline-block h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: accent.hex }}
-                          title={accent.label}
-                        />
                         <span className="text-muted-foreground">{era.order}.</span> {era.name}
                       </p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">{era.slug}</p>
