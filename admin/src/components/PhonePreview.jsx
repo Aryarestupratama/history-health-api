@@ -22,7 +22,10 @@ export default function PhonePreview({ screen, data, eraSlug }) {
     <div className="sticky top-4 flex flex-col items-center">
       <PhoneFrame>
         <StatusBar />
-        <div className="flex-1 overflow-y-auto px-4 pb-6 pt-3" style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden break-words px-4 pb-6 pt-3"
+          style={{ fontFamily: "Inter, system-ui, sans-serif" }}
+        >
           {screen === "roadmap" && <RoadmapScreen data={data} accent={accent} eraLabel={eraLabel} />}
           {screen === "section-detail" && <SectionDetailScreen data={data} accent={accent} eraLabel={eraLabel} />}
           {screen === "summary" && <SummaryScreen data={data} accent={accent} />}

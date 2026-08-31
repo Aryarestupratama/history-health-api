@@ -4,7 +4,16 @@ import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
 import apiClient from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { ERA_ACCENTS } from "@/config/branding";
 
 /**
@@ -133,29 +142,60 @@ function YearGrid({ era, years, loading, onSelect, onCreate }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ year: "", title: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState(null);
   const accent = ERA_ACCENTS?.[era.slug]?.hex ?? "#0C0C0C";
+
+  function openForm() {
+    setForm({ year: "", title: "" });
+    setFormError(null);
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setFormError(null);
+  }
 
   async function submit(e) {
     e.preventDefault();
     if (!form.year || !form.title) return;
     setSubmitting(true);
+    setFormError(null);
     try {
       await onCreate({ year: Number(form.year), title: form.title });
+      // navigate ke workspace terjadi di onCreate (App.jsx/StudioEraYearPicker
+      // induk) — dialog tidak perlu ditutup manual karena komponen ini
+      // akan unmount begitu route berpindah.
     } catch (err) {
-      alert(err?.response?.data?.message ?? "Gagal membuat tahun baru");
+      setFormError(err?.response?.data?.message ?? "Gagal membuat tahun baru");
       setSubmitting(false);
     }
   }
 
+  const yearAlreadyExists = form.year && years.some((y) => y.year === Number(form.year));
+
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
-        <h2 className="text-base font-semibold text-zinc-900">{era.name}</h2>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
+          <h2 className="text-base font-semibold text-zinc-900">{era.name}</h2>
+        </div>
+        <Button size="sm" onClick={openForm} style={{ backgroundColor: accent }} className="text-white hover:opacity-90">
+          <Plus size={16} /> Tambah Tahun Baru
+        </Button>
       </div>
 
       {loading ? (
         <p className="text-sm text-zinc-400">Memuat tahun…</p>
+      ) : years.length === 0 ? (
+        <button
+          onClick={openForm}
+          className="flex w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-zinc-200 p-8 text-zinc-400 transition hover:border-zinc-300 hover:text-zinc-600"
+        >
+          <Plus size={18} />
+          <span className="text-xs">Belum ada tahun di era ini — klik untuk tambah</span>
+        </button>
       ) : (
         <div className="grid grid-cols-4 gap-3">
           {years.map((y) => (
@@ -173,44 +213,65 @@ function YearGrid({ era, years, loading, onSelect, onCreate }) {
               </div>
             </button>
           ))}
+        </div>
+      )}
 
-          {!showForm ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-zinc-200 p-4 text-zinc-400 transition hover:border-zinc-300 hover:text-zinc-600"
-            >
-              <Plus size={18} />
-              <span className="text-xs">Tambah Tahun Baru</span>
-            </button>
-          ) : (
-            <form
-              onSubmit={submit}
-              className="flex flex-col gap-2 rounded-xl border border-zinc-200 p-3"
-            >
+      <Dialog open={showForm} onOpenChange={(open) => !open && closeForm()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
+              Tahun Baru — {era.name}
+            </DialogTitle>
+            <DialogDescription>
+              Submit langsung membuka Workspace Wabah untuk tahun ini.
+            </DialogDescription>
+          </DialogHeader>
+
+          {formError && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError}</p>
+          )}
+
+          <form id="quick-create-year-form" onSubmit={submit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Tahun</Label>
               <Input
                 type="number"
-                placeholder="Tahun, mis. 1918"
+                placeholder="mis. 1918"
                 value={form.year}
                 onChange={(e) => setForm({ ...form, year: e.target.value })}
                 autoFocus
+                required
               />
+              {yearAlreadyExists && (
+                <p className="text-xs text-warning">⚠ Tahun ini sudah pernah diinput sebelumnya</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Judul Wabah</Label>
               <Input
-                placeholder="Judul wabah"
+                placeholder="mis. Wabah Flu Spanyol"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
               />
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" disabled={submitting} style={{ backgroundColor: accent }}>
-                  {submitting ? "Membuat…" : "Buat & Buka"}
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
-                  Batal
-                </Button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
+            </div>
+          </form>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeForm}>Batal</Button>
+            <Button
+              type="submit"
+              form="quick-create-year-form"
+              disabled={submitting}
+              style={{ backgroundColor: accent }}
+              className="text-white hover:opacity-90"
+            >
+              {submitting ? "Membuat…" : "Buat & Buka"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

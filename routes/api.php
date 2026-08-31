@@ -44,7 +44,8 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
-    Route::apiResource('eras', AdminEraController::class);
+    // Create era sengaja ditutup — 3 era paten dari EraSeeder (lihat EraController).
+    Route::apiResource('eras', AdminEraController::class)->only(['index', 'show', 'update', 'destroy']);
     Route::apiResource('years', AdminYearController::class);
     Route::apiResource('vaccines', AdminVaccineController::class);
 

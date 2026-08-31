@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useConfirm } from "@/components/confirm-dialog";
 import PhonePreview from "@/components/PhonePreview";
 import { ERA_ACCENTS } from "@/config/branding";
 
@@ -18,6 +20,7 @@ const TABS = [
 
 export default function WabahWorkspace() {
   const { yearId } = useParams();
+  const { confirm: confirmDialog, dialog } = useConfirm();
 
   const [year, setYear] = useState(null); // { id, year, title, summary, era: {slug,name}, sections: [], vaccines: [], quiz: {...} }
   const [loading, setLoading] = useState(true);
@@ -31,9 +34,17 @@ export default function WabahWorkspace() {
   // Dipakai HANYA untuk tombol Simpan (enable/disable + label) di masing-masing
   // tab -- bukan indikator "belum disimpan" per field (lihat state di bawah).
   const [tabStatus, setTabStatus] = useState({ section: "idle", summary: "idle", quiz: "idle" });
+  // Pesan error per tab -- pengganti alert() browser, ditampilkan sebagai
+  // <Alert> di atas konten tab aktif, konsisten dengan AdminManager/
+  // VaccineManager/EraYearManager.
+  const [tabError, setTabError] = useState({ section: null, summary: null, quiz: null });
 
   function setStatusFor(tabKey, status) {
     setTabStatus((prev) => ({ ...prev, [tabKey]: status }));
+  }
+
+  function setErrorFor(tabKey, message) {
+    setTabError((prev) => ({ ...prev, [tabKey]: message }));
   }
 
   // ------------------------------------------------------------------
@@ -73,11 +84,12 @@ export default function WabahWorkspace() {
 
   // Dipanggil dari mana pun yang mau berpindah keluar workspace ini
   // (breadcrumb ganti tahun/era) -- true berarti boleh lanjut.
-  function confirmDiscardIfUnsaved(message) {
+  async function confirmDiscardIfUnsaved(message) {
     if (!hasAnyUnsaved) return true;
-    return confirm(
-      message ?? "Ada perubahan yang belum disimpan di workspace ini. Tetap pindah dan buang perubahan?"
-    );
+    return confirmDialog({
+      title: "Ada perubahan belum disimpan",
+      description: message ?? "Ada perubahan yang belum disimpan di workspace ini. Tetap pindah dan buang perubahan?",
+    });
   }
 
   useEffect(() => {
@@ -134,11 +146,14 @@ export default function WabahWorkspace() {
     return (section?.content_blocks ?? []).some((b) => sectionBlockDirty.has(b.id));
   }
 
-  function selectSection(id) {
+  async function selectSection(id) {
     if (id === activeSectionId) return;
     if (
       isSectionDirty(activeSectionId) &&
-      !confirm("Ada perubahan di section ini yang belum disimpan. Pindah section dan buang perubahan?")
+      !(await confirmDialog({
+        title: "Ada perubahan belum disimpan",
+        description: "Ada perubahan di section ini yang belum disimpan. Pindah section dan buang perubahan?",
+      }))
     ) {
       return;
     }
@@ -213,6 +228,7 @@ export default function WabahWorkspace() {
 
   return (
     <div className="flex h-full flex-col">
+      {dialog}
       <Breadcrumb year={year} confirmDiscardIfUnsaved={confirmDiscardIfUnsaved} />
 
       <div className="flex border-b border-zinc-100 px-6">
@@ -238,6 +254,11 @@ export default function WabahWorkspace() {
 
       <div className="grid flex-1 grid-cols-[65%_35%] overflow-hidden">
         <div className="overflow-y-auto p-6">
+          {tabError[activeTab] && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{tabError[activeTab]}</AlertDescription>
+            </Alert>
+          )}
           {activeTab === "section" && (
             <SectionBlokTab
               year={year}
@@ -247,6 +268,8 @@ export default function WabahWorkspace() {
               eraAccent={eraAccent}
               status={tabStatus.section}
               setStatus={(s) => setStatusFor("section", s)}
+              setError={(m) => setErrorFor("section", m)}
+              confirmDialog={confirmDialog}
               titleDirty={sectionTitleDirty}
               setTitleDirty={setSectionTitleDirty}
               blockDirty={sectionBlockDirty}
@@ -259,6 +282,7 @@ export default function WabahWorkspace() {
               setYear={setYear}
               status={tabStatus.summary}
               setStatus={(s) => setStatusFor("summary", s)}
+              setError={(m) => setErrorFor("summary", m)}
               summaryDirty={summaryDirty}
               setSummaryDirty={setSummaryDirty}
               vaccinesDirty={vaccinesDirty}
@@ -273,6 +297,7 @@ export default function WabahWorkspace() {
               setActiveQuestionIndex={setActiveQuestionIndex}
               status={tabStatus.quiz}
               setStatus={(s) => setStatusFor("quiz", s)}
+              setError={(m) => setErrorFor("quiz", m)}
               dirtyFields={quizFieldDirty}
               setDirtyFields={setQuizFieldDirty}
             />
