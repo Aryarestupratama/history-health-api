@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin\Quiz;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateQuizQuestionRequest extends FormRequest
 {
@@ -16,8 +15,6 @@ class UpdateQuizQuestionRequest extends FormRequest
     {
         return [
             'question' => 'sometimes|nullable|string',
-            'type' => 'sometimes|required|in:multiple_choice,essay',
-            'correct_answer' => 'nullable|string',
 
             'options' => ['sometimes', 'array', 'min:2'],
 
@@ -34,12 +31,7 @@ class UpdateQuizQuestionRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // Nama parameter route sudah benar: routes/api.php mendefinisikan
-            // 'quiz-questions/{question}', jadi $this->route('question') tepat
-            // (berbeda dari bug 'content_block' vs 'contentBlock' sebelumnya).
-            $type = $this->input('type', $this->route('question')?->type);
-
-            if ($type !== 'multiple_choice' || ! $this->has('options')) {
+            if (! $this->has('options')) {
                 return;
             }
 

@@ -122,7 +122,7 @@ export default function AdminManager() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Kelola Admin</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Tambah atau kelola akun admin. Semua admin punya akses setara, tanpa sub-level (R-ADMIN-01).
+            Tambah atau kelola akun admin. Semua admin punya akses setara, tanpa sub-level.
           </p>
         </div>
         <Button onClick={openAddForm} className="bg-gamify text-white hover:bg-gamify/90">

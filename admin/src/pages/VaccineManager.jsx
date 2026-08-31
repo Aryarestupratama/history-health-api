@@ -132,7 +132,7 @@ export default function VaccineManager() {
           <h1 className="text-2xl font-semibold tracking-tight">Kelola Vaksin</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Data vaksin untuk collectible card di aplikasi mobile. Assign ke tahun (wabah) dilakukan
-            di halaman workspace tahun (VAC-01–03).
+            di halaman workspace tahun.
           </p>
         </div>
         <Button onClick={openAddForm} className="bg-gamify text-white hover:bg-gamify/90">
@@ -198,7 +198,7 @@ export default function VaccineManager() {
           <DialogHeader>
             <DialogTitle>{editingId ? 'Edit Vaksin' : 'Vaksin Baru'}</DialogTitle>
             <DialogDescription>
-              Data ini dipakai sebagai collectible card di aplikasi mobile (VAC-01/02).
+              Data ini dipakai sebagai collectible card di aplikasi mobile.
             </DialogDescription>
           </DialogHeader>
 

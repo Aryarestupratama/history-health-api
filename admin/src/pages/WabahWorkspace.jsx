@@ -5,7 +5,6 @@ import apiClient from "@/api"; // axios instance dgn interceptor token Sanctum
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -898,7 +897,7 @@ function SummaryVaccineTab({
           placeholder="Tulis rangkuman wabah ini…"
         />
         <p className="mt-1 text-[11px] text-zinc-400">
-          Wajib terisi sebelum kuis bisa di-publish (R-QUIZ-05). Klik tombol Simpan di bawah untuk menyimpan
+          Wajib terisi sebelum kuis bisa di-publish. Klik tombol Simpan di bawah untuk menyimpan
           perubahan rangkuman & vaksin sekaligus.
         </p>
       </div>
@@ -973,7 +972,6 @@ function QuizTab({
     if (questions.length >= 5) return alert("Maksimal 5 soal per kuis (R-QUIZ-06)");
     const { data } = await apiClient.post(`/admin/quizzes/${quiz.id}/questions`, {
       question: "",
-      type: "multiple_choice",
       options: [{ option_text: "", is_correct: true }, { option_text: "", is_correct: false }],
     });
     setYear({ ...year, quiz: { ...quiz, questions: [...questions, data] } });
@@ -1019,7 +1017,7 @@ function QuizTab({
       });
       setYear({ ...year, quiz: { ...quiz, ...data } });
     } catch (e) {
-      alert(e?.response?.data?.message ?? "Gagal publish (butuh min. 1 soal + rangkuman terisi — R-QUIZ-05)");
+      alert(e?.response?.data?.message ?? "Gagal publish (butuh min. 1 soal + rangkuman terisi");
     }
   }
 
@@ -1036,9 +1034,7 @@ function QuizTab({
           if (!q) return Promise.resolve();
           return apiClient.patch(`/admin/quiz-questions/${id}`, {
             question: q.question,
-            type: q.type,
             options: q.options,
-            correct_answer: q.correct_answer,
           });
         })
       );
@@ -1114,49 +1110,14 @@ function QuizTab({
 
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <p className="text-[11px] font-medium text-zinc-400">Tipe soal</p>
-              {activeDirtyFields.has("type") && <UnsavedFieldBadge />}
+              <p className="text-[11px] font-medium text-zinc-400">Opsi jawaban</p>
+              {activeDirtyFields.has("options") && <UnsavedFieldBadge />}
             </div>
-            <Select
-              value={activeQuestion.type}
-              onValueChange={(type) => updateQuestion(activeQuestion.id, { type }, "type")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih tipe soal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="multiple_choice">Pilihan ganda</SelectItem>
-                <SelectItem value="essay">Esai</SelectItem>
-              </SelectContent>
-            </Select>
+            <OptionsEditor
+              question={activeQuestion}
+              onChange={(options) => updateQuestion(activeQuestion.id, { options }, "options")}
+            />
           </div>
-
-          {activeQuestion.type === "multiple_choice" ? (
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <p className="text-[11px] font-medium text-zinc-400">Opsi jawaban</p>
-                {activeDirtyFields.has("options") && <UnsavedFieldBadge />}
-              </div>
-              <OptionsEditor
-                question={activeQuestion}
-                onChange={(options) => updateQuestion(activeQuestion.id, { options }, "options")}
-              />
-            </div>
-          ) : (
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <p className="text-[11px] font-medium text-zinc-400">Referensi jawaban (esai)</p>
-                {activeDirtyFields.has("correct_answer") && <UnsavedFieldBadge />}
-              </div>
-              <Input
-                value={activeQuestion.correct_answer ?? ""}
-                placeholder="Referensi jawaban (opsional, bukan untuk grading)"
-                onChange={(e) =>
-                  updateQuestion(activeQuestion.id, { correct_answer: e.target.value }, "correct_answer")
-                }
-              />
-            </div>
-          )}
 
           <Button variant="ghost" size="sm" onClick={() => deleteQuestion(activeQuestion.id)}>
             <Trash2 size={14} className="text-red-500" /> Hapus soal

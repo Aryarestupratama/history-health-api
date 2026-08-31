@@ -75,18 +75,18 @@ class QuizController extends Controller
 
         $question = $quiz->questions()->create($data);
 
-        if ($data['type'] === 'multiple_choice') {
-            foreach ($options as $index => $option) {
-                $question->options()->create([
-                    // FIX: sama alasan seperti 'question' di atas —
-                    // option_text: "" dari addQuestion() jadi null via
-                    // middleware, sementara quiz_question_options.option_text
-                    // NOT NULL di DB.
-                    'option_text' => $option['option_text'] ?? '',
-                    'is_correct' => $option['is_correct'] ?? false,
-                    'order' => $index + 1,
-                ]);
-            }
+        // R-QUIZ-07: kuis murni pilihan ganda — opsi selalu diproses, tidak
+        // ada lagi percabangan tipe soal.
+        foreach ($options as $index => $option) {
+            $question->options()->create([
+                // FIX: sama alasan seperti 'question' di atas —
+                // option_text: "" dari addQuestion() jadi null via
+                // middleware, sementara quiz_question_options.option_text
+                // NOT NULL di DB.
+                'option_text' => $option['option_text'] ?? '',
+                'is_correct' => $option['is_correct'] ?? false,
+                'order' => $index + 1,
+            ]);
         }
 
         return response()->json($question->load('options'), 201);
@@ -112,13 +112,8 @@ class QuizController extends Controller
 
         // R-QUIZ-07: opsi jawaban di-replace penuh saat diedit, lebih sederhana
         // daripada diff per-opsi dan cukup untuk kebutuhan admin CMS ini.
-        // Jika tipe soal berubah jadi 'essay', opsi lama (peninggalan saat
-        // masih multiple_choice) juga wajib dibersihkan — bukan cuma saat
-        // options baru dikirim, supaya tidak ada opsi nyangkut di DB untuk
-        // soal yang sekarang bertipe essay.
-        if ($question->type !== 'multiple_choice') {
-            $question->options()->delete();
-        } elseif ($options !== null) {
+        // Tidak ada lagi percabangan tipe soal — kuis murni pilihan ganda.
+        if ($options !== null) {
             $question->options()->delete();
 
             foreach ($options as $index => $option) {

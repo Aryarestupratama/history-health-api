@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin\Quiz;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreQuizQuestionRequest extends FormRequest
 {
@@ -26,15 +25,9 @@ class StoreQuizQuestionRequest extends FormRequest
             // StoreContentBlockRequest).
             'question' => 'nullable|string',
 
-            'type' => 'required|in:multiple_choice,essay',
-            'correct_answer' => 'nullable|string', // referensi saja untuk essay, bukan grading (R-QUIZ-07)
-
-            // R-QUIZ-07: multiple_choice wajib minimal 2 opsi, tepat satu is_correct.
-            'options' => [
-                Rule::requiredIf($this->input('type') === 'multiple_choice'),
-                'array',
-                'min:2',
-            ],
+            // R-QUIZ-07: kuis murni pilihan ganda — semua soal wajib minimal
+            // 2 opsi, tepat satu is_correct. Tidak ada lagi percabangan tipe.
+            'options' => ['required', 'array', 'min:2'],
 
             // FIX: 'nullable' (bukan 'required_with'). Sama alasan seperti
             // 'question' di atas — addQuestion() mengirim option_text: ""
@@ -47,10 +40,6 @@ class StoreQuizQuestionRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            if ($this->input('type') !== 'multiple_choice') {
-                return;
-            }
-
             $options = collect($this->input('options', []));
             $correctCount = $options->filter(fn ($opt) => (bool) ($opt['is_correct'] ?? false))->count();
 

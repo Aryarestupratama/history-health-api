@@ -16,7 +16,6 @@ class QuizSeeder extends Seeder
         if ($year1918) {
             $this->seedQuizFor($year1918, [
                 [
-                    'type' => 'multiple_choice',
                     'question' => 'Di mana wabah Flu Spanyol pertama kali terdeteksi menyebar luas di Hindia Belanda?',
                     'options' => [
                         ['text' => 'Pulau Jawa', 'is_correct' => true],
@@ -25,9 +24,12 @@ class QuizSeeder extends Seeder
                     ],
                 ],
                 [
-                    'type' => 'essay',
-                    'question' => 'Menurutmu, apa dampak wabah Flu Spanyol terhadap kebijakan kesehatan publik saat itu?',
-                    'correct_answer' => 'Mendorong perhatian lebih besar pemerintah kolonial terhadap sistem kesehatan masyarakat.',
+                    'question' => 'Apa dampak utama wabah Flu Spanyol terhadap kebijakan kesehatan publik pemerintah kolonial saat itu?',
+                    'options' => [
+                        ['text' => 'Mendorong perhatian lebih besar terhadap sistem kesehatan masyarakat', 'is_correct' => true],
+                        ['text' => 'Tidak ada perubahan kebijakan sama sekali', 'is_correct' => false],
+                        ['text' => 'Kesehatan publik diserahkan sepenuhnya ke pihak swasta', 'is_correct' => false],
+                    ],
                 ],
             ]);
         }
@@ -35,7 +37,6 @@ class QuizSeeder extends Seeder
         if ($year2020) {
             $this->seedQuizFor($year2020, [
                 [
-                    'type' => 'multiple_choice',
                     'question' => 'Kapan kasus pertama COVID-19 diumumkan resmi di Indonesia?',
                     'options' => [
                         ['text' => 'Januari 2020', 'is_correct' => false],
@@ -44,9 +45,12 @@ class QuizSeeder extends Seeder
                     ],
                 ],
                 [
-                    'type' => 'essay',
-                    'question' => 'Sebutkan satu perubahan kebiasaan masyarakat akibat pandemi COVID-19 yang kamu ingat.',
-                    'correct_answer' => null,
+                    'question' => 'Manakah yang merupakan perubahan kebiasaan masyarakat akibat pandemi COVID-19?',
+                    'options' => [
+                        ['text' => 'Penerapan protokol kesehatan seperti masker dan jaga jarak', 'is_correct' => true],
+                        ['text' => 'Penghapusan total layanan kesehatan daring', 'is_correct' => false],
+                        ['text' => 'Larangan penggunaan hand sanitizer', 'is_correct' => false],
+                    ],
                 ],
             ]);
         }
@@ -65,18 +69,14 @@ class QuizSeeder extends Seeder
             $question = $quiz->questions()->create([
                 'order' => $index + 1,
                 'question' => $q['question'],
-                'type' => $q['type'],
-                'correct_answer' => $q['correct_answer'] ?? null,
             ]);
 
-            if ($q['type'] === 'multiple_choice') {
-                foreach ($q['options'] as $optIndex => $opt) {
-                    $question->options()->create([
-                        'option_text' => $opt['text'],
-                        'is_correct' => $opt['is_correct'],
-                        'order' => $optIndex + 1,
-                    ]);
-                }
+            foreach ($q['options'] as $optIndex => $opt) {
+                $question->options()->create([
+                    'option_text' => $opt['text'],
+                    'is_correct' => $opt['is_correct'],
+                    'order' => $optIndex + 1,
+                ]);
             }
         }
     }

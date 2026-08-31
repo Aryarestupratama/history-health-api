@@ -13,8 +13,6 @@ class QuizQuestion extends Model
         'quiz_id',
         'order',
         'question',
-        'type',
-        'correct_answer',
     ];
 
     protected function casts(): array

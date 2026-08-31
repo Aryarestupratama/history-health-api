@@ -258,7 +258,7 @@ function SummaryScreen({ data, accent }) {
 }
 
 /* --------------------------------------------------------------- Quiz tab */
-// data: { questions: [{ id, question, type, options: [{ option_text, is_correct }] }], activeIndex }
+// data: { questions: [{ id, question, options: [{ option_text, is_correct }] }], activeIndex }
 //
 // Semua soal ditampilkan berurutan dalam 1 layar scrollable (bukan 1 soal
 // per layar dengan navigasi index) — selaras rencana model Flutter yang
@@ -295,34 +295,45 @@ function QuizScreen({ data, accent }) {
                 {q.question || <span className="text-zinc-300">Teks soal kosong</span>}
               </p>
 
-              {q.type === "multiple_choice" ? (
-                <div className="space-y-2">
-                  {(q.options ?? []).length === 0 && (
-                    <p className="text-xs text-zinc-300">Belum ada opsi jawaban</p>
-                  )}
-                  {(q.options ?? []).map((opt, oi) => (
-                    <div
-                      key={oi}
-                      className="flex items-center gap-2 rounded-lg border border-zinc-100 p-2.5 text-sm text-zinc-700"
-                    >
-                      <span
-                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
-                        style={{ borderColor: accent }}
-                      />
-                      {/* FIX: API balikin 'option_text' (snake_case, lihat
-                          Schema.md & QuizController), sebelumnya kode di
-                          sini baca 'optionText' (camelCase) yang selalu
-                          undefined -> opsi kelihatan "kosong" terus walau
-                          sudah diisi teksnya di editor. */}
+              <div className="space-y-2">
+                {(q.options ?? []).length === 0 && (
+                  <p className="text-xs text-zinc-300">Belum ada opsi jawaban</p>
+                )}
+                {(q.options ?? []).map((opt, oi) => (
+                  <div
+                    key={oi}
+                    className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm ${
+                      opt.is_correct
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-zinc-100 text-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
+                      style={{ borderColor: opt.is_correct ? "#4BA95F" : accent }}
+                    />
+                    {/* FIX: API balikin 'option_text' (snake_case, lihat
+                        Schema.md & QuizController), sebelumnya kode di
+                        sini baca 'optionText' (camelCase) yang selalu
+                        undefined -> opsi kelihatan "kosong" terus walau
+                        sudah diisi teksnya di editor. */}
+                    <span className="flex-1">
                       {opt.option_text || <span className="text-zinc-300">Opsi kosong</span>}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-zinc-100 p-3 text-xs text-zinc-300">
-                  Jawaban esai (input teks bebas)
-                </div>
-              )}
+                    </span>
+                    {opt.is_correct && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">
+                        Benar
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {(q.options ?? []).length > 0 && (
+                  <p className="pt-0.5 text-[10px] text-zinc-300">
+                    Simulasi feedback ke user setelah menjawab — highlight ini muncul instan per
+                    soal, bukan skor akhir
+                  </p>
+                )}
+              </div>
             </div>
           ))}
         </div>

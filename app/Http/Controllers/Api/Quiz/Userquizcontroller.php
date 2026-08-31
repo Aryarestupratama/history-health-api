@@ -40,9 +40,11 @@ class UserQuizController extends Controller
             ], 403);
         }
 
-        // R-QUIZ-04: tidak ada kunci jawaban yang dikirim ke user (bukan alat tes).
+        // R-QUIZ-04: tidak ada kunci jawaban yang dikirim ke user sebelum
+        // menjawab (bukan alat tes) — is_correct baru diikutkan di feedback
+        // submitAttempt() setelah kuis dikerjakan.
         return $quiz->load(['questions' => function ($q) {
-            $q->select('id', 'quiz_id', 'order', 'question', 'type');
+            $q->select('id', 'quiz_id', 'order', 'question');
         }, 'questions.options:id,quiz_question_id,option_text,order']);
     }
 
@@ -62,12 +64,43 @@ class UserQuizController extends Controller
 
         $data = $request->validate([
             'answers' => 'nullable|array',
+            // Format: { "<question_id>": <quiz_question_option_id> }
+            'answers.*' => 'nullable|integer|exists:quiz_question_options,id',
         ]);
+
+        $answers = $data['answers'] ?? [];
 
         $attempt = UserQuizAttempt::firstOrCreate(
             ['user_id' => $request->user()->id, 'quiz_id' => $quiz->id],
-            ['answers' => $data['answers'] ?? null, 'completed_at' => now()]
+            ['answers' => $answers, 'completed_at' => now()]
         );
+
+        // R-QUIZ-08 (idempotent): kalau attempt sudah ada sebelumnya,
+        // firstOrCreate() TIDAK menimpa answers lama dengan $answers dari
+        // request kedua ini — feedback selalu dihitung dari jawaban asli
+        // yang tersimpan (attempt pertama), bukan dari body request saat ini.
+        $storedAnswers = $attempt->answers ?? [];
+
+        // R-QUIZ-04: feedback benar/salah per soal dihitung on-the-fly di sini
+        // (bandingkan quiz_question_option_id yang dipilih vs is_correct opsi
+        // tsb) — tidak disimpan sebagai kolom baru, tidak diagregasi jadi
+        // skor/nilai akhir, dan tidak memengaruhi status attempt "selesai"
+        // maupun "year completed" (R-PROG-07) yang sudah ditentukan di atas
+        // begitu attempt tercatat.
+        $questions = $quiz->questions()->with('options:id,quiz_question_id,is_correct')->get();
+
+        $feedback = $questions->map(function ($question) use ($storedAnswers) {
+            $selectedOptionId = $storedAnswers[$question->id] ?? null;
+            $selectedOption = $selectedOptionId
+                ? $question->options->firstWhere('id', (int) $selectedOptionId)
+                : null;
+
+            return [
+                'question_id' => $question->id,
+                'selected_option_id' => $selectedOptionId,
+                'is_correct' => (bool) ($selectedOption->is_correct ?? false),
+            ];
+        })->values();
 
         // R-PROG-08: re-check status "year completed" setiap ada attempt baru.
         $newlyUnlocked = $this->yearCompletion->checkAndUnlockVaccines($request->user(), $year);
@@ -77,6 +110,7 @@ class UserQuizController extends Controller
                 ? 'Kuis berhasil dikerjakan.'
                 : 'Kuis ini sudah pernah dikerjakan sebelumnya.',
             'completed_at' => $attempt->completed_at,
+            'feedback' => $feedback,
             'newly_unlocked_vaccine_ids' => $newlyUnlocked->values(),
         ]);
     }
