@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('photo')->nullable(); // link Google Drive, pola sama seperti figures.photo sebelumnya
+            $table->string('photo_locked')->nullable(); // link Google Drive versi siluet/terkunci — ditampilkan sebelum vaksin unlock, dipakai untuk animasi reveal di Flutter
             $table->string('manufacturer')->nullable(); // produsen/penemu vaksin
             $table->string('disease_target')->nullable(); // penyakit/wabah yang ditargetkan
             $table->integer('year_introduced')->nullable(); // tahun vaksin ditemukan/diperkenalkan

@@ -13,6 +13,7 @@ class Vaccine extends Model
     protected $fillable = [
         'name',
         'photo',
+        'photo_locked',
         'manufacturer',
         'disease_target',
         'year_introduced',
@@ -26,7 +27,7 @@ class Vaccine extends Model
         ];
     }
 
-    protected $appends = ['photo_url'];
+    protected $appends = ['photo_url', 'photo_locked_url'];
 
     public function years()
     {
@@ -41,5 +42,10 @@ class Vaccine extends Model
     public function getPhotoUrlAttribute(): ?string
     {
         return app(LinkParserService::class)->toDriveImageUrl($this->photo);
+    }
+
+    public function getPhotoLockedUrlAttribute(): ?string
+    {
+        return app(LinkParserService::class)->toDriveImageUrl($this->photo_locked);
     }
 }

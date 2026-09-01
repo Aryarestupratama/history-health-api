@@ -13,6 +13,7 @@ class VaccineDetailResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'photo_url' => $this->photo_url,
+            'photo_locked_url' => $this->photo_locked_url,
             'manufacturer' => $this->manufacturer,
             'disease_target' => $this->disease_target,
             'year_introduced' => $this->year_introduced,

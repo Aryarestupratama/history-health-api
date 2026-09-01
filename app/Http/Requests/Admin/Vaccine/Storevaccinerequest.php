@@ -17,6 +17,7 @@ class StoreVaccineRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'photo' => ['nullable', 'string', new ValidGoogleDriveLink],
+            'photo_locked' => ['nullable', 'string', new ValidGoogleDriveLink],
             'manufacturer' => 'nullable|string|max:255',
             'disease_target' => 'required|string|max:255',
             'year_introduced' => 'nullable|integer|min:1000|max:'.(date('Y') + 1),

@@ -41,6 +41,7 @@ function resolveDrivePhotoUrl(rawUrl) {
 const EMPTY_FORM = {
   name: '',
   photo: '',
+  photo_locked: '',
   manufacturer: '',
   disease_target: '',
   year_introduced: '',
@@ -91,6 +92,7 @@ export default function VaccineManager() {
       const payload = {
         name: form.name,
         photo: form.photo || null,
+        photo_locked: form.photo_locked || null,
         manufacturer: form.manufacturer || null,
         disease_target: form.disease_target,
         year_introduced: form.year_introduced ? Number(form.year_introduced) : null,
@@ -115,6 +117,7 @@ export default function VaccineManager() {
     setForm({
       name: vaccine.name || '',
       photo: vaccine.photo || '',
+      photo_locked: vaccine.photo_locked || '',
       manufacturer: vaccine.manufacturer || '',
       disease_target: vaccine.disease_target || '',
       year_introduced: vaccine.year_introduced != null ? String(vaccine.year_introduced) : '',
@@ -254,6 +257,18 @@ export default function VaccineManager() {
                 placeholder="https://drive.google.com/file/d/FILE_ID/view..."
               />
             </div>
+            <div className="space-y-1.5">
+              <Label>Foto Siluet / Terkunci (link Google Drive)</Label>
+              <Input
+                value={form.photo_locked}
+                onChange={(e) => setForm({ ...form, photo_locked: e.target.value })}
+                placeholder="https://drive.google.com/file/d/FILE_ID/view..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Ditampilkan sebelum vaksin ter-unlock user (siluet/placeholder). Dipakai Flutter untuk
+                animasi reveal saat unlock.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Produsen</Label>
@@ -321,6 +336,7 @@ export default function VaccineManager() {
                 data={{
                   name: previewVaccine.name,
                   resolvedPhotoUrl: resolveDrivePhotoUrl(previewVaccine.photo),
+                  resolvedPhotoLockedUrl: resolveDrivePhotoUrl(previewVaccine.photo_locked),
                   manufacturer: previewVaccine.manufacturer,
                   diseaseTarget: previewVaccine.disease_target,
                   yearIntroduced: previewVaccine.year_introduced,

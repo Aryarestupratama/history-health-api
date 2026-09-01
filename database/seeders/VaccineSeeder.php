@@ -14,6 +14,7 @@ class VaccineSeeder extends Seeder
             ['name' => 'Vaksin Flu Spanyol (Bacterial)'],
             [
                 'photo' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_VAKSIN1/view',
+                'photo_locked' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_VAKSIN1_SILUET/view',
                 'manufacturer' => 'Berbagai laboratorium kolonial Hindia Belanda',
                 'disease_target' => 'Influenza (Flu Spanyol)',
                 'year_introduced' => 1918,
@@ -25,6 +26,7 @@ class VaccineSeeder extends Seeder
             ['name' => 'Vaksin COVID-19 (Sinovac)'],
             [
                 'photo' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_VAKSIN2/view',
+                'photo_locked' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_VAKSIN2_SILUET/view',
                 'manufacturer' => 'Sinovac Biotech / Bio Farma',
                 'disease_target' => 'COVID-19',
                 'year_introduced' => 2020,

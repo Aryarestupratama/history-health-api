@@ -413,6 +413,7 @@ function VaccineDetailScreen({ data, accent }) {
   const {
     name,
     resolvedPhotoUrl,
+    resolvedPhotoLockedUrl,
     manufacturer,
     diseaseTarget,
     yearIntroduced,
@@ -431,10 +432,20 @@ function VaccineDetailScreen({ data, accent }) {
 
       <div className="mb-4 flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50">
         {locked ? (
-          <div className="flex flex-col items-center gap-2 text-zinc-300">
-            <Lock size={32} />
-            <span className="text-[10px] font-medium uppercase tracking-wide">Belum terbuka</span>
-          </div>
+          resolvedPhotoLockedUrl ? (
+            <img
+              src={resolvedPhotoLockedUrl}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-zinc-300">
+              <Lock size={32} />
+              <span className="text-[10px] font-medium uppercase tracking-wide">Belum terbuka</span>
+              <span className="text-[9px]">(link foto siluet belum diisi)</span>
+            </div>
+          )
         ) : resolvedPhotoUrl ? (
           <img
             src={resolvedPhotoUrl}
