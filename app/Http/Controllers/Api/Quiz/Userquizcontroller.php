@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Quiz;
 
 use App\Http\Controllers\Controller;
+use App\Models\QuizQuestionOption;
 use App\Models\UserQuizAttempt;
 use App\Models\Year;
 use App\Services\Progress\YearCompletionService;
@@ -69,6 +70,31 @@ class UserQuizController extends Controller
         ]);
 
         $answers = $data['answers'] ?? [];
+
+        // Cek tiap key (question_id) memang soal milik quiz ini, DAN tiap
+        // value (option_id) memang milik question_id tsb — sebelumnya rule
+        // 'exists:quiz_question_options,id' saja tidak menjamin relasi ini,
+        // sehingga option_id dari soal/quiz lain yang kebetulan valid ID-nya
+        // bisa lolos dan bikin feedback salah tampil (R-QUIZ-04).
+        $quizQuestionIds = $quiz->questions()->pluck('id');
+
+        foreach ($answers as $questionId => $optionId) {
+            if (! $quizQuestionIds->contains((int) $questionId)) {
+                return response()->json([
+                    'message' => "Soal dengan id {$questionId} bukan bagian dari kuis ini.",
+                ], 422);
+            }
+
+            $belongsToQuestion = QuizQuestionOption::where('id', $optionId)
+                ->where('quiz_question_id', $questionId)
+                ->exists();
+
+            if (! $belongsToQuestion) {
+                return response()->json([
+                    'message' => "Opsi jawaban tidak sesuai dengan soal id {$questionId}.",
+                ], 422);
+            }
+        }
 
         $attempt = UserQuizAttempt::firstOrCreate(
             ['user_id' => $request->user()->id, 'quiz_id' => $quiz->id],

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye } from 'lucide-react';
 import api from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,24 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { useConfirm } from '@/components/confirm-dialog';
+import PhonePreview from "@/components/PhonePreview";
+
+// Versi ringan LinkParserService::extractDriveFileId/toDriveImageUrl
+// (backend) khusus dipakai di sisi klien supaya preview HP bisa live
+// update saat admin mengetik, tanpa round-trip ke API. Format URL ('thumbnail')
+// harus tetap disamakan dengan backend agar preview representatif terhadap
+// tampilan asli di app (Design.md §4.3).
+function resolveDrivePhotoUrl(rawUrl) {
+  if (!rawUrl) return null;
+  const patterns = [/\/d\/([a-zA-Z0-9_-]{10,})/, /[?&]id=([a-zA-Z0-9_-]{10,})/];
+  for (const pattern of patterns) {
+    const match = rawUrl.match(pattern);
+    if (match) {
+      return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+    }
+  }
+  return null;
+}
 
 // Menggantikan FigureManager.jsx (Architecture.md §4.8 — collectible card:
 // tokoh -> vaksin). Field mengikuti migrasi `vaccines` (progress.md):
@@ -40,6 +58,8 @@ export default function VaccineManager() {
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [previewVaccine, setPreviewVaccine] = useState(null);
+  const [previewLocked, setPreviewLocked] = useState(false);
 
   useEffect(() => {
     fetchVaccines();
@@ -110,6 +130,16 @@ export default function VaccineManager() {
     setError(null);
   }
 
+  function openPreview(vaccine) {
+    setPreviewLocked(false);
+    setPreviewVaccine(vaccine);
+  }
+
+  function closePreview() {
+    setPreviewVaccine(null);
+    setPreviewLocked(false);
+  }
+
   async function handleDelete(vaccine) {
     const ok = await confirm({
       title: `Hapus vaksin "${vaccine.name}"?`,
@@ -178,6 +208,9 @@ export default function VaccineManager() {
                   <TableCell className="text-muted-foreground">{vaccine.year_introduced || '—'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPreview(vaccine)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(vaccine)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -264,6 +297,39 @@ export default function VaccineManager() {
               {saving ? 'Menyimpan...' : editingId ? 'Update Vaksin' : 'Tambah Vaksin'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!previewVaccine} onOpenChange={(open) => !open && closePreview()}>
+        <DialogContent className="max-h-[85vh] max-w-sm overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Preview: {previewVaccine?.name || 'Vaksin'}</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPreviewLocked((v) => !v)}
+              className="self-end text-xs font-medium text-gamify hover:underline"
+            >
+              {previewLocked ? 'Lihat versi terbuka' : 'Simulasikan versi terkunci'}
+            </button>
+            {previewVaccine && (
+              <PhonePreview
+                screen="vaccine-detail"
+                compact
+                data={{
+                  name: previewVaccine.name,
+                  resolvedPhotoUrl: resolveDrivePhotoUrl(previewVaccine.photo),
+                  manufacturer: previewVaccine.manufacturer,
+                  diseaseTarget: previewVaccine.disease_target,
+                  yearIntroduced: previewVaccine.year_introduced,
+                  description: previewVaccine.description,
+                  locked: previewLocked,
+                }}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
