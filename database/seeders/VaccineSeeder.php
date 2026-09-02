@@ -22,27 +22,13 @@ class VaccineSeeder extends Seeder
             ]
         );
 
-        $vaccine2 = Vaccine::updateOrCreate(
-            ['name' => 'Vaksin COVID-19 (Sinovac)'],
-            [
-                'photo' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_VAKSIN2/view',
-                'photo_locked' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_VAKSIN2_SILUET/view',
-                'manufacturer' => 'Sinovac Biotech / Bio Farma',
-                'disease_target' => 'COVID-19',
-                'year_introduced' => 2020,
-                'description' => 'Vaksin pertama yang digunakan dalam program vaksinasi nasional Indonesia untuk menanggulangi pandemi COVID-19.',
-            ]
-        );
-
         $year1918 = Year::where('year', 1918)->first();
-        $year2020 = Year::where('year', 2020)->first();
 
         if ($year1918) {
             $year1918->vaccines()->syncWithoutDetaching([$vaccine1->id]);
         }
 
-        if ($year2020) {
-            $year2020->vaccines()->syncWithoutDetaching([$vaccine2->id]);
-        }
+        // Vaccine COVID-19 (year 2020) sengaja tidak di-seed di sini —
+        // lihat ModernDummySeeder untuk versi dengan foto locked/unlocked real.
     }
 }

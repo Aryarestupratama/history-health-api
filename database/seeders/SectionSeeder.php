@@ -8,17 +8,18 @@ use Illuminate\Database\Seeder;
 
 class SectionSeeder extends Seeder
 {
+    /**
+     * Catatan: section & vaccine untuk year 2020 (COVID) TIDAK lagi
+     * di-handle di sini — sudah dipindah seluruhnya ke ModernDummySeeder
+     * (data real) supaya tidak ada dua seeder yang saling menimpa year
+     * yang sama.
+     */
     public function run(): void
     {
         $year1918 = Year::where('year', 1918)->first();
-        $year2020 = Year::where('year', 2020)->first();
 
         $year1918->update([
             'summary' => 'Wabah Flu Spanyol tahun 1918 menjadi salah satu pandemi paling mematikan yang pernah tercatat di Hindia Belanda, menewaskan ratusan ribu jiwa dan mengubah pendekatan sanitasi serta layanan kesehatan kolonial pada masa itu.',
-        ]);
-
-        $year2020->update([
-            'summary' => 'Pandemi COVID-19 yang masuk ke Indonesia pada awal 2020 mendorong transformasi besar dalam sistem kesehatan nasional, mulai dari protokol kesehatan masyarakat hingga percepatan pengembangan dan distribusi vaksin.',
         ]);
 
         $section1918 = Section::updateOrCreate(
@@ -69,28 +70,6 @@ class SectionSeeder extends Seeder
             [
                 'type' => 'image',
                 'content' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_1918B/view',
-                'order' => 2,
-            ],
-        ]);
-
-        $section2020 = Section::updateOrCreate(
-            ['year_id' => $year2020->id, 'title' => 'Pandemi COVID-19 di Indonesia'],
-            [
-                'order' => 1,
-                'is_published' => true,
-            ]
-        );
-
-        $section2020->contentBlocks()->delete();
-        $section2020->contentBlocks()->createMany([
-            [
-                'type' => 'text',
-                'content' => 'Kasus pertama COVID-19 di Indonesia diumumkan pada Maret 2020...',
-                'order' => 1,
-            ],
-            [
-                'type' => 'pdf',
-                'content' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_PDF/view',
                 'order' => 2,
             ],
         ]);

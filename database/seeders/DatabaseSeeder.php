@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
             SectionSeeder::class,
             VaccineSeeder::class,
             QuizSeeder::class,
+            KolonialDummySeeder::class,
+            ModernDummySeeder::class,
         ]);
     }
 }
