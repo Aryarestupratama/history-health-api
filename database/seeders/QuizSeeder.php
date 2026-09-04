@@ -6,36 +6,51 @@ use App\Models\Quiz;
 use App\Models\Year;
 use Illuminate\Database\Seeder;
 
+/**
+ * Quiz DUMMY untuk year Cacar (1974) & COVID-19 (2020) di era Modern.
+ *
+ * Soal-soal di bawah ini dikarang sendiri (bukan dari dokumen sumber),
+ * tujuannya murni untuk menguji tampilan quiz di roadmap — silakan
+ * diganti/disesuaikan dengan soal final nanti.
+ */
 class QuizSeeder extends Seeder
 {
     public function run(): void
     {
-        $year1918 = Year::where('year', 1918)->first();
-        $year2020 = Year::where('year', 2020)->first();
+        $yearCacar = Year::where('year', 1974)->first();
+        $yearCovid = Year::where('year', 2020)->first();
 
-        if ($year1918) {
-            $this->seedQuizFor($year1918, [
+        if ($yearCacar) {
+            $this->seedQuizFor($yearCacar, [
                 [
-                    'question' => 'Di mana wabah Flu Spanyol pertama kali terdeteksi menyebar luas di Hindia Belanda?',
+                    'question' => 'Pada tahun berapa Indonesia dinyatakan bebas dari penyakit cacar (smallpox)?',
                     'options' => [
-                        ['text' => 'Pulau Jawa', 'is_correct' => true],
-                        ['text' => 'Pulau Kalimantan', 'is_correct' => false],
-                        ['text' => 'Pulau Sulawesi', 'is_correct' => false],
+                        ['text' => '1960', 'is_correct' => false],
+                        ['text' => '1974', 'is_correct' => true],
+                        ['text' => '1980', 'is_correct' => false],
                     ],
                 ],
                 [
-                    'question' => 'Apa dampak utama wabah Flu Spanyol terhadap kebijakan kesehatan publik pemerintah kolonial saat itu?',
+                    'question' => 'Organisasi internasional apa yang menggagas program eradikasi cacar secara global?',
                     'options' => [
-                        ['text' => 'Mendorong perhatian lebih besar terhadap sistem kesehatan masyarakat', 'is_correct' => true],
-                        ['text' => 'Tidak ada perubahan kebijakan sama sekali', 'is_correct' => false],
-                        ['text' => 'Kesehatan publik diserahkan sepenuhnya ke pihak swasta', 'is_correct' => false],
+                        ['text' => 'WHO (World Health Organization)', 'is_correct' => true],
+                        ['text' => 'UNICEF', 'is_correct' => false],
+                        ['text' => 'Palang Merah Internasional', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Apa strategi utama yang digunakan dalam program eradikasi cacar?',
+                    'options' => [
+                        ['text' => 'Karantina wilayah total tanpa vaksinasi', 'is_correct' => false],
+                        ['text' => 'Vaksinasi massal disertai pengawasan kasus yang ketat', 'is_correct' => true],
+                        ['text' => 'Isolasi mandiri tanpa program vaksinasi', 'is_correct' => false],
                     ],
                 ],
             ]);
         }
 
-        if ($year2020) {
-            $this->seedQuizFor($year2020, [
+        if ($yearCovid) {
+            $this->seedQuizFor($yearCovid, [
                 [
                     'question' => 'Kapan kasus pertama COVID-19 diumumkan resmi di Indonesia?',
                     'options' => [
@@ -45,11 +60,27 @@ class QuizSeeder extends Seeder
                     ],
                 ],
                 [
-                    'question' => 'Manakah yang merupakan perubahan kebiasaan masyarakat akibat pandemi COVID-19?',
+                    'question' => 'Vaksin apa yang pertama kali digunakan dalam program vaksinasi nasional COVID-19 di Indonesia?',
                     'options' => [
-                        ['text' => 'Penerapan protokol kesehatan seperti masker dan jaga jarak', 'is_correct' => true],
-                        ['text' => 'Penghapusan total layanan kesehatan daring', 'is_correct' => false],
-                        ['text' => 'Larangan penggunaan hand sanitizer', 'is_correct' => false],
+                        ['text' => 'Sinovac', 'is_correct' => true],
+                        ['text' => 'Moderna', 'is_correct' => false],
+                        ['text' => 'Pfizer-BioNTech', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Manakah pasangan vaksin yang menggunakan teknologi mRNA?',
+                    'options' => [
+                        ['text' => 'Sinovac dan AstraZeneca', 'is_correct' => false],
+                        ['text' => 'Pfizer-BioNTech dan Moderna', 'is_correct' => true],
+                        ['text' => 'AstraZeneca dan Sinovac', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Kebijakan apa yang diterapkan pemerintah untuk menekan penyebaran COVID-19 di awal pandemi?',
+                    'options' => [
+                        ['text' => 'PSBB (Pembatasan Sosial Berskala Besar)', 'is_correct' => true],
+                        ['text' => 'Larangan total pergerakan tanpa pengecualian', 'is_correct' => false],
+                        ['text' => 'Penutupan seluruh fasilitas kesehatan', 'is_correct' => false],
                     ],
                 ],
             ]);
