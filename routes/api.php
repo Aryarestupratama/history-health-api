@@ -99,4 +99,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // untuk minim breaking change di Flutter, tapi resource-nya sudah Vaccine.
     Route::get('cards', [CardController::class, 'index']);
     Route::get('cards/{vaccine}', [CardController::class, 'show']);
+    // Ditandai "sudah dilihat" begitu animasi reveal locked->unlocked
+    // selesai diputar di halaman Koleksi (badge dot & auto-scroll reveal).
+    Route::post('cards/{vaccine}/seen', [CardController::class, 'markSeen']);
 });

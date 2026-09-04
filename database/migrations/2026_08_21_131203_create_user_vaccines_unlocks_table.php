@@ -13,6 +13,11 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('vaccine_id')->constrained('vaccines')->cascadeOnDelete();
             $table->timestamp('unlocked_at');
+            // nullable: null = belum pernah dilihat user di halaman Koleksi
+            // Vaksin (dipakai buat badge dot bottom nav & animasi reveal
+            // locked->unlocked pertama kali), diisi begitu user membuka
+            // detail/animasi vaksin tsb (lihat endpoint mark-seen).
+            $table->timestamp('seen_at')->nullable();
 
             $table->unique(['user_id', 'vaccine_id']); // R-CARD-03 (idempotent, sama seperti sebelumnya)
         });

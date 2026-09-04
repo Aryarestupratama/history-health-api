@@ -49,25 +49,44 @@ class ProgressService
 
     /**
      * Progress agregat per era untuk user (R-PROG-01, HOME-01).
-     * Hanya menghitung section yang published.
+     *
+     * PERBAIKAN: sebelumnya `completed`/`total` di sini menghitung
+     * `sections` mentah (bukan `years`) — sementara di seluruh UI Flutter
+     * (EraCard, OverallProgressCard, RecommendationCard) angka ini
+     * ditampilkan dengan label "X dari Y TAHUN dibaca". Akibatnya kalau
+     * satu `year` punya 5 section dan user baru baca 2, tampilannya salah
+     * jadi "2 dari 5 tahun dibaca" — padahal seharusnya masih "0 dari N
+     * tahun" sampai year tsb benar-benar "completed" (seluruh section +
+     * quiz selesai, R-PROG-07).
+     *
+     * Sekarang `total` = jumlah `years` dalam era yang punya minimal 1
+     * section published, dan `completed` = jumlah year tsb yang sudah
+     * berstatus "completed" (dihitung via YearCompletionService::isCompleted(),
+     * sama seperti sumber kebenaran R-PROG-07/R-VAC-01 lainnya) — supaya
+     * granularitasnya konsisten dengan label "tahun dibaca" di semua UI.
+     *
+     * Catatan performa: isCompleted() dipanggil per-year (N+1 style)
+     * karena tiap year butuh cek section+quiz attempt sendiri-sendiri;
+     * cukup untuk skala MVP, bisa dioptimasi belakangan kalau jumlah
+     * year per era sudah besar.
      */
     public function progressByEra(User $user): \Illuminate\Support\Collection
     {
         return \App\Models\Era::orderBy('order')->get()->map(function ($era) use ($user) {
-            $totalPublished = Section::whereHas('year', fn ($q) => $q->where('era_id', $era->id))
-                ->published()
-                ->count();
+            $years = \App\Models\Year::where('era_id', $era->id)
+                ->whereHas('sections', fn ($q) => $q->published())
+                ->get();
 
-            $completed = UserProgress::where('user_id', $user->id)
-                ->whereHas('section', function ($q) use ($era) {
-                    $q->published()->whereHas('year', fn ($q2) => $q2->where('era_id', $era->id));
-                })
+            $totalYears = $years->count();
+
+            $completedYears = $years
+                ->filter(fn ($year) => $this->yearCompletionService->isCompleted($user, $year))
                 ->count();
 
             return [
                 'era' => $era,
-                'completed' => $completed,
-                'total' => $totalPublished,
+                'completed' => $completedYears,
+                'total' => $totalYears,
             ];
         });
     }
