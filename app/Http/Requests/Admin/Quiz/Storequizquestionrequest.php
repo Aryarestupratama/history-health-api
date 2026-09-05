@@ -25,6 +25,18 @@ class StoreQuizQuestionRequest extends FormRequest
             // StoreContentBlockRequest).
             'question' => 'nullable|string',
 
+            // R-QUIZ-04/R-QUIZ-10 (revisi terbaru — feedback dipecah 2 kolom):
+            // 'nullable' (bukan 'required'), alasan SAMA seperti 'question' di
+            // atas — QuizTab::addQuestion() bikin skeleton soal dulu (semua
+            // field teks "") supaya dapat id, baru diisi belakangan via
+            // updateQuestion() (PATCH). Enforcement "wajib diisi" (R-QUIZ-10)
+            // TIDAK dilakukan di sini, melainkan sebagai syarat publish kuis
+            // (lihat Quiz::canPublish(), perlu diperluas terpisah dari file
+            // ini) — konsisten dengan pola R-QUIZ-05 (years.summary juga
+            // dicek saat publish, bukan saat soal dibuat).
+            'explanation_correct' => 'nullable|string',
+            'explanation_incorrect' => 'nullable|string',
+
             // R-QUIZ-07: kuis murni pilihan ganda — semua soal wajib minimal
             // 2 opsi, tepat satu is_correct. Tidak ada lagi percabangan tipe.
             'options' => ['required', 'array', 'min:2'],

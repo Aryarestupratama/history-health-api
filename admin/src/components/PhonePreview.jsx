@@ -10,6 +10,7 @@ import {
   Building2,
   CalendarDays,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { PALETTE, ERA_ACCENTS } from "@/config/branding";
 
 /**
@@ -307,95 +308,185 @@ function SummaryScreen({ data, accent }) {
 }
 
 /* --------------------------------------------------------------- Quiz tab */
-// data: { questions: [{ id, question, options: [{ option_text, is_correct }] }], activeIndex }
+// data: { questions: [{ id, question, explanation_correct, explanation_incorrect,
+//         options: [{ option_text, is_correct }] }], activeIndex }
 //
-// Semua soal ditampilkan berurutan dalam 1 layar scrollable (bukan 1 soal
-// per layar dengan navigasi index) — selaras rencana model Flutter yang
-// juga scrollable form, bukan swipe per-soal. `activeIndex` dipakai untuk
-// highlight soal yang sedang diedit admin di editor kiri, supaya preview
-// tetap kasih konteks "lagi ngedit yang mana".
+// R-QUIZ-04 (revisi terbaru — feedback dipecah 2 kolom): preview kini
+// menampilkan 1 soal per halaman (bukan lagi semua soal sekaligus dalam 1
+// layar scrollable) — mengikuti `activeIndex` yang dikontrol dari tombol
+// selector soal (1/2/3/...) di editor admin (WabahWorkspace::QuizTab), jadi
+// preview otomatis "ganti halaman" begitu admin pindah soal di editor.
+// Ditambah toggle simulasi "Benar"/"Salah" supaya admin bisa lihat kedua
+// versi tampilan feedback (explanation_correct vs explanation_incorrect)
+// tanpa perlu login sebagai user beneran — toggle ini murni alat bantu
+// preview, bukan bagian dari tampilan end-user asli.
 
 function QuizScreen({ data, accent }) {
   const questions = data?.questions ?? [];
-  const activeIndex = data?.activeIndex;
+  const activeIndex = data?.activeIndex ?? 0;
+  const question = questions[activeIndex];
+
+  // null = "belum dijawab" (state default, sama seperti tampilan user
+  // sebelum tap opsi apa pun — tidak ada highlight/kunci jawaban bocor,
+  // selaras R-QUIZ-04).
+  const [feedbackMode, setFeedbackMode] = useState(null);
+
+  // Reset ke "belum dijawab" tiap kali admin pindah soal di editor, supaya
+  // simulasi lama tidak nyangkut ke soal lain yang belum tentu relevan.
+  useEffect(() => {
+    setFeedbackMode(null);
+  }, [activeIndex]);
+
+  if (questions.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+        Belum ada soal
+      </p>
+    );
+  }
+
+  if (!question) {
+    // activeIndex di luar jangkauan (mis. soal baru saja dihapus admin).
+    return null;
+  }
+
+  const options = question.options ?? [];
+  const correctOption = options.find((o) => o.is_correct);
+  // Simulasi opsi yang "dipilih user" sesuai mode toggle yang aktif.
+  const simulatedSelected =
+    feedbackMode === "correct"
+      ? correctOption
+      : feedbackMode === "incorrect"
+      ? options.find((o) => !o.is_correct) ?? null
+      : null;
 
   return (
     <div>
-      <p className="mb-3 text-xs font-medium text-zinc-400">
-        {questions.length} soal
-      </p>
-
-      {questions.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
-          Belum ada soal
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs font-medium text-zinc-400">
+          Soal {activeIndex + 1} dari {questions.length}
         </p>
-      ) : (
-        <div className="space-y-5">
-          {questions.map((q, i) => (
-            <div
-              key={q.id ?? i}
-              className="rounded-xl p-3 transition"
-              style={i === activeIndex ? { boxShadow: `0 0 0 2px ${accent}` } : undefined}
-            >
-              <p className="mb-2 text-xs font-semibold" style={{ color: accent }}>
-                Soal {i + 1}
-              </p>
-              <p className="mb-3 text-sm font-medium leading-relaxed text-zinc-900">
-                {q.question || <span className="text-zinc-300">Teks soal kosong</span>}
-              </p>
-
-              <div className="space-y-2">
-                {(q.options ?? []).length === 0 && (
-                  <p className="text-xs text-zinc-300">Belum ada opsi jawaban</p>
-                )}
-                {(q.options ?? []).map((opt, oi) => (
-                  <div
-                    key={oi}
-                    className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm ${
-                      opt.is_correct
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-zinc-100 text-zinc-700"
-                    }`}
-                  >
-                    <span
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
-                      style={{ borderColor: opt.is_correct ? "#4BA95F" : accent }}
-                    />
-                    {/* FIX: API balikin 'option_text' (snake_case, lihat
-                        Schema.md & QuizController), sebelumnya kode di
-                        sini baca 'optionText' (camelCase) yang selalu
-                        undefined -> opsi kelihatan "kosong" terus walau
-                        sudah diisi teksnya di editor. */}
-                    <span className="flex-1">
-                      {opt.option_text || <span className="text-zinc-300">Opsi kosong</span>}
-                    </span>
-                    {opt.is_correct && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">
-                        Benar
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {(q.options ?? []).length > 0 && (
-                  <p className="pt-0.5 text-[10px] text-zinc-300">
-                    Simulasi feedback ke user setelah menjawab — highlight ini muncul instan per
-                    soal, bukan skor akhir
-                  </p>
-                )}
-              </div>
-            </div>
+        <div className="flex gap-1">
+          {questions.map((_, i) => (
+            <span
+              key={i}
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: i === activeIndex ? accent : "#E4E4E7" }}
+            />
           ))}
         </div>
-      )}
+      </div>
 
-      <button
-        className="mt-6 w-full rounded-lg py-2.5 text-sm font-medium text-white"
-        style={{ backgroundColor: accent }}
-        disabled
-      >
-        Kuis selesai dikerjakan
-      </button>
-      <p className="mt-2 text-center text-[10px] text-zinc-300">Tanpa tampilan skor</p>
+      <div className="rounded-xl p-3">
+        <p className="mb-3 text-sm font-medium leading-relaxed text-zinc-900">
+          {question.question || <span className="text-zinc-300">Teks soal kosong</span>}
+        </p>
+
+        <div className="space-y-2">
+          {options.length === 0 && (
+            <p className="text-xs text-zinc-300">Belum ada opsi jawaban</p>
+          )}
+          {options.map((opt, oi) => {
+            const isCorrectOpt = !!opt.is_correct;
+            const isSimulatedSelected = simulatedSelected === opt;
+            // R-QUIZ-04: opsi benar tetap di-highlight begitu sudah "dijawab"
+            // (mode manapun), termasuk saat simulasi salah — user tetap
+            // lihat mana opsi yang benar di antara pilihan.
+            const showAsCorrect = feedbackMode !== null && isCorrectOpt;
+            const showAsWrongSelected = feedbackMode === "incorrect" && isSimulatedSelected && !isCorrectOpt;
+
+            return (
+              <div
+                key={oi}
+                className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm ${
+                  showAsCorrect
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : showAsWrongSelected
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-zinc-100 text-zinc-700"
+                }`}
+              >
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
+                  style={{
+                    borderColor: showAsCorrect ? "#4BA95F" : showAsWrongSelected ? "#DC5B5B" : accent,
+                  }}
+                />
+                <span className="flex-1">
+                  {opt.option_text || <span className="text-zinc-300">Opsi kosong</span>}
+                </span>
+                {showAsCorrect && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">
+                    Benar
+                  </span>
+                )}
+                {showAsWrongSelected && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500">
+                    Dipilih user
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {feedbackMode !== null && (
+          <div
+            className={`mt-3 rounded-lg p-3 text-xs leading-relaxed ${
+              feedbackMode === "correct" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+            }`}
+          >
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide">
+              {feedbackMode === "correct" ? "Benar! 🎉" : "Kurang tepat"}
+            </p>
+            <p>
+              {feedbackMode === "correct" ? (
+                question.explanation_correct || <span className="italic text-zinc-300">Belum diisi</span>
+              ) : (
+                question.explanation_incorrect || <span className="italic text-zinc-300">Belum diisi</span>
+              )}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Toggle simulasi preview — BUKAN kontrol yang muncul di tampilan
+          end-user asli, murni alat bantu admin lihat 3 kondisi (belum
+          dijawab/benar/salah) tanpa perlu 2 device atau login sebagai user
+          beneran. */}
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => setFeedbackMode(null)}
+          className={`flex-1 rounded-lg py-1.5 text-[11px] font-medium transition ${
+            feedbackMode === null ? "text-white" : "bg-zinc-100 text-zinc-500"
+          }`}
+          style={feedbackMode === null ? { backgroundColor: accent } : undefined}
+        >
+          Belum dijawab
+        </button>
+        <button
+          onClick={() => setFeedbackMode("correct")}
+          className={`flex-1 rounded-lg py-1.5 text-[11px] font-medium transition ${
+            feedbackMode === "correct" ? "text-white" : "bg-zinc-100 text-zinc-500"
+          }`}
+          style={feedbackMode === "correct" ? { backgroundColor: "#4BA95F" } : undefined}
+        >
+          Simulasi: Benar
+        </button>
+        <button
+          onClick={() => setFeedbackMode("incorrect")}
+          className={`flex-1 rounded-lg py-1.5 text-[11px] font-medium transition ${
+            feedbackMode === "incorrect" ? "text-white" : "bg-zinc-100 text-zinc-500"
+          }`}
+          style={feedbackMode === "incorrect" ? { backgroundColor: "#DC5B5B" } : undefined}
+        >
+          Simulasi: Salah
+        </button>
+      </div>
+
+      <p className="mt-2 text-center text-[10px] text-zinc-300">
+        Ganti soal dari editor di sebelah kiri &middot; tanpa tampilan skor
+      </p>
     </div>
   );
 }

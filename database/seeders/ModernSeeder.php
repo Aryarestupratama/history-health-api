@@ -121,6 +121,7 @@ class ModernSeeder extends Seeder
         $gambarCovid2 = 'https://drive.google.com/file/d/1rd1QhrnW7IpMRv8BK4xxIMud-jqp3h13/view?usp=drive_link';
         $videoCovid1 = 'https://youtu.be/kW8PqjgImlU?si=dOQZuIPB8Warl-Hf';
         $videoCovid2 = 'https://youtu.be/0dAoCfgAQw8?si=9WSrbFDX7aCApgJx';
+        $pdfCovid1 = 'https://drive.google.com/file/d/13eeGg5bt83x-e1yZW_C54Rg6h2fVgKqv/view?usp=drive_link'; // Pedoman Pencegahan dan Pengendalian COVID-19
 
         $sections = [
             [
@@ -175,6 +176,11 @@ class ModernSeeder extends Seeder
                         'type' => 'text',
                         'content' => 'Distribusi vaksin dilakukan secara bertahap ke seluruh provinsi dengan melibatkan puskesmas, rumah sakit, hingga sentra-sentra vaksinasi massal di berbagai daerah. Program vaksinasi ini menjadi salah satu program imunisasi nasional dengan skala dan kecepatan pelaksanaan terbesar dalam sejarah kesehatan Indonesia, dan menjadi kunci penting dalam transisi dari status pandemi menuju endemi pada tahun-tahun berikutnya.',
                         'order' => 2,
+                    ],
+                    [
+                        'type' => 'pdf',
+                        'content' => $pdfCovid1,
+                        'order' => 3,
                     ],
                 ],
             ],

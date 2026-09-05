@@ -40,6 +40,13 @@ Route::prefix('auth')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
 
         Route::post('email/verify/resend', [EmailVerificationController::class, 'resend']);
+
+        // FIX: dipindah ke sini (bareng logout/me) dari grup ['auth:sanctum',
+        // 'verified'] paling bawah — ganti password TIDAK termasuk daftar
+        // fitur yang wajib email terverifikasi (R-AUTH-03 cuma membatasi
+        // progress, kuis, collectible card), jadi tidak butuh middleware
+        // 'verified'. Cukup login (auth:sanctum) seperti route auth lainnya.
+        Route::post('password', [AuthController::class, 'changePassword']);
     });
 });
 

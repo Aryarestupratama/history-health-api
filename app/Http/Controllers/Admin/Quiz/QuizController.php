@@ -36,7 +36,7 @@ class QuizController extends Controller
 
         if ($wantsPublish && ! $quiz->canPublish()) {
             return response()->json([
-                'message' => 'Kuis belum bisa dipublish. Pastikan minimal 1 soal sudah dibuat dan rangkuman tahun (years.summary) sudah terisi.',
+                'message' => 'Kuis belum bisa dipublish. Pastikan minimal 1 soal sudah dibuat, rangkuman tahun (years.summary) sudah terisi, dan setiap soal sudah punya penjelasan untuk jawaban benar maupun salah (explanation_correct & explanation_incorrect).',
             ], 422);
         }
 
@@ -70,6 +70,13 @@ class QuizController extends Controller
         // di DB NOT NULL tanpa default -> insert null gagal (pola identik
         // dengan fix ContentBlockController::store() sebelumnya).
         $data['question'] = $data['question'] ?? '';
+
+        // FIX: sama alasan seperti 'question' di atas — explanation_correct
+        // & explanation_incorrect juga NOT NULL di DB (lihat migration
+        // create_quiz_questions_table), sementara skeleton soal dari
+        // addQuestion() mengirim keduanya sebagai "" -> null via middleware.
+        $data['explanation_correct'] = $data['explanation_correct'] ?? '';
+        $data['explanation_incorrect'] = $data['explanation_incorrect'] ?? '';
 
         $data['order'] = $quiz->questions()->max('order') + 1;
 
@@ -106,6 +113,18 @@ class QuizController extends Controller
         // ini memang tidak ikut dikirim di request (PATCH partial update).
         if (array_key_exists('question', $data)) {
             $data['question'] = $data['question'] ?? '';
+        }
+
+        // FIX: sama alasan seperti 'question' di atas — pakai
+        // array_key_exists (bukan isset/??), supaya field ini tidak ikut
+        // ditimpa '' kalau memang tidak dikirim di body PATCH (partial
+        // update), tapi tetap di-fallback '' kalau dikirim sebagai null.
+        if (array_key_exists('explanation_correct', $data)) {
+            $data['explanation_correct'] = $data['explanation_correct'] ?? '';
+        }
+
+        if (array_key_exists('explanation_incorrect', $data)) {
+            $data['explanation_incorrect'] = $data['explanation_incorrect'] ?? '';
         }
 
         $question->update($data);

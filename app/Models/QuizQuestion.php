@@ -13,6 +13,8 @@ class QuizQuestion extends Model
         'quiz_id',
         'order',
         'question',
+        'explanation_correct',
+        'explanation_incorrect',
     ];
 
     protected function casts(): array
@@ -30,5 +32,15 @@ class QuizQuestion extends Model
     public function options()
     {
         return $this->hasMany(QuizQuestionOption::class)->orderBy('order');
+    }
+
+    /**
+     * R-QUIZ-04: pilih teks explanation yang sesuai berdasarkan hasil
+     * jawaban user, supaya logic "pilih kolom mana" tidak terduplikasi
+     * di controller/resource yang menampilkan feedback kuis.
+     */
+    public function explanationFor(bool $isCorrect): string
+    {
+        return $isCorrect ? $this->explanation_correct : $this->explanation_incorrect;
     }
 }

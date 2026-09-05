@@ -87,7 +87,9 @@ class UserQuizController extends Controller
         // skor/nilai akhir, dan tidak memengaruhi status attempt "selesai"
         // maupun "year completed" (R-PROG-07) yang sudah ditentukan di atas
         // begitu attempt tercatat.
-        $questions = $quiz->questions()->with('options:id,quiz_question_id,is_correct')->get();
+        $questions = $quiz->questions()
+            ->with('options:id,quiz_question_id,is_correct')
+            ->get(['id', 'quiz_id', 'order', 'question', 'explanation_correct', 'explanation_incorrect']);
 
         $feedback = $questions->map(function ($question) use ($storedAnswers) {
             $selectedOptionId = $storedAnswers[$question->id] ?? null;
@@ -95,10 +97,17 @@ class UserQuizController extends Controller
                 ? $question->options->firstWhere('id', (int) $selectedOptionId)
                 : null;
 
+            $isCorrect = (bool) ($selectedOption->is_correct ?? false);
+
             return [
                 'question_id' => $question->id,
                 'selected_option_id' => $selectedOptionId,
-                'is_correct' => (bool) ($selectedOption->is_correct ?? false),
+                'is_correct' => $isCorrect,
+                // R-QUIZ-04 (revisi terbaru): explanation selalu dikirim,
+                // tapi isinya beda kolom tergantung hasil jawaban — validasi
+                // + apresiasi kalau benar, penjelasan jawaban benar kalau
+                // salah. Lihat QuizQuestion::explanationFor().
+                'explanation' => $question->explanationFor($isCorrect),
             ];
         })->values();
 

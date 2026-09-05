@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\GoogleAuthService;
@@ -79,6 +80,19 @@ class AuthController extends Controller
             'message' => 'Login dengan Google berhasil.',
             'user' => new UserResource($user),
             'token' => $token,
+        ]);
+    }
+
+    public function changePassword(ChangePasswordRequest $request)
+    {
+        $this->authService->changePassword(
+            $request->user(),
+            $request->validated('current_password'),
+            $request->validated('password'),
+        );
+
+        return response()->json([
+            'message' => 'Password berhasil diubah.',
         ]);
     }
 }

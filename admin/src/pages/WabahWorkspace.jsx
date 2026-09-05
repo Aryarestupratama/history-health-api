@@ -972,6 +972,12 @@ function QuizTab({
     if (questions.length >= 5) return alert("Maksimal 5 soal per kuis (R-QUIZ-06)");
     const { data } = await apiClient.post(`/admin/quizzes/${quiz.id}/questions`, {
       question: "",
+      // R-QUIZ-04/R-QUIZ-10 (revisi terbaru — feedback kuis 2 kolom): sama
+      // pola skeleton kosong seperti 'question' — diisi belakangan lewat
+      // updateQuestion(), wajib lengkap baru saat admin coba publish
+      // (lihat Quiz::canPublish() backend).
+      explanation_correct: "",
+      explanation_incorrect: "",
       options: [{ option_text: "", is_correct: true }, { option_text: "", is_correct: false }],
     });
     setYear({ ...year, quiz: { ...quiz, questions: [...questions, data] } });
@@ -1034,6 +1040,8 @@ function QuizTab({
           if (!q) return Promise.resolve();
           return apiClient.patch(`/admin/quiz-questions/${id}`, {
             question: q.question,
+            explanation_correct: q.explanation_correct,
+            explanation_incorrect: q.explanation_incorrect,
             options: q.options,
           });
         })
@@ -1057,6 +1065,9 @@ function QuizTab({
 
   const activeQuestion = questions[activeQuestionIndex];
   const activeDirtyFields = activeQuestion ? dirtyFields.get(activeQuestion.id) ?? new Set() : new Set();
+  const missingExplanationCount = questions.filter(
+    (q) => !q.explanation_correct || !q.explanation_incorrect
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -1119,10 +1130,52 @@ function QuizTab({
             />
           </div>
 
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-[11px] font-medium text-zinc-400">
+                Penjelasan jika jawaban <span className="text-emerald-500">BENAR</span>
+              </p>
+              {activeDirtyFields.has("explanation_correct") && <UnsavedFieldBadge />}
+            </div>
+            <Textarea
+              value={activeQuestion.explanation_correct}
+              placeholder="Apresiasi + penguat pemahaman, tampil saat user jawab benar…"
+              onChange={(e) =>
+                updateQuestion(activeQuestion.id, { explanation_correct: e.target.value }, "explanation_correct")
+              }
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-[11px] font-medium text-zinc-400">
+                Penjelasan jika jawaban <span className="text-red-500">SALAH</span>
+              </p>
+              {activeDirtyFields.has("explanation_incorrect") && <UnsavedFieldBadge />}
+            </div>
+            <Textarea
+              value={activeQuestion.explanation_incorrect}
+              placeholder="Jelaskan kenapa opsi yang benar itu benar, tampil saat user jawab salah…"
+              onChange={(e) =>
+                updateQuestion(activeQuestion.id, { explanation_incorrect: e.target.value }, "explanation_incorrect")
+              }
+            />
+          </div>
+
           <Button variant="ghost" size="sm" onClick={() => deleteQuestion(activeQuestion.id)}>
             <Trash2 size={14} className="text-red-500" /> Hapus soal
           </Button>
         </div>
+      )}
+
+      {/* R-QUIZ-10: hint client-side, bukan pengganti validasi backend —
+          Quiz::canPublish() tetap sumber kebenaran, ini cuma bantu admin
+          tahu lebih awal kenapa publish nanti bisa ditolak. */}
+      {missingExplanationCount > 0 && (
+        <p className="text-xs text-amber-600">
+          {missingExplanationCount} soal masih punya penjelasan benar/salah yang kosong — wajib
+          lengkap dulu sebelum kuis bisa dipublish.
+        </p>
       )}
 
       <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
