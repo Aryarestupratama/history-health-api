@@ -21,7 +21,7 @@ export default function WabahWorkspace() {
   const { yearId } = useParams();
   const { confirm: confirmDialog, dialog } = useConfirm();
 
-  const [year, setYear] = useState(null); // { id, year, title, summary, era: {slug,name}, sections: [], vaccines: [], quiz: {...} }
+  const [year, setYear] = useState(null); // { id, year, title, summary_image, resolved_summary_image_url, quote_text, references, era: {slug,name}, sections: [], vaccines: [], quiz: {...} }
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("section");
 
@@ -61,6 +61,10 @@ export default function WabahWorkspace() {
   // - summaryDirty / vaccinesDirty: boolean, independen satu sama lain
   // - quizFieldDirty: Map<questionId, Set<fieldName>>
   const [sectionTitleDirty, setSectionTitleDirty] = useState(new Set());
+  // (Baru) header_image OPSIONAL per section — dirty tracking terpisah dari
+  // title, supaya badge "belum disimpan" akurat per field (bisa jadi cuma
+  // title yang berubah, cuma header_image, atau dua-duanya sekaligus).
+  const [sectionHeaderImageDirty, setSectionHeaderImageDirty] = useState(new Set());
   const [sectionBlockDirty, setSectionBlockDirty] = useState(new Set());
   const [summaryDirty, setSummaryDirty] = useState(false);
   const [vaccinesDirty, setVaccinesDirty] = useState(false);
@@ -68,6 +72,7 @@ export default function WabahWorkspace() {
 
   const hasAnyUnsaved =
     sectionTitleDirty.size > 0 ||
+    sectionHeaderImageDirty.size > 0 ||
     sectionBlockDirty.size > 0 ||
     summaryDirty ||
     vaccinesDirty ||
@@ -75,6 +80,7 @@ export default function WabahWorkspace() {
 
   function resetAllDirty() {
     setSectionTitleDirty(new Set());
+    setSectionHeaderImageDirty(new Set());
     setSectionBlockDirty(new Set());
     setSummaryDirty(false);
     setVaccinesDirty(false);
@@ -141,6 +147,7 @@ export default function WabahWorkspace() {
   // ada di sectionTitleDirty ATAU salah satu bloknya ada di sectionBlockDirty.
   function isSectionDirty(sectionId) {
     if (sectionTitleDirty.has(sectionId)) return true;
+    if (sectionHeaderImageDirty.has(sectionId)) return true;
     const section = year?.sections?.find((s) => s.id === sectionId);
     return (section?.content_blocks ?? []).some((b) => sectionBlockDirty.has(b.id));
   }
@@ -169,7 +176,12 @@ export default function WabahWorkspace() {
         return {
           screen: "section-detail",
           data: {
+            // (Revisi) `sectionTitle` TIDAK LAGI dirender sebagai judul di
+            // layar end-user — dikirim tetap (buat referensi/label saja),
+            // posisi paling atas sekarang `headerImageUrl` (opsional, bisa
+            // null kalau section ini belum/tidak diisi header gambar).
             sectionTitle: activeSection.title,
+            headerImageUrl: activeSection.resolved_header_image_url ?? null,
             blocks: activeSection.content_blocks ?? [],
           },
         };
@@ -195,7 +207,14 @@ export default function WabahWorkspace() {
       return {
         screen: "summary",
         data: {
-          summary: year.summary,
+          // (Revisi) Rangkuman sekarang infografis (gambar), bukan teks —
+          // `resolved_summary_image_url` sudah di-resolve backend (appended
+          // attribute model Year), null kalau admin belum isi.
+          summaryImageUrl: year.resolved_summary_image_url ?? null,
+          // (Baru) Quote & Referensi — tampil di layar yang sama, urutan
+          // sesuai Flutter: rangkuman > quote > referensi > tombol kuis.
+          quoteText: year.quote_text ?? null,
+          references: year.references ?? [],
           vaccines: year.vaccines ?? [],
           showUnlockAnimation: (year.vaccines ?? []).length > 0,
         },
@@ -271,6 +290,8 @@ export default function WabahWorkspace() {
               confirmDialog={confirmDialog}
               titleDirty={sectionTitleDirty}
               setTitleDirty={setSectionTitleDirty}
+              headerImageDirty={sectionHeaderImageDirty}
+              setHeaderImageDirty={setSectionHeaderImageDirty}
               blockDirty={sectionBlockDirty}
               setBlockDirty={setSectionBlockDirty}
             />
@@ -438,6 +459,8 @@ function SectionBlokTab({
   setStatus,
   titleDirty,
   setTitleDirty,
+  headerImageDirty,
+  setHeaderImageDirty,
   blockDirty,
   setBlockDirty,
 }) {
@@ -449,6 +472,7 @@ function SectionBlokTab({
 
   function isSectionDirty(sectionId) {
     if (titleDirty.has(sectionId)) return true;
+    if (headerImageDirty.has(sectionId)) return true;
     const section = year.sections.find((s) => s.id === sectionId);
     return (section?.content_blocks ?? []).some((b) => blockDirty.has(b.id));
   }
@@ -513,6 +537,17 @@ function SectionBlokTab({
     setStatus("dirty");
   }
 
+  // (Baru) header_image OPSIONAL per section — boleh dikosongkan (hapus
+  // link, jadi string kosong / null) kapan saja, bukan wajib diisi.
+  function editSectionHeaderImage(id, headerImage) {
+    setYear({
+      ...year,
+      sections: year.sections.map((s) => (s.id === id ? { ...s, header_image: headerImage } : s)),
+    });
+    setHeaderImageDirty((prev) => new Set(prev).add(id));
+    setStatus("dirty");
+  }
+
   async function togglePublish(section) {
     try {
       const { data } = await apiClient.put(`/admin/sections/${section.id}`, {
@@ -538,6 +573,11 @@ function SectionBlokTab({
       next.delete(id);
       return next;
     });
+    setHeaderImageDirty((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   function markBlockDirty(blockId) {
@@ -549,15 +589,29 @@ function SectionBlokTab({
     if (!activeSection) return;
     setStatus("saving");
     try {
-      if (titleDirty.has(activeSection.id)) {
-        await apiClient.put(`/admin/sections/${activeSection.id}`, { title: activeSection.title });
+      // title & header_image sama-sama field milik Section (bukan content
+      // block), jadi digabung 1 PUT kalau salah satu atau keduanya dirty —
+      // menghindari 2 request terpisah untuk 1 section yang sama.
+      const sectionPayload = {};
+      if (titleDirty.has(activeSection.id)) sectionPayload.title = activeSection.title;
+      if (headerImageDirty.has(activeSection.id)) sectionPayload.header_image = activeSection.header_image || null;
+
+      let refreshedSection = null;
+      if (Object.keys(sectionPayload).length > 0) {
+        const { data } = await apiClient.put(`/admin/sections/${activeSection.id}`, sectionPayload);
+        refreshedSection = data; // includes resolved_header_image_url terbaru
       }
 
       const blocksToSave = (activeSection.content_blocks ?? []).filter((b) => blockDirty.has(b.id));
       const updatedBlocks = await Promise.all(
         blocksToSave.map((b) =>
           apiClient
-            .patch(`/admin/sections/${activeSection.id}/content-blocks/${b.id}`, { content: b.content })
+            // Caption dikirim bersamaan dengan content — keduanya field
+            // milik block yang sama, tidak perlu request terpisah.
+            .patch(`/admin/sections/${activeSection.id}/content-blocks/${b.id}`, {
+              content: b.content,
+              caption: b.caption || null,
+            })
             .then(({ data }) => data)
         )
       );
@@ -569,10 +623,15 @@ function SectionBlokTab({
           const merged = (s.content_blocks ?? []).map(
             (b) => updatedBlocks.find((u) => u.id === b.id) ?? b
           );
-          return { ...s, content_blocks: merged };
+          return { ...s, ...(refreshedSection ?? {}), content_blocks: merged };
         }),
       }));
       setTitleDirty((prev) => {
+        const next = new Set(prev);
+        next.delete(activeSection.id);
+        return next;
+      });
+      setHeaderImageDirty((prev) => {
         const next = new Set(prev);
         next.delete(activeSection.id);
         return next;
@@ -654,7 +713,9 @@ function SectionBlokTab({
           <>
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Judul Section</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  Judul Section <span className="normal-case font-normal text-zinc-400">(label admin saja, tidak tampil ke user)</span>
+                </p>
                 {titleDirty.has(activeSection.id) && <UnsavedFieldBadge />}
               </div>
               <Input
@@ -662,6 +723,24 @@ function SectionBlokTab({
                 onChange={(e) => editSectionTitle(activeSection.id, e.target.value)}
                 placeholder="Judul section…"
               />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  Header Gambar <span className="normal-case font-normal text-zinc-400">(opsional)</span>
+                </p>
+                {headerImageDirty.has(activeSection.id) && <UnsavedFieldBadge />}
+              </div>
+              <Input
+                value={activeSection.header_image ?? ""}
+                onChange={(e) => editSectionHeaderImage(activeSection.id, e.target.value)}
+                placeholder="Link Google Drive (boleh dikosongkan)…"
+              />
+              <p className="mt-1 text-[11px] text-zinc-400">
+                Tampil di posisi paling atas layar Detail Section, menggantikan judul. Boleh diisi
+                boleh tidak — kalau kosong, section langsung mulai dari blok konten pertama.
+              </p>
             </div>
 
             <div className="flex items-center justify-between">
@@ -727,8 +806,10 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
   // Isi blok sekarang cuma diubah di state lokal saat mengetik -- dikirim
   // ke backend saat admin klik tombol Simpan (lihat
   // SectionBlokTab::handleSaveSection), bukan lagi PATCH di setiap keystroke.
-  function updateBlock(id, content) {
-    onChange(blocks.map((b) => (b.id === id ? { ...b, content } : b)));
+  // `patch` bisa berisi { content } dan/atau { caption } -- caption cuma
+  // relevan utk type image/video, tapi fungsi ini generik untuk semua type.
+  function updateBlock(id, patch) {
+    onChange(blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
     markDirty?.(id);
   }
 
@@ -802,13 +883,23 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
               <Textarea
                 defaultValue={b.content}
                 placeholder="Tulis teks konten…"
-                onChange={(e) => updateBlock(b.id, e.target.value)}
+                onChange={(e) => updateBlock(b.id, { content: e.target.value })}
               />
             ) : (
               <Input
                 defaultValue={b.content}
                 placeholder={b.type === "video" ? "Link YouTube (unlisted)" : "Link Google Drive"}
-                onChange={(e) => updateBlock(b.id, e.target.value)}
+                onChange={(e) => updateBlock(b.id, { content: e.target.value })}
+              />
+            )}
+            {/* (Baru) Caption -- OPSIONAL, cuma relevan utk image/video
+                (sumber/keterangan media). Tidak ditampilkan utk text/pdf. */}
+            {(b.type === "image" || b.type === "video") && (
+              <Input
+                className="mt-2"
+                defaultValue={b.caption ?? ""}
+                placeholder="Caption (opsional) — mis. sumber/keterangan gambar atau video…"
+                onChange={(e) => updateBlock(b.id, { caption: e.target.value })}
               />
             )}
           </div>
@@ -844,8 +935,25 @@ function SummaryVaccineTab({
     apiClient.get("/admin/vaccines").then(({ data }) => setAllVaccines(data));
   }, []);
 
-  function editSummary(summary) {
-    setYear({ ...year, summary });
+  // (Revisi) summary (teks) -> summary_image (link gdrive infografis).
+  function editSummaryImage(summaryImage) {
+    setYear({ ...year, summary_image: summaryImage });
+    setSummaryDirty(true);
+    setStatus("dirty");
+  }
+
+  // (Baru) Quote — 1 teks kutipan per wabah.
+  function editQuoteText(quoteText) {
+    setYear({ ...year, quote_text: quoteText });
+    setSummaryDirty(true);
+    setStatus("dirty");
+  }
+
+  // (Baru) Referensi — replace penuh array setiap kali berubah (bukan
+  // append/patch parsial) -- lebih sederhana daripada nge-track index yang
+  // berubah, dan sesuai cara ReferencesEditor mengembalikan array baru.
+  function editReferences(references) {
+    setYear({ ...year, references });
     setSummaryDirty(true);
     setStatus("dirty");
   }
@@ -864,7 +972,15 @@ function SummaryVaccineTab({
     setStatus("saving");
     try {
       if (summaryDirty) {
-        await apiClient.put(`/admin/years/${year.id}`, { summary: year.summary });
+        const { data } = await apiClient.put(`/admin/years/${year.id}`, {
+          summary_image: year.summary_image || null,
+          quote_text: year.quote_text || null,
+          references: year.references ?? [],
+        });
+        // Merge respons (termasuk resolved_summary_image_url terbaru) -- perlu
+        // supaya preview HP langsung akurat begitu link Drive baru divalidasi
+        // & tersimpan, bukan cuma mengandalkan state lokal yang belum resolved.
+        setYear((prev) => ({ ...prev, ...data }));
       }
       if (vaccinesDirty) {
         const { data } = await apiClient.post(`/admin/years/${year.id}/assign-vaccines`, {
@@ -883,23 +999,52 @@ function SummaryVaccineTab({
 
   return (
     <div className="space-y-8">
+      {/* Urutan section di bawah SENGAJA mengikuti urutan tampil di layar
+          end-user (Design.md §3.3.4): Rangkuman > Quote > Referensi > tombol
+          Kuis (tombol Kuis-nya sendiri ada di tab Kuis terpisah). */}
+
       <div>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Rangkuman Wabah (years.summary)
+            Rangkuman Wabah (years.summary_image)
+          </p>
+          {summaryDirty && <UnsavedFieldBadge />}
+        </div>
+        <Input
+          value={year.summary_image ?? ""}
+          onChange={(e) => editSummaryImage(e.target.value)}
+          placeholder="Link Google Drive (infografis rangkuman)…"
+        />
+        <p className="mt-1 text-[11px] text-zinc-400">
+          Rangkuman kini berupa gambar infografis (link Google Drive), bukan teks. Wajib terisi
+          sebelum kuis bisa di-publish. Klik tombol Simpan di bawah untuk menyimpan perubahan
+          rangkuman, quote, referensi & vaksin sekaligus.
+        </p>
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Quote <span className="normal-case font-normal text-zinc-400">(opsional)</span>
           </p>
           {summaryDirty && <UnsavedFieldBadge />}
         </div>
         <Textarea
-          rows={6}
-          value={year.summary ?? ""}
-          onChange={(e) => editSummary(e.target.value)}
-          placeholder="Tulis rangkuman wabah ini…"
+          rows={3}
+          value={year.quote_text ?? ""}
+          onChange={(e) => editQuoteText(e.target.value)}
+          placeholder="Kutipan singkat terkait wabah ini…"
         />
-        <p className="mt-1 text-[11px] text-zinc-400">
-          Wajib terisi sebelum kuis bisa di-publish. Klik tombol Simpan di bawah untuk menyimpan
-          perubahan rangkuman & vaksin sekaligus.
-        </p>
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Referensi <span className="normal-case font-normal text-zinc-400">(opsional)</span>
+          </p>
+          {summaryDirty && <UnsavedFieldBadge />}
+        </div>
+        <ReferencesEditor references={year.references ?? []} onChange={editReferences} />
       </div>
 
       <div>
@@ -1222,6 +1367,49 @@ function OptionsEditor({ question, onChange }) {
       <Button variant="outline" size="sm" onClick={addOption}>
         <Plus size={12} /> Opsi
       </Button>
+    </div>
+  );
+}
+
+/* --------------------------------------------------------- ReferencesEditor */
+// List teks referensi (mis. daftar pustaka), ditampilkan/diedit sebagai list
+// bernomor -- mirip pola OptionsEditor (kuis) tapi tanpa radio "benar/salah",
+// murni tambah/hapus/edit teks bebas per item.
+
+function ReferencesEditor({ references, onChange }) {
+  function setItem(i, value) {
+    onChange(references.map((r, idx) => (idx === i ? value : r)));
+  }
+
+  function addItem() {
+    onChange([...references, ""]);
+  }
+
+  function removeItem(i) {
+    onChange(references.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-2">
+      {references.map((ref, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="w-5 shrink-0 text-right text-xs text-zinc-400">{i + 1}.</span>
+          <Input
+            value={ref}
+            placeholder="Mis. Kementerian Kesehatan RI, judul dokumen, tahun…"
+            onChange={(e) => setItem(i, e.target.value)}
+          />
+          <Button variant="ghost" size="icon" onClick={() => removeItem(i)}>
+            <Trash2 size={14} className="text-red-500" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" onClick={addItem}>
+        <Plus size={12} /> Referensi
+      </Button>
+      {references.length === 0 && (
+        <p className="text-xs text-zinc-400">Belum ada referensi. Opsional, boleh dikosongkan.</p>
+      )}
     </div>
   );
 }

@@ -101,6 +101,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // R-QUIZ-02/09: hanya login+verified, gate detail dicek di controller (section belum tuntas).
     Route::get('years/{year}/quiz', [UserQuizController::class, 'show']);
     Route::post('years/{year}/quiz/attempt', [UserQuizController::class, 'submitAttempt']);
+    Route::post('years/{year}/quiz/questions/{question}/answer', [UserQuizController::class, 'answerQuestion']);
 
     // R-VAC-05: koleksi vaksin (dulu "cards" tokoh) — nama endpoint tetap "cards"
     // untuk minim breaking change di Flutter, tapi resource-nya sudah Vaccine.

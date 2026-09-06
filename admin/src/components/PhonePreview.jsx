@@ -9,6 +9,8 @@ import {
   Syringe,
   Building2,
   CalendarDays,
+  Quote,
+  BookOpen,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PALETTE, ERA_ACCENTS } from "@/config/branding";
@@ -23,7 +25,10 @@ import { PALETTE, ERA_ACCENTS } from "@/config/branding";
  *
  * Props:
  * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "vaccine-detail"
- * - data: bentuk berbeda tergantung `screen`, lihat masing-masing shape di bawah.
+ * - data: bentuk berbeda tergantung `screen` — lihat komentar shape di atas
+ *   masing-masing screen (SectionDetailScreen sekarang pakai `headerImageUrl`
+ *   menggantikan judul, SummaryScreen pakai `summaryImageUrl`/`quoteText`/
+ *   `references` menggantikan `summary` teks).
  * - eraSlug: opsional, untuk aksen warna era (kolonial/kemerdekaan/modern)
  * - compact: opsional, perkecil frame HP (dipakai saat preview ada di dalam
  *   modal sempit, mis. dialog preview vaksin — bukan split-screen Content
@@ -154,10 +159,16 @@ function RoadmapScreen({ data, accent, eraLabel }) {
 }
 
 /* -------------------------------------------------------- Section detail */
-// data: { sectionTitle, blocks: [{ id, type: 'text'|'image'|'video'|'pdf', content, resolvedUrl }] }
+// data: { sectionTitle, headerImageUrl, blocks: [{ id, type: 'text'|'image'|'video'|'pdf', content, resolved_url, caption }] }
+//
+// (Revisi) `sectionTitle` TIDAK LAGI dirender sebagai judul — posisi paling
+// atas sekarang `headerImageUrl` (opsional per section, boleh null). Kalau
+// null, section langsung mulai dari blok konten pertama tanpa header apa pun
+// (bukan fallback ke judul teks).
 
 function SectionDetailScreen({ data, accent, eraLabel }) {
   const blocks = data?.blocks ?? [];
+  const headerImageUrl = data?.headerImageUrl;
   return (
     <div>
       {eraLabel && (
@@ -168,7 +179,18 @@ function SectionDetailScreen({ data, accent, eraLabel }) {
           {eraLabel}
         </span>
       )}
-      <h2 className="mb-3 text-base font-semibold text-zinc-900">{data?.sectionTitle || "Judul section"}</h2>
+      {headerImageUrl ? (
+        <img
+          src={headerImageUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="mb-3 w-full rounded-xl border border-zinc-100 object-cover"
+        />
+      ) : (
+        <p className="mb-3 text-[10px] italic text-zinc-300">
+          (Belum ada header gambar — opsional, section langsung mulai dari blok konten pertama)
+        </p>
+      )}
       {blocks.length === 0 && (
         <p className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
           Belum ada blok konten
@@ -199,12 +221,15 @@ function BlockPreview({ block, accent }) {
       );
     case "image":
       return resolvedUrl ? (
-        <img
-          src={resolvedUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          className="w-full rounded-lg border border-zinc-100 object-cover"
-        />
+        <div>
+          <img
+            src={resolvedUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="w-full rounded-lg border border-zinc-100 object-cover"
+          />
+          {block.caption && <p className="mt-1 text-[10px] italic text-zinc-400">{block.caption}</p>}
+        </div>
       ) : (
         <MediaPlaceholder icon={<ImageIcon size={18} />} label="Link gambar belum valid" accent={accent} />
       );
@@ -217,15 +242,18 @@ function BlockPreview({ block, accent }) {
       // sudah benar. Diganti <iframe> supaya admin lihat player asli
       // (selaras Design.md §4.3: "render thumbnail/embed asli").
       return resolvedUrl ? (
-        <div className="aspect-video w-full overflow-hidden rounded-lg border border-zinc-100 bg-black">
-          <iframe
-            src={resolvedUrl}
-            title="Preview video"
-            className="h-full w-full"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+        <div>
+          <div className="aspect-video w-full overflow-hidden rounded-lg border border-zinc-100 bg-black">
+            <iframe
+              src={resolvedUrl}
+              title="Preview video"
+              className="h-full w-full"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+          {block.caption && <p className="mt-1 text-[10px] italic text-zinc-400">{block.caption}</p>}
         </div>
       ) : (
         <MediaPlaceholder icon={<Youtube size={18} />} label="Link YouTube belum valid" accent={accent} />
@@ -259,16 +287,53 @@ function MediaPlaceholder({ icon, label, accent }) {
 }
 
 /* ------------------------------------------------------------- Summary tab */
-// data: { summary, vaccines: [{ id, name, photo }], showUnlockAnimation }
+// data: { summaryImageUrl, quoteText, references: string[], vaccines: [{ id, name, photo }], showUnlockAnimation }
+//
+// (Revisi) Urutan render mengikuti urutan tampil end-user (Design.md §3.3.4):
+// Rangkuman (gambar infografis) -> Quote -> Referensi -> Vaksin terkait ->
+// tombol Kuis. `summary` (teks) dihapus, diganti `summaryImageUrl` (resolved).
 
 function SummaryScreen({ data, accent }) {
   const vaccines = data?.vaccines ?? [];
+  const references = data?.references ?? [];
   return (
     <div>
       <h2 className="mb-2 text-base font-semibold text-zinc-900">Rangkuman Wabah</h2>
-      <p className="mb-5 whitespace-pre-line text-sm leading-relaxed text-zinc-600">
-        {data?.summary || <span className="text-zinc-300">Rangkuman belum diisi</span>}
-      </p>
+
+      {data?.summaryImageUrl ? (
+        <img
+          src={data.summaryImageUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="mb-5 w-full rounded-xl border border-zinc-100 object-cover"
+        />
+      ) : (
+        <p className="mb-5 rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+          Rangkuman (infografis) belum diisi
+        </p>
+      )}
+
+      {data?.quoteText && (
+        <div className="mb-5 flex gap-2 rounded-xl bg-zinc-50 p-3">
+          <Quote size={16} className="mt-0.5 shrink-0" style={{ color: accent }} />
+          <p className="text-sm italic leading-relaxed text-zinc-600">{data.quoteText}</p>
+        </div>
+      )}
+
+      {references.length > 0 && (
+        <div className="mb-5">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            <BookOpen size={12} /> Referensi
+          </p>
+          <ol className="space-y-1 pl-4 text-[11px] leading-relaxed text-zinc-500">
+            {references.map((ref, i) => (
+              <li key={i} className="list-decimal">
+                {ref}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {data?.showUnlockAnimation && vaccines.length > 0 && (
         <div

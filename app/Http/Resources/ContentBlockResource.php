@@ -14,6 +14,9 @@ class ContentBlockResource extends JsonResource
             'type' => $this->type,
             'content' => $this->content,       // raw (fallback jika resolved_url null, mis. type=text)
             'resolved_url' => $this->resolved_url, // accessor: direct-view/embed URL utk image/video/pdf
+            // (Baru) Caption — opsional, relevan untuk type image/video
+            // (sumber/keterangan media). null kalau belum diisi admin.
+            'caption' => $this->caption,
             'order' => $this->order,
         ];
     }

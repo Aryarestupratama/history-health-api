@@ -18,13 +18,17 @@ class UpdateContentBlockRequest extends FormRequest
     {
         return [
             // Tipe 'summary' dihapus dari daftar valid — rangkuman sudah naik
-            // level ke years.summary (Schema.md revisi major, R-YEAR-01).
+            // level ke years.summary_image (Schema.md revisi major, R-YEAR-01).
             'type' => ['sometimes', 'required', Rule::in(['text', 'image', 'video', 'pdf'])],
 
             // Tetap 'required' di update: berbeda dari store, PATCH di sini
             // dipakai admin untuk benar-benar mengisi konten (WabahWorkspace.jsx
             // updateBlock()), jadi string kosong memang seharusnya ditolak.
             'content' => ['sometimes', 'required', 'string', $this->contentRule()],
+
+            // (Baru) Caption — OPSIONAL, boleh dikosongkan lewat update
+            // (mis. admin menghapus caption yang sudah pernah diisi).
+            'caption' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 

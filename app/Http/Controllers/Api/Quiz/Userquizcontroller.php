@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Quiz;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quiz\StoreQuizAttemptRequest;
+use App\Http\Requests\Quiz\StoreQuizAnswerRequest;
 use App\Models\UserQuizAttempt;
+use App\Models\QuizQuestion;
 use App\Models\Year;
 use App\Services\Progress\YearCompletionService;
 use Illuminate\Http\Request;
@@ -120,6 +122,98 @@ class UserQuizController extends Controller
                 : 'Kuis ini sudah pernah dikerjakan sebelumnya.',
             'completed_at' => $attempt->completed_at,
             'feedback' => $feedback,
+            'newly_unlocked_vaccine_ids' => $newlyUnlocked->values(),
+        ]);
+    }
+
+    /**
+     * POST /api/years/{year}/quiz/questions/{question}/answer
+     * BARU — progressive save + feedback real-time per soal.
+     *
+     * Beda dari submitAttempt() lama (terima SEMUA jawaban sekaligus di
+     * akhir): endpoint ini dipanggil SETIAP soal dijawab, langsung menyimpan
+     * progresif ke user_quiz_attempts.answers (upsert per-key, bukan overwrite
+     * total) dan mengembalikan feedback instan untuk soal ITU SAJA — termasuk
+     * correct_option_id (BEDA dari submitAttempt() lama yang sengaja tidak
+     * mengirim ini) supaya opsi yang benar bisa di-highlight saat user salah,
+     * sesuai PRD.md QUIZ-03 / Rules.md R-QUIZ-04 ("opsi yang benar ikut
+     * di-highlight" saat jawaban salah).
+     *
+     * completed_at BARU di-set begitu jawaban untuk SEMUA soal quiz ini sudah
+     * terkumpul (bukan saat endpoint ini pertama kali dipanggil) — baru di
+     * titik itu status "year completed" (R-PROG-07/08) & unlock vaksin
+     * dicek ulang.
+     *
+     * R-QUIZ-08 (idempotent) tetap terjaga: kalau attempt SUDAH punya
+     * completed_at (semua soal sudah pernah dituntaskan), request baru ke
+     * endpoint ini ditolak 409 — jawaban yang sudah final tidak boleh diubah.
+     */
+    public function answerQuestion(StoreQuizAnswerRequest $request, Year $year, QuizQuestion $question)
+    {
+        $quiz = $year->quiz;
+
+        if (! $quiz || ! $quiz->is_published || $question->quiz_id !== $quiz->id) {
+            throw new NotFoundHttpException();
+        }
+
+        // R-QUIZ-02: sama seperti show(), harus sudah selesai semua section.
+        $publishedSections = $year->sections()->published()->get();
+        $completedCount = $request->user()->progress()
+            ->whereIn('section_id', $publishedSections->pluck('id'))
+            ->count();
+
+        if ($completedCount < $publishedSections->count()) {
+            return response()->json([
+                'message' => 'Selesaikan seluruh section pada tahun ini terlebih dahulu sebelum mengerjakan kuis.',
+            ], 403);
+        }
+
+        $attempt = UserQuizAttempt::firstOrCreate(
+            ['user_id' => $request->user()->id, 'quiz_id' => $quiz->id],
+            ['answers' => [], 'completed_at' => null]
+        );
+
+        if ($attempt->completed_at !== null) {
+            return response()->json([
+                'message' => 'Kuis ini sudah selesai dikerjakan sebelumnya.',
+            ], 409);
+        }
+
+        $optionId = (int) $request->validated()['option_id'];
+
+        // Upsert progresif — gabung ke jawaban yang sudah ada, bukan overwrite total.
+        $answers = $attempt->answers ?? [];
+        $answers[$question->id] = $optionId;
+        $attempt->answers = $answers;
+
+        $allQuestionIds = $quiz->questions()->pluck('id');
+        $answeredQuestionIds = collect(array_keys($answers))->map(fn ($id) => (int) $id);
+        $isNowComplete = $allQuestionIds->diff($answeredQuestionIds)->isEmpty();
+
+        if ($isNowComplete) {
+            $attempt->completed_at = now();
+        }
+
+        $attempt->save();
+
+        $newlyUnlocked = collect();
+        if ($isNowComplete) {
+            // R-PROG-08: re-check status "year completed" begitu quiz selesai.
+            $newlyUnlocked = $this->yearCompletion->checkAndUnlockVaccines($request->user(), $year);
+        }
+
+        $question->loadMissing('options:id,quiz_question_id,option_text,is_correct,order');
+        $selectedOption = $question->options->firstWhere('id', $optionId);
+        $correctOption = $question->options->firstWhere('is_correct', true);
+        $isCorrect = (bool) ($selectedOption->is_correct ?? false);
+
+        return response()->json([
+            'question_id' => $question->id,
+            'selected_option_id' => $optionId,
+            'correct_option_id' => $correctOption?->id,
+            'is_correct' => $isCorrect,
+            'explanation' => $question->explanationFor($isCorrect),
+            'quiz_completed' => $isNowComplete,
             'newly_unlocked_vaccine_ids' => $newlyUnlocked->values(),
         ]);
     }

@@ -14,6 +14,7 @@ class ContentBlock extends Model
         'section_id',
         'type',
         'content',
+        'caption', // (baru) opsional, relevan untuk type image/video — sumber/keterangan media
         'order',
     ];
 

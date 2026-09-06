@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('quiz_id')->constrained('quizzes')->cascadeOnDelete();
             $table->json('answers')->nullable(); // opsional: rekap jawaban user, tidak dipakai untuk skor
-            $table->timestamp('completed_at');
+            $table->timestamp('completed_at')->nullable();
 
             // Idempotent, selaras pola user_progress: 1 user hanya 1 record per quiz
             $table->unique(['user_id', 'quiz_id']);

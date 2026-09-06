@@ -18,7 +18,7 @@ class StoreContentBlockRequest extends FormRequest
     {
         return [
             // Tipe 'summary' dihapus dari daftar valid — rangkuman sudah naik
-            // level ke years.summary (Schema.md revisi major, R-YEAR-01).
+            // level ke years.summary_image (Schema.md revisi major, R-YEAR-01).
             'type' => ['required', Rule::in(['text', 'image', 'video', 'pdf'])],
 
             // 'nullable' (bukan 'required'): WabahWorkspace.jsx (addBlock())
@@ -28,6 +28,11 @@ class StoreContentBlockRequest extends FormRequest
             // "The content field is required." setiap kali admin klik
             // "+ Tambah Blok".
             'content' => ['nullable', 'string', $this->contentRule()],
+
+            // (Baru) Caption — OPSIONAL, relevan untuk type image/video
+            // (sumber/keterangan media). Nullable murni, tidak ada rule
+            // tambahan (bebas teks bebas).
+            'caption' => ['nullable', 'string', 'max:255'],
         ];
     }
 

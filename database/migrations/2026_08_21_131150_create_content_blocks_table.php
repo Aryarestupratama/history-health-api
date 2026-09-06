@@ -13,6 +13,12 @@ return new class extends Migration
             $table->foreignId('section_id')->constrained('sections')->cascadeOnDelete();
             $table->enum('type', ['text', 'image', 'video', 'pdf']);
             $table->text('content');
+
+            // (Baru) Caption — OPSIONAL, relevan untuk tipe `image` & `video`
+            // (sumber/keterangan media, mis. "Foto: Arsip Nasional RI, 1920").
+            // Nullable & diabaikan (tidak ditampilkan) untuk tipe `text`/`pdf`.
+            $table->string('caption')->nullable();
+
             $table->integer('order')->default(0);
             $table->timestamps();
         });

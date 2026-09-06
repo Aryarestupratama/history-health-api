@@ -13,8 +13,25 @@ class YearResource extends JsonResource
             'id' => $this->id,
             'year' => $this->year,
             'title' => $this->title,
-            // R-YEAR-01: rangkuman wabah di level year, null jika belum diisi admin.
-            'summary' => $this->summary,
+
+            // (Revisi) Rangkuman wabah sekarang berupa infografis, bukan
+            // teks — `summary` (dulu) diganti `summary_image_url`, sudah
+            // di-resolve ke direct-view URL lewat accessor model
+            // (Year::getResolvedSummaryImageUrlAttribute()). null kalau
+            // belum diisi admin.
+            'summary_image_url' => $this->resolved_summary_image_url,
+
+            // (Baru) Quote — 1 teks kutipan per wabah. null kalau belum diisi.
+            'quote_text' => $this->quote_text,
+
+            // (Baru) Referensi — list teks, ditampilkan mirip daftar pustaka.
+            // Selalu array (default [] kalau belum diisi, bukan null) supaya
+            // Flutter tidak perlu null-check sebelum iterasi.
+            'references' => $this->references ?? [],
+
+            // Catatan urutan tampil di Flutter (halaman Rangkuman Wabah):
+            // summary_image_url -> quote_text -> references -> tombol Kuis.
+
             // R-YEAR-02/03 (baru): status lock DI LEVEL TAHUN itu sendiri —
             // diset di YearController::index sebelum resource ini dipanggil.
             // Beda dari 'locked' per section di dalam array 'sections' di

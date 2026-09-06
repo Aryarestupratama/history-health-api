@@ -39,7 +39,15 @@ class SectionDetailResource extends JsonResource
 
         return [
             'id' => $this->id,
+            // `title` dipertahankan di response (dipakai admin/label internal),
+            // tapi Flutter TIDAK LAGI merender ini sebagai judul di layar
+            // Detail Section — posisi paling atas digantikan `header_image_url`
+            // (opsional, null kalau section ini tidak diisi header gambar).
             'title' => $this->title,
+            // (Baru) Header gambar section — opsional per section (bisa ada,
+            // bisa tidak). Sudah di-resolve ke direct-view URL lewat accessor
+            // model (Section::getResolvedHeaderImageUrlAttribute()).
+            'header_image_url' => $this->resolved_header_image_url,
             'order' => $this->order,
             'locked' => false,
             'year' => $this->yearSummaryArray(),

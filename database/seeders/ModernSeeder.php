@@ -19,6 +19,23 @@ use Illuminate\Database\Seeder;
  * 6 year setelah COVID (2021-2026) sengaja DUMMY, tujuannya untuk menguji
  * roadmap & sequential unlock year di aplikasi (year berikutnya baru
  * terbuka setelah year sebelumnya diselesaikan).
+ *
+ * (Revisi skema — Header/Rangkuman/Quote/Referensi/Caption)
+ * - `summary` (teks) sudah tidak ada, diganti `summary_image` (link gdrive
+ *   infografis). Teks rangkuman lama DIPINDAH jadi komentar di tiap method
+ *   supaya tidak hilang — dipakai sebagai BRIEF untuk admin bikin infografis
+ *   asli nanti, BUKAN dipakai langsung sebagai isi field.
+ * - `summary_image` di seeder ini masih PLACEHOLDER (file ID dummy) karena
+ *   aset infografis asli belum ada — wajib diganti sebelum quiz year tsb
+ *   bisa di-publish (R-QUIZ-05 tetap berlaku ke kolom ini).
+ * - `quote_text` & `references` juga masih PLACEHOLDER — tandanya eksplisit
+ *   di teks ("[Placeholder]") supaya tidak tertukar dengan data historis
+ *   yang sudah diverifikasi (beda dari teks section yang memang sudah real).
+ * - `header_image` per section OPSIONAL — sengaja dibiarkan kosong (null) di
+ *   seeder ini karena belum ada aset gambar header, bukan berarti wajib diisi.
+ * - `caption` ditambahkan untuk block image/video yang datanya sudah real
+ *   (Cacar & COVID), disusun dari konteks paragraf section yang sama —
+ *   tetap perlu diverifikasi ulang oleh admin/tim konten, bukan sumber pasti.
  */
 class ModernSeeder extends Seeder
 {
@@ -40,11 +57,21 @@ class ModernSeeder extends Seeder
 
     private function seedCacarYear(Era $era): void
     {
+        // Brief lama utk infografis (dulu teks `summary`, dipindah ke komentar):
+        // "Cacar (smallpox) masih muncul di Indonesia hingga awal 1970-an,
+        // sebelum akhirnya dinyatakan bebas cacar pada tahun 1974 melalui
+        // program eradikasi global yang digagas WHO, menjadi salah satu
+        // pencapaian kesehatan masyarakat terbesar di abad ke-20."
         $year = Year::updateOrCreate(
             ['era_id' => $era->id, 'year' => 1974],
             [
                 'title' => 'Eradikasi Cacar di Indonesia',
-                'summary' => 'Cacar (smallpox) masih muncul di Indonesia hingga awal 1970-an, sebelum akhirnya dinyatakan bebas cacar pada tahun 1974 melalui program eradikasi global yang digagas WHO, menjadi salah satu pencapaian kesehatan masyarakat terbesar di abad ke-20.',
+                'summary_image' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_SUMMARY_1974/view', // TODO: ganti infografis asli
+                'quote_text' => '[Placeholder] "Eradikasi cacar adalah bukti bahwa kerja sama global dan kemauan politik bisa mengalahkan penyakit yang pernah membunuh jutaan orang." — ganti dengan kutipan asli (mis. dari WHO/tokoh kesehatan terkait).',
+                'references' => [
+                    '[Placeholder] WHO, "Smallpox Eradication Programme", ganti dengan referensi resmi.',
+                    '[Placeholder] Kementerian Kesehatan RI, dokumentasi program eradikasi cacar 1974.',
+                ],
             ]
         );
 
@@ -55,35 +82,42 @@ class ModernSeeder extends Seeder
         $sections = [
             [
                 'title' => 'Wabah Cacar di Indonesia',
+                'header_image' => null, // opsional, belum ada aset
                 'blocks' => [
                     [
                         'type' => 'text',
                         'content' => 'Cacar atau smallpox merupakan salah satu penyakit menular tertua yang menyerang manusia, dan di Indonesia penyakit ini terus muncul secara sporadis dari masa kolonial hingga awal tahun 1970-an. Berbeda dengan banyak penyakit menular lain yang sudah mulai bisa dikendalikan pasca kemerdekaan, cacar tetap menjadi ancaman serius karena penyebarannya yang cepat melalui kontak langsung maupun droplet udara, serta tingkat kematian yang tinggi terutama pada kelompok anak-anak dan penduduk dengan akses layanan kesehatan terbatas. Wabah-wabah lokal masih dilaporkan terjadi di berbagai daerah, memaksa pemerintah untuk terus menjalankan program vaksinasi cacar secara berkelanjutan sembari bekerja sama dengan organisasi kesehatan internasional.',
+                        'caption' => null,
                         'order' => 1,
                     ],
                     [
                         'type' => 'image',
                         'content' => $gambarCacar1,
+                        'caption' => 'Dokumentasi kasus/penanganan cacar di Indonesia sebelum eradikasi (perlu verifikasi sumber asli oleh admin).',
                         'order' => 2,
                     ],
                     [
                         'type' => 'image',
                         'content' => $gambarCacar2,
+                        'caption' => 'Dokumentasi terkait wabah cacar di Indonesia (perlu verifikasi sumber asli oleh admin).',
                         'order' => 3,
                     ],
                 ],
             ],
             [
                 'title' => 'Program Eradikasi Cacar Global',
+                'header_image' => null,
                 'blocks' => [
                     [
                         'type' => 'text',
                         'content' => 'Pada dekade 1960-an, World Health Organization (WHO) mencanangkan program eradikasi cacar secara global dengan strategi vaksinasi massal serta pengawasan kasus yang ketat (surveillance and containment). Indonesia turut serta dalam program ini dengan memperluas jangkauan vaksinasi cacar ke seluruh pelosok negeri, termasuk daerah-daerah terpencil yang sebelumnya sulit dijangkau layanan kesehatan. Upaya ini melibatkan tenaga kesehatan yang dikerahkan dari desa ke desa untuk memberikan vaksin sekaligus mendeteksi dini kasus baru. Berkat kerja keras tersebut, Indonesia akhirnya berhasil dinyatakan bebas dari penyakit cacar pada tahun 1974, mendahului deklarasi WHO tahun 1980 yang menyatakan cacar telah diberantas sepenuhnya dari muka bumi — pencapaian yang hingga kini masih dianggap sebagai salah satu keberhasilan terbesar kesehatan masyarakat modern.',
+                        'caption' => null,
                         'order' => 1,
                     ],
                     [
                         'type' => 'video',
                         'content' => $videoCacar,
+                        'caption' => 'Video edukasi/dokumentasi program eradikasi cacar (perlu verifikasi judul & sumber asli video oleh admin).',
                         'order' => 2,
                     ],
                 ],
@@ -109,11 +143,24 @@ class ModernSeeder extends Seeder
 
     private function seedCovidYear(Era $era): void
     {
+        // Brief lama utk infografis (dulu teks `summary`, dipindah ke komentar):
+        // "Pandemi COVID-19 yang berlangsung sejak 2020 hingga 2023 menjadi
+        // salah satu krisis kesehatan terbesar yang pernah dihadapi Indonesia
+        // sejak kemerdekaan, dengan dampak yang sangat luas terhadap sistem
+        // kesehatan, ekonomi, dan kehidupan sosial masyarakat, sekaligus
+        // mendorong percepatan program vaksinasi nasional dan transformasi
+        // layanan kesehatan digital."
         $year = Year::updateOrCreate(
             ['era_id' => $era->id, 'year' => 2020],
             [
                 'title' => 'Pandemi COVID-19',
-                'summary' => 'Pandemi COVID-19 yang berlangsung sejak 2020 hingga 2023 menjadi salah satu krisis kesehatan terbesar yang pernah dihadapi Indonesia sejak kemerdekaan, dengan dampak yang sangat luas terhadap sistem kesehatan, ekonomi, dan kehidupan sosial masyarakat, sekaligus mendorong percepatan program vaksinasi nasional dan transformasi layanan kesehatan digital.',
+                'summary_image' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_SUMMARY_2020/view', // TODO: ganti infografis asli
+                'quote_text' => '[Placeholder] "Pandemi mengajarkan kita bahwa kesehatan satu orang adalah urusan bersama." — ganti dengan kutipan asli (mis. dari pejabat kesehatan/tokoh terkait penanganan COVID-19).',
+                'references' => [
+                    '[Placeholder] Kementerian Kesehatan RI, Pedoman Pencegahan dan Pengendalian COVID-19.',
+                    '[Placeholder] Satuan Tugas Penanganan COVID-19, laporan perkembangan kasus nasional.',
+                    '[Placeholder] WHO Indonesia, situation report COVID-19.',
+                ],
             ]
         );
 
@@ -126,60 +173,72 @@ class ModernSeeder extends Seeder
         $sections = [
             [
                 'title' => 'Pandemi COVID-19 di Indonesia',
+                'header_image' => null,
                 'blocks' => [
                     [
                         'type' => 'text',
                         'content' => 'COVID-19 merupakan pandemi besar yang berlangsung dari tahun 2020 hingga 2023 dan tercatat sebagai salah satu krisis kesehatan terbesar yang pernah dialami Indonesia sejak masa kemerdekaan. Kasus pertama diumumkan secara resmi oleh pemerintah pada awal Maret 2020, dan sejak saat itu penyebaran virus SARS-CoV-2 meluas dengan sangat cepat ke hampir seluruh provinsi di Indonesia. Pemerintah kemudian menerapkan berbagai kebijakan pembatasan sosial berskala besar (PSBB) dan pemberlakuan pembatasan kegiatan masyarakat (PPKM) untuk menekan laju penularan, yang berdampak signifikan terhadap mobilitas dan aktivitas sehari-hari masyarakat di berbagai daerah.',
+                        'caption' => null,
                         'order' => 1,
                     ],
                     [
                         'type' => 'image',
                         'content' => $gambarCovid1,
+                        'caption' => 'Dokumentasi suasana penanganan COVID-19 di Indonesia (perlu verifikasi sumber asli oleh admin).',
                         'order' => 2,
                     ],
                     [
                         'type' => 'image',
                         'content' => $gambarCovid2,
+                        'caption' => 'Dokumentasi terkait kebijakan pembatasan sosial masa pandemi (perlu verifikasi sumber asli oleh admin).',
                         'order' => 3,
                     ],
                 ],
             ],
             [
                 'title' => 'Liputan dan Edukasi COVID-19',
+                'header_image' => null,
                 'blocks' => [
                     [
                         'type' => 'text',
                         'content' => 'Selama pandemi berlangsung, berbagai kanal media turut berperan menyebarkan informasi dan edukasi kepada masyarakat mengenai bahaya COVID-19, cara penularannya, serta pentingnya penerapan protokol kesehatan. Liputan-liputan ini membantu masyarakat memahami perkembangan situasi pandemi dari waktu ke waktu, mulai dari lonjakan kasus di berbagai gelombang, respons pemerintah, hingga upaya-upaya tenaga kesehatan yang berjuang di garis depan menangani pasien COVID-19 di tengah keterbatasan sumber daya.',
+                        'caption' => null,
                         'order' => 1,
                     ],
                     [
                         'type' => 'video',
                         'content' => $videoCovid1,
+                        'caption' => 'Liputan/edukasi COVID-19 (perlu verifikasi judul & sumber asli video oleh admin).',
                         'order' => 2,
                     ],
                     [
                         'type' => 'video',
                         'content' => $videoCovid2,
+                        'caption' => 'Liputan/edukasi COVID-19 (perlu verifikasi judul & sumber asli video oleh admin).',
                         'order' => 3,
                     ],
                 ],
             ],
             [
                 'title' => 'Vaksinasi COVID-19 di Indonesia',
+                'header_image' => null,
                 'blocks' => [
                     [
                         'type' => 'text',
                         'content' => 'Untuk menekan penyebaran COVID-19 dan membentuk kekebalan kelompok (herd immunity), pemerintah Indonesia menjalankan program vaksinasi nasional secara bertahap mulai Januari 2021. Program ini diprioritaskan bagi tenaga kesehatan yang berada di garis depan penanganan pandemi, sebelum kemudian diperluas ke kelompok lanjut usia, pekerja publik, dan akhirnya masyarakat umum. Beberapa jenis vaksin digunakan dalam program ini, di antaranya Sinovac, AstraZeneca, Pfizer-BioNTech, dan Moderna, masing-masing dengan karakteristik teknologi dan jadwal pemberian dosis yang berbeda-beda namun sama-sama bertujuan melindungi masyarakat dari risiko keparahan akibat infeksi COVID-19.',
+                        'caption' => null,
                         'order' => 1,
                     ],
                     [
                         'type' => 'text',
                         'content' => 'Distribusi vaksin dilakukan secara bertahap ke seluruh provinsi dengan melibatkan puskesmas, rumah sakit, hingga sentra-sentra vaksinasi massal di berbagai daerah. Program vaksinasi ini menjadi salah satu program imunisasi nasional dengan skala dan kecepatan pelaksanaan terbesar dalam sejarah kesehatan Indonesia, dan menjadi kunci penting dalam transisi dari status pandemi menuju endemi pada tahun-tahun berikutnya.',
+                        'caption' => null,
                         'order' => 2,
                     ],
                     [
                         'type' => 'pdf',
                         'content' => $pdfCovid1,
+                        'caption' => 'Pedoman Pencegahan dan Pengendalian COVID-19, Kementerian Kesehatan RI (perlu verifikasi versi/edisi dokumen oleh admin).',
                         'order' => 3,
                     ],
                 ],
@@ -254,7 +313,12 @@ class ModernSeeder extends Seeder
                 ['era_id' => $era->id, 'year' => $y],
                 [
                     'title' => "[Dummy] Tahun Modern {$y}",
-                    'summary' => 'Konten dummy untuk menguji roadmap & sequential unlock year era Modern setelah year COVID-19 (2020) diselesaikan.',
+                    'summary_image' => "https://drive.google.com/file/d/CONTOH_FILE_ID_SUMMARY_DUMMY_{$y}/view",
+                    'quote_text' => "[Dummy] Kutipan placeholder untuk tahun {$y}, dipakai untuk menguji tampilan halaman rangkuman, bukan konten historis nyata.",
+                    'references' => [
+                        "[Dummy] Referensi placeholder #1 untuk tahun {$y}.",
+                        "[Dummy] Referensi placeholder #2 untuk tahun {$y}.",
+                    ],
                 ]
             );
 
@@ -264,6 +328,7 @@ class ModernSeeder extends Seeder
                     [
                         'order' => $index + 1,
                         'is_published' => true,
+                        'header_image' => null, // opsional, dummy sengaja dibiarkan kosong
                     ]
                 );
 
@@ -276,6 +341,9 @@ class ModernSeeder extends Seeder
                     $blocksToCreate[] = [
                         'type' => $type,
                         'content' => $this->dummyContentFor($type, $y, $index + 1, $b),
+                        'caption' => in_array($type, ['image', 'video'], true)
+                            ? "[Dummy] Caption placeholder block {$type} #{$b} section ke-{$index}, tahun {$y}."
+                            : null,
                         'order' => $b,
                     ];
                 }
@@ -285,7 +353,7 @@ class ModernSeeder extends Seeder
     }
 
     /**
-     * @param array<int, array{title: string, blocks: array<int, array{type: string, content: string, order: int}>}> $sections
+     * @param array<int, array{title: string, header_image: ?string, blocks: array<int, array{type: string, content: string, caption: ?string, order: int}>}> $sections
      */
     private function createSections(Year $year, array $sections): void
     {
@@ -295,6 +363,7 @@ class ModernSeeder extends Seeder
                 [
                     'order' => $index + 1,
                     'is_published' => true,
+                    'header_image' => $sectionData['header_image'] ?? null,
                 ]
             );
 

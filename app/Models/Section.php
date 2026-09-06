@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Content\LinkParserService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,7 +12,8 @@ class Section extends Model
 
     protected $fillable = [
         'year_id',
-        'title',
+        'title', // tetap disimpan (label admin di Content Studio), tidak lagi dirender sebagai judul di layar end-user
+        'header_image', // (baru) opsional, raw link Google Drive — boleh kosong per section
         'order',
         'is_published',
     ];
@@ -23,6 +25,8 @@ class Section extends Model
             'order' => 'integer',
         ];
     }
+
+    protected $appends = ['resolved_header_image_url'];
 
     public function year()
     {
@@ -42,5 +46,18 @@ class Section extends Model
     public function scopePublished($query)
     {
         return $query->where('is_published', true);
+    }
+
+    /**
+     * URL siap pakai (direct-view) dari `header_image`, atau null kalau
+     * section ini tidak diisi header gambar (opsional per section).
+     */
+    public function getResolvedHeaderImageUrlAttribute(): ?string
+    {
+        if (empty($this->header_image)) {
+            return null;
+        }
+
+        return app(LinkParserService::class)->toDriveImageUrl($this->header_image);
     }
 }
