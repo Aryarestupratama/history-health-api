@@ -3,7 +3,7 @@ import {
   CheckCircle2,
   FileText,
   Image as ImageIcon,
-  Youtube,
+  Video,
   FileWarning,
   Sparkles,
   Syringe,
@@ -234,13 +234,13 @@ function BlockPreview({ block, accent }) {
         <MediaPlaceholder icon={<ImageIcon size={18} />} label="Link gambar belum valid" accent={accent} />
       );
     case "video":
-      // FIX: resolved_url untuk type=video adalah YouTube EMBED URL
-      // (https://www.youtube.com/embed/VIDEO_ID, lihat
-      // LinkParserService::toYoutubeEmbedUrl()) -- ini format untuk
-      // <iframe>, bukan URL gambar. Sebelumnya dipakai sebagai src <img>
-      // (mengira ini thumbnail) sehingga selalu broken image walau field
-      // sudah benar. Diganti <iframe> supaya admin lihat player asli
-      // (selaras Design.md §4.3: "render thumbnail/embed asli").
+      // (Revisi) resolved_url untuk type=video sekarang Google Drive EMBED
+      // URL (https://drive.google.com/file/d/{id}/preview, lihat
+      // LinkParserService::toDriveVideoEmbedUrl()) -- format sama persis
+      // dengan PDF di bawah, sama-sama siap di-<iframe>. YouTube dihapus
+      // total dari sistem (Rules.md R-CMS-06 revisi) karena embed video
+      // orang lain sering gagal ("video is unavailable") saat uploader
+      // aslinya tidak mengaktifkan enable-embed, di luar kendali admin.
       return resolvedUrl ? (
         <div>
           <div className="aspect-video w-full overflow-hidden rounded-lg border border-zinc-100 bg-black">
@@ -256,7 +256,7 @@ function BlockPreview({ block, accent }) {
           {block.caption && <p className="mt-1 text-[10px] italic text-zinc-400">{block.caption}</p>}
         </div>
       ) : (
-        <MediaPlaceholder icon={<Youtube size={18} />} label="Link YouTube belum valid" accent={accent} />
+        <MediaPlaceholder icon={<Video size={18} />} label="Link Google Drive belum valid" accent={accent} />
       );
     case "pdf":
       // FIX: sebelumnya cuma tampilkan label "Dokumen PDF" tanpa pernah

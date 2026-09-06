@@ -54,45 +54,18 @@ class LinkParserService
     }
 
     /**
-     * Ekstrak VIDEO_ID dari berbagai format link YouTube.
+     * (Baru) Video kini via Google Drive, bukan lagi YouTube — lihat
+     * Architecture.md §4.1 & Rules.md R-CMS-06 (revisi). Format URL embed
+     * Drive untuk video sebenarnya identik dengan PDF ('/preview'), tapi
+     * dipisah jadi method sendiri (bukan reuse toDrivePdfEmbedUrl()) supaya
+     * semantiknya eksplisit di ContentBlock::getResolvedUrlAttribute() dan
+     * tidak membingungkan kalau nanti video butuh parameter tambahan
+     * (mis. '?autoplay=0') yang tidak relevan untuk PDF.
      */
-    public function extractYoutubeVideoId(?string $url): ?string
+    public function toDriveVideoEmbedUrl(?string $url): ?string
     {
-        if (!$url) {
-            return null;
-        }
+        $fileId = $this->extractDriveFileId($url);
 
-        if (preg_match('/youtu\.be\/([a-zA-Z0-9_-]{11})/', $url, $matches)) {
-            return $matches[1];
-        }
-
-        if (preg_match('/[?&]v=([a-zA-Z0-9_-]{11})/', $url, $matches)) {
-            return $matches[1];
-        }
-
-        if (preg_match('/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/', $url, $matches)) {
-            return $matches[1];
-        }
-
-        return null;
-    }
-
-    public function isValidYoutubeLink(?string $url): bool
-    {
-        return $this->extractYoutubeVideoId($url) !== null;
-    }
-
-    public function toYoutubeEmbedUrl(?string $url): ?string
-    {
-        $videoId = $this->extractYoutubeVideoId($url);
-
-        return $videoId ? "https://www.youtube.com/embed/{$videoId}" : null;
-    }
-
-    public function toYoutubeThumbnailUrl(?string $url): ?string
-    {
-        $videoId = $this->extractYoutubeVideoId($url);
-
-        return $videoId ? "https://img.youtube.com/vi/{$videoId}/hqdefault.jpg" : null;
+        return $fileId ? "https://drive.google.com/file/d/{$fileId}/preview" : null;
     }
 }

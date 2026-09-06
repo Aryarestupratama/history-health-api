@@ -795,6 +795,14 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
 
   const orderedBlocks = (blocks ?? []).slice().sort((a, b) => a.order - b.order);
 
+  // (Baru) Guard client-side maks 2 block 'video' per section -- hint saja,
+  // bukan pengganti validasi backend (ContentBlockController::store()/update()
+  // tetap sumber kebenaran, sama pola dengan hint missingExplanationCount di
+  // QuizTab). Alasan limit: performa render WebView Drive kalau terlalu
+  // banyak video aktif sekaligus di 1 section (lihat Architecture.md §4.1).
+  const videoCount = orderedBlocks.filter((b) => b.type === "video").length;
+  const videoLimitReached = videoCount >= 2;
+
   async function addBlock(type) {
     const { data } = await apiClient.post(`/admin/sections/${section.id}/content-blocks`, {
       type,
@@ -888,7 +896,12 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
             ) : (
               <Input
                 defaultValue={b.content}
-                placeholder={b.type === "video" ? "Link YouTube (unlisted)" : "Link Google Drive"}
+                // (Revisi) Video kini via Google Drive juga, bukan lagi
+                // YouTube (Rules.md R-CMS-06 revisi) -- placeholder sekarang
+                // sama dengan image/pdf, ditambah hint batas ukuran/durasi.
+                placeholder={
+                  b.type === "video" ? "Link Google Drive (maks 50MB, disarankan ≤10 menit)" : "Link Google Drive"
+                }
                 onChange={(e) => updateBlock(b.id, { content: e.target.value })}
               />
             )}
@@ -907,12 +920,27 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
       })}
 
       <div className="flex gap-2">
-        {["text", "image", "video", "pdf"].map((t) => (
-          <Button key={t} variant="outline" size="sm" onClick={() => addBlock(t)}>
-            <Plus size={12} /> {t}
-          </Button>
-        ))}
+        {["text", "image", "video", "pdf"].map((t) => {
+          const disabled = t === "video" && videoLimitReached;
+          return (
+            <Button
+              key={t}
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              title={disabled ? "Maksimal 2 video per section" : undefined}
+              onClick={() => addBlock(t)}
+            >
+              <Plus size={12} /> {t}
+            </Button>
+          );
+        })}
       </div>
+      {videoLimitReached && (
+        <p className="text-xs text-amber-600">
+          Section ini sudah punya 2 video (maks). Hapus salah satu dulu untuk menambah video baru.
+        </p>
+      )}
     </div>
   );
 }

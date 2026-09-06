@@ -77,7 +77,11 @@ class ModernSeeder extends Seeder
 
         $gambarCacar1 = 'https://drive.google.com/file/d/1aTaPkpeFkxifnIEJBMUTsLHh5n-RZLuI/view?usp=drive_link';
         $gambarCacar2 = 'https://drive.google.com/file/d/1SpHxOHhRFgN833jRuhysZfbyRlZ59qiF/view?usp=drive_link';
-        $videoCacar = 'https://youtu.be/1qo_9a2jNvY?si=SuZO3ZHqVVytHYZ7';
+        // TODO: video Cacar dulu link YouTube ('https://youtu.be/1qo_9a2jNvY...'),
+        // dihapus sementara karena video kini wajib via Google Drive (Rules.md
+        // R-CMS-06 revisi). Block video di section "Program Eradikasi Cacar
+        // Global" di bawah ikut dihapus sampai ada link Drive pengganti untuk
+        // konten ini (perlu kompres ulang & upload manual, R-CMS-06/limit 50MB).
 
         $sections = [
             [
@@ -114,12 +118,9 @@ class ModernSeeder extends Seeder
                         'caption' => null,
                         'order' => 1,
                     ],
-                    [
-                        'type' => 'video',
-                        'content' => $videoCacar,
-                        'caption' => 'Video edukasi/dokumentasi program eradikasi cacar (perlu verifikasi judul & sumber asli video oleh admin).',
-                        'order' => 2,
-                    ],
+                    // TODO: dulu ada block 'video' di sini (link YouTube,
+                    // dihapus). Tambahkan lagi setelah ada link Google Drive
+                    // pengganti untuk video edukasi/dokumentasi eradikasi cacar.
                 ],
             ],
         ];
@@ -166,8 +167,11 @@ class ModernSeeder extends Seeder
 
         $gambarCovid1 = 'https://drive.google.com/file/d/16_dq-S932UpgYfiJhm9UJK1_So5pE7xX/view?usp=drive_link';
         $gambarCovid2 = 'https://drive.google.com/file/d/1rd1QhrnW7IpMRv8BK4xxIMud-jqp3h13/view?usp=drive_link';
-        $videoCovid1 = 'https://youtu.be/kW8PqjgImlU?si=dOQZuIPB8Warl-Hf';
-        $videoCovid2 = 'https://youtu.be/0dAoCfgAQw8?si=9WSrbFDX7aCApgJx';
+        // TODO: 2 video COVID dulu link YouTube ($videoCovid1/$videoCovid2),
+        // dihapus sementara karena video kini wajib via Google Drive
+        // (Rules.md R-CMS-06 revisi). Kedua block video di section "Liputan
+        // dan Edukasi COVID-19" di bawah ikut dihapus sampai ada link Drive
+        // pengganti (ingat batas maks 2 video/section & 50MB/file kalau nanti diisi lagi).
         $pdfCovid1 = 'https://drive.google.com/file/d/13eeGg5bt83x-e1yZW_C54Rg6h2fVgKqv/view?usp=drive_link'; // Pedoman Pencegahan dan Pengendalian COVID-19
 
         $sections = [
@@ -205,18 +209,10 @@ class ModernSeeder extends Seeder
                         'caption' => null,
                         'order' => 1,
                     ],
-                    [
-                        'type' => 'video',
-                        'content' => $videoCovid1,
-                        'caption' => 'Liputan/edukasi COVID-19 (perlu verifikasi judul & sumber asli video oleh admin).',
-                        'order' => 2,
-                    ],
-                    [
-                        'type' => 'video',
-                        'content' => $videoCovid2,
-                        'caption' => 'Liputan/edukasi COVID-19 (perlu verifikasi judul & sumber asli video oleh admin).',
-                        'order' => 3,
-                    ],
+                    // TODO: dulu ada 2 block 'video' di sini (link YouTube,
+                    // dihapus). Tambahkan lagi setelah ada link Google Drive
+                    // pengganti untuk liputan/edukasi COVID-19 (maks 2 video
+                    // per section jika keduanya diisi lagi, R-CMS-06 revisi).
                 ],
             ],
             [
@@ -306,7 +302,14 @@ class ModernSeeder extends Seeder
             'Dampak dan Pembelajaran',
         ];
 
-        $blockPool = ['text', 'image', 'video', 'pdf'];
+        // TODO: 'video' dikeluarkan sementara dari pool acak — dulu
+        // dummyContentFor() generate link YouTube dummy untuk tipe ini
+        // ('youtube.com/watch?v=CONTOH_VIDEO_DUMMY'), sudah tidak valid
+        // karena video kini wajib via Google Drive (Rules.md R-CMS-06
+        // revisi). Tambahkan lagi 'video' ke pool setelah ada link Drive
+        // dummy pengganti untuk testing (lihat dummyContentFor() di bawah,
+        // case 'video' sudah disiapkan polanya, tinggal diaktifkan lagi).
+        $blockPool = ['text', 'image', 'pdf'];
 
         for ($y = 2021; $y <= 2026; $y++) {
             $year = Year::updateOrCreate(
@@ -377,7 +380,10 @@ class ModernSeeder extends Seeder
         return match ($type) {
             'text' => "Ini adalah teks dummy untuk section ke-{$sectionOrder} pada year dummy {$year}, dipakai untuk menguji tampilan roadmap & sequential unlock, bukan konten historis nyata.",
             'image' => "https://drive.google.com/file/d/CONTOH_FILE_ID_DUMMY_{$year}_{$sectionOrder}_{$blockOrder}/view",
-            'video' => 'https://www.youtube.com/watch?v=CONTOH_VIDEO_DUMMY',
+            // (Tidak reachable saat ini karena 'video' dikeluarkan dari
+            // $blockPool — pola placeholder sudah disesuaikan ke Drive
+            // duluan supaya tinggal diaktifkan lagi, bukan youtube lagi.)
+            'video' => "https://drive.google.com/file/d/CONTOH_FILE_ID_VIDEO_DUMMY_{$year}_{$sectionOrder}_{$blockOrder}/view",
             'pdf' => "https://drive.google.com/file/d/CONTOH_FILE_ID_PDF_DUMMY_{$year}_{$sectionOrder}/view",
             default => 'dummy',
         };

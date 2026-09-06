@@ -43,7 +43,13 @@ class ContentBlock extends Model
         return match ($this->type) {
             'image' => $parser->toDriveImageUrl($this->content),
             'pdf' => $parser->toDrivePdfEmbedUrl($this->content),
-            'video' => $parser->toYoutubeEmbedUrl($this->content),
+            // (Revisi) Video kini via Google Drive, bukan lagi YouTube —
+            // lihat Rules.md R-CMS-06 (revisi) & LinkParserService::toDriveVideoEmbedUrl().
+            // Catatan: content_block bertipe 'video' dari data lama yang masih
+            // berisi link YouTube akan mengembalikan resolved_url = null di
+            // sini (extractDriveFileId tidak match format YouTube) — perlu
+            // migrasi data manual, di luar scope perubahan ini.
+            'video' => $parser->toDriveVideoEmbedUrl($this->content),
             default => null,
         };
     }

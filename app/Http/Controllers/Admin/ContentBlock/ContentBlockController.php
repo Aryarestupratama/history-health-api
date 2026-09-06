@@ -25,6 +25,20 @@ class ContentBlockController extends Controller
 
         $data = $request->validated();
 
+        // (Baru) Guard: maks 2 content block bertipe 'video' per section —
+        // keputusan tim untuk menjaga performa render (WebView Drive/section
+        // terlalu banyak video aktif bikin lemot di HP low-end), bukan
+        // constraint DB (mirip pola R-QUIZ-06 maks 5 soal per kuis).
+        if (($data['type'] ?? null) === 'video') {
+            $existingVideoCount = $section->contentBlocks()->where('type', 'video')->count();
+
+            abort_if(
+                $existingVideoCount >= 2,
+                422,
+                'Maksimal 2 video per section. Hapus salah satu video yang ada terlebih dahulu.'
+            );
+        }
+
         // FIX: StoreContentBlockRequest sengaja bikin 'content' nullable,
         // karena WabahWorkspace.jsx (addBlock()) membuat block skeleton dulu
         // dengan content: "" sebelum diisi via updateBlock() (PATCH). Tapi
@@ -47,7 +61,23 @@ class ContentBlockController extends Controller
 
     public function update(UpdateContentBlockRequest $request, Section $section, ContentBlock $contentBlock)
     {
-        $contentBlock->update($request->validated());
+        $data = $request->validated();
+
+        // (Baru) Guard yang sama seperti store(): berlaku juga kalau admin
+        // mengubah type block yang sudah ada (mis. dari 'text' ke 'video')
+        // lewat update, bukan cuma saat membuat block baru.
+        $newType = $data['type'] ?? $contentBlock->type;
+        if ($newType === 'video' && $contentBlock->type !== 'video') {
+            $existingVideoCount = $section->contentBlocks()->where('type', 'video')->count();
+
+            abort_if(
+                $existingVideoCount >= 2,
+                422,
+                'Maksimal 2 video per section. Hapus salah satu video yang ada terlebih dahulu.'
+            );
+        }
+
+        $contentBlock->update($data);
 
         return $contentBlock;
     }

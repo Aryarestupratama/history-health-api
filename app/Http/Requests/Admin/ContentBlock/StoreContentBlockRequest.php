@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin\ContentBlock;
 
 use App\Rules\Content\ValidGoogleDriveLink;
-use App\Rules\Content\ValidYoutubeLink;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -51,10 +50,13 @@ class StoreContentBlockRequest extends FormRequest
 
             $type = $this->input('type');
 
-            if (in_array($type, ['image', 'pdf'])) {
+            // (Revisi) 'video' kini digabung ke validasi Google Drive —
+            // YouTube dihapus total dari sistem (Rules.md R-CMS-06 revisi),
+            // karena embed YouTube sering gagal ("video is unavailable")
+            // ketika uploader video tidak mengaktifkan enable-embed, di luar
+            // kendali admin SEKALA.
+            if (in_array($type, ['image', 'video', 'pdf'])) {
                 (new ValidGoogleDriveLink)->validate($attribute, $value, $fail);
-            } elseif ($type === 'video') {
-                (new ValidYoutubeLink)->validate($attribute, $value, $fail);
             }
             // type text -> tidak perlu validasi link, bebas teks/HTML
         };

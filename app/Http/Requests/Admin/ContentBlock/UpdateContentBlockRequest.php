@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin\ContentBlock;
 
 use App\Rules\Content\ValidGoogleDriveLink;
-use App\Rules\Content\ValidYoutubeLink;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -45,10 +44,10 @@ class UpdateContentBlockRequest extends FormRequest
             // image/video/pdf.
             $type = $this->input('type', $this->route('contentBlock')?->type);
 
-            if (in_array($type, ['image', 'pdf'])) {
+            // (Revisi) 'video' digabung ke validasi Google Drive — lihat
+            // catatan yang sama di StoreContentBlockRequest.
+            if (in_array($type, ['image', 'video', 'pdf'])) {
                 (new ValidGoogleDriveLink)->validate($attribute, $value, $fail);
-            } elseif ($type === 'video') {
-                (new ValidYoutubeLink)->validate($attribute, $value, $fail);
             }
         };
     }
