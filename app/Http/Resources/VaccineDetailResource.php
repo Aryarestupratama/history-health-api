@@ -18,6 +18,11 @@ class VaccineDetailResource extends JsonResource
             'disease_target' => $this->disease_target,
             'year_introduced' => $this->year_introduced,
             'description' => $this->description,
+            'eras' => $this->eras->map(fn ($era) => [
+                'id' => $era->id,
+                'name' => $era->name,
+                'slug' => $era->slug,
+            ]),
         ];
     }
 }

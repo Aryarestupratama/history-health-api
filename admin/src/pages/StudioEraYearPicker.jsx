@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ERA_ACCENTS } from "@/config/branding";
+import EraQuizManager from "@/pages/EraQuizManager";
 
 /**
  * Class Tailwind solid per era untuk card di EraGrid (Design.md — mockup
@@ -42,6 +43,10 @@ export default function StudioEraYearPicker() {
   const [activeEra, setActiveEra] = useState(null); // era yang lagi di-expand
   const [years, setYears] = useState([]);
   const [loadingYears, setLoadingYears] = useState(false);
+  // Tab level Era (BUKAN level Year seperti tab di WabahWorkspace) — "years"
+  // = grid Tahun (default), "quiz" = EraQuizManager (kuis sumatif "final
+  // boss" era ini, Rules.md R-ERAQUIZ). Direset tiap ganti era (lihat openEra).
+  const [eraTab, setEraTab] = useState("years");
 
   useEffect(() => {
     apiClient.get("/admin/eras").then(({ data }) => setEras(data));
@@ -49,6 +54,7 @@ export default function StudioEraYearPicker() {
 
   async function openEra(era) {
     setActiveEra(era);
+    setEraTab("years");
     setLoadingYears(true);
     // TODO verifikasi: asumsi endpoint mendukung filter `?era_id=`, konsisten
     // dengan pola filter di AdminSectionController (`?year_id=`).
@@ -93,16 +99,49 @@ export default function StudioEraYearPicker() {
           >
             <ArrowLeft size={14} /> Kembali ke pilih masa
           </button>
-          <YearGrid
-            era={activeEra}
-            years={years}
-            loading={loadingYears}
-            onSelect={(y) => navigate(`/studio/${y.id}`)}
-            onCreate={createYear}
-          />
+
+          {/* Tab switcher level Era (Design.md, revisi Content Studio):
+              "Tahun" = grid tahun seperti sebelumnya, "Kuis Sumatif Era" =
+              EraQuizManager, dikelola sebagai tab di sini (bukan halaman
+              terpisah) supaya admin tidak perlu keluar dari Content Studio. */}
+          <div className="mb-4 flex gap-1 border-b border-zinc-100">
+            <EraTabButton active={eraTab === "years"} onClick={() => setEraTab("years")}>
+              Tahun
+            </EraTabButton>
+            <EraTabButton active={eraTab === "quiz"} onClick={() => setEraTab("quiz")}>
+              Kuis Sumatif Era
+            </EraTabButton>
+          </div>
+
+          {eraTab === "years" ? (
+            <YearGrid
+              era={activeEra}
+              years={years}
+              loading={loadingYears}
+              onSelect={(y) => navigate(`/studio/${y.id}`)}
+              onCreate={createYear}
+            />
+          ) : (
+            <EraQuizManager era={activeEra} />
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function EraTabButton({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
+        active
+          ? "border-zinc-900 text-zinc-900"
+          : "border-transparent text-zinc-400 hover:text-zinc-600"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

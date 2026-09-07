@@ -27,4 +27,9 @@ class Era extends Model
     {
         return $this->hasMany(Year::class);
     }
+
+    public function eraQuiz()
+    {
+        return $this->hasOne(EraQuiz::class);
+    }
 }

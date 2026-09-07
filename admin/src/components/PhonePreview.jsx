@@ -50,6 +50,7 @@ export default function PhonePreview({ screen, data, eraSlug, compact = false })
           {screen === "section-detail" && <SectionDetailScreen data={data} accent={accent} eraLabel={eraLabel} />}
           {screen === "summary" && <SummaryScreen data={data} accent={accent} />}
           {screen === "quiz" && <QuizScreen data={data} accent={accent} />}
+          {screen === "era-quiz-recap" && <EraQuizRecapScreen data={data} accent={accent} />}
           {screen === "vaccine-detail" && <VaccineDetailScreen data={data} accent={accent} />}
           {!screen && <EmptyState />}
         </div>
@@ -374,7 +375,7 @@ function SummaryScreen({ data, accent }) {
 
 /* --------------------------------------------------------------- Quiz tab */
 // data: { questions: [{ id, question, explanation_correct, explanation_incorrect,
-//         options: [{ option_text, is_correct }] }], activeIndex }
+//         options: [{ option_text, is_correct }] }], activeIndex, footerNote? }
 //
 // R-QUIZ-04 (revisi terbaru — feedback dipecah 2 kolom): preview kini
 // menampilkan 1 soal per halaman (bukan lagi semua soal sekaligus dalam 1
@@ -385,6 +386,13 @@ function SummaryScreen({ data, accent }) {
 // versi tampilan feedback (explanation_correct vs explanation_incorrect)
 // tanpa perlu login sebagai user beneran — toggle ini murni alat bantu
 // preview, bukan bagian dari tampilan end-user asli.
+//
+// DIREUSE untuk preview kuis sumatif era (EraQuizManager) — bentuk data
+// per-soal identik (question/options/explanation_correct/explanation_incorrect),
+// cuma beda perilaku end-user asli (submit di akhir + halaman skor, bukan
+// feedback instan tanpa skor). `footerNote` dipakai EraQuizManager untuk
+// menimpa teks catatan bawah supaya tidak menyesatkan ("tanpa tampilan skor"
+// tidak berlaku untuk kuis sumatif era).
 
 function QuizScreen({ data, accent }) {
   const questions = data?.questions ?? [];
@@ -550,8 +558,93 @@ function QuizScreen({ data, accent }) {
       </div>
 
       <p className="mt-2 text-center text-[10px] text-zinc-300">
-        Ganti soal dari editor di sebelah kiri &middot; tanpa tampilan skor
+        {data?.footerNote ?? "Ganti soal dari editor di sebelah kiri · tanpa tampilan skor"}
       </p>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------- Era quiz recap tab */
+// data: { eraLabel, score: { correct, total, percentage },
+//         questions: [{ question, options: [{ id, option_text }],
+//         selected_option_id, correct_option_id, is_correct, explanation }] }
+//
+// Preview halaman "Lihat Rekapan" kuis sumatif era — BEDA dari QuizScreen
+// (1 soal per halaman): di sini SEMUA soal ditampilkan sekaligus dalam 1
+// layar scroll, masing-masing sudah dalam kondisi "sudah dijawab" (opsi
+// benar hijau, opsi user yang salah merah, explanation tampil langsung
+// tanpa toggle simulasi — datanya sudah final dari attempt yang tersimpan).
+
+function EraQuizRecapScreen({ data, accent }) {
+  const questions = data?.questions ?? [];
+  const score = data?.score;
+
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium text-zinc-400">Rekap Kuis Sumatif</p>
+      <h2 className="mb-1 text-lg font-semibold text-zinc-900">{data?.eraLabel || "Era"}</h2>
+      {score && (
+        <p className="mb-4 text-xs text-zinc-500">
+          Benar {score.correct} dari {score.total} soal ({score.percentage}%)
+        </p>
+      )}
+
+      {questions.length === 0 && (
+        <p className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+          Belum ada soal / belum ada attempt
+        </p>
+      )}
+
+      <div className="space-y-4">
+        {questions.map((item, qi) => (
+          <div key={qi} className="rounded-xl border border-zinc-100 p-3">
+            <p className="mb-2 text-sm font-medium leading-relaxed text-zinc-900">
+              {qi + 1}. {item.question || <span className="text-zinc-300">Teks soal kosong</span>}
+            </p>
+            <div className="space-y-2">
+              {(item.options ?? []).map((opt) => {
+                const isCorrectOpt = opt.id === item.correct_option_id;
+                const isUserWrongPick = opt.id === item.selected_option_id && !item.is_correct;
+
+                return (
+                  <div
+                    key={opt.id}
+                    className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm ${
+                      isCorrectOpt
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : isUserWrongPick
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : "border-zinc-100 text-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
+                      style={{
+                        borderColor: isCorrectOpt ? "#4BA95F" : isUserWrongPick ? "#DC5B5B" : accent,
+                      }}
+                    />
+                    <span className="flex-1">{opt.option_text}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div
+              className={`mt-2 rounded-lg p-2.5 text-xs leading-relaxed ${
+                item.is_correct ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {item.explanation || <span className="italic text-zinc-300">Belum diisi</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        className="mt-6 w-full rounded-lg py-2.5 text-sm font-medium text-white"
+        style={{ backgroundColor: accent }}
+      >
+        Kembali ke Hasil
+      </button>
     </div>
   );
 }

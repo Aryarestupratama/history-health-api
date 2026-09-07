@@ -44,6 +44,14 @@ class VaccineCardResource extends JsonResource
                 'photo_locked_url' => $this->photo_locked_url,
                 'unlocked' => false,
                 'unseen' => false,
+                // Era tetap dikirim meski masih siluet (bukan spoiler —
+                // cuma label era, bukan identitas vaksinnya) supaya Flutter
+                // bisa filter per-era tanpa perlu vaksin ini unlock dulu.
+                'eras' => $this->eras->map(fn ($era) => [
+                    'id' => $era->id,
+                    'name' => $era->name,
+                    'slug' => $era->slug,
+                ]),
             ];
         }
 
@@ -60,6 +68,11 @@ class VaccineCardResource extends JsonResource
             'photo_locked_url' => $this->photo_locked_url,
             'unlocked' => true,
             'unseen' => $this->unlock->seen_at === null,
+            'eras' => $this->eras->map(fn ($era) => [
+                'id' => $era->id,
+                'name' => $era->name,
+                'slug' => $era->slug,
+            ]),
         ];
     }
 }

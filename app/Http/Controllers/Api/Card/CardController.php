@@ -23,12 +23,38 @@ class CardController extends Controller
 
         // R-VAC-04: vaccine yang belum unlock tetap muncul di list (siluet),
         // bukan disembunyikan.
-        $vaccines = Vaccine::orderBy('name')->get();
+        // Eager-load years.era supaya accessor Vaccine::eras (dipakai
+        // VaccineCardResource buat filter per-era, VAC-04 lanjutan) tidak
+        // kena N+1 query per vaksin.
+        $vaccines = Vaccine::with('years.era')->orderBy('name')->get();
 
         $data = $vaccines->map(
             fn ($vaccine) => (new VaccineCardResource($vaccine))
                 ->withUnlock($unlocksByVaccineId->get($vaccine->id))
         )->values();
+
+        // Ringkasan per-era (total & unlocked) — dipakai Flutter buat badge
+        // angka di chip filter era, mis. "Kolonial (3/5)", tanpa perlu
+        // hitung ulang manual dari `data` di sisi client.
+        $erasSummary = $vaccines
+            ->flatMap(fn ($vaccine) => $vaccine->eras)
+            ->unique('id')
+            ->map(function ($era) use ($vaccines, $unlocksByVaccineId) {
+                $vaccineIdsInEra = $vaccines
+                    ->filter(fn ($v) => $v->eras->contains('id', $era->id))
+                    ->pluck('id');
+
+                return [
+                    'id' => $era->id,
+                    'name' => $era->name,
+                    'slug' => $era->slug,
+                    'total' => $vaccineIdsInEra->count(),
+                    'unlocked' => $vaccineIdsInEra
+                        ->filter(fn ($id) => $unlocksByVaccineId->has($id))
+                        ->count(),
+                ];
+            })
+            ->values();
 
         return response()->json([
             'data' => $data,
@@ -38,6 +64,7 @@ class CardController extends Controller
                 // Dipakai buat badge dot bottom nav & auto-scroll ke vaksin
                 // yang masih perlu animasi reveal saat halaman Koleksi dibuka.
                 'unseen' => $unlocksByVaccineId->whereNull('seen_at')->count(),
+                'eras' => $erasSummary,
             ],
         ]);
     }
@@ -52,6 +79,11 @@ class CardController extends Controller
         if (! $isUnlocked) {
             throw new NotFoundHttpException();
         }
+
+        // Eager-load years.era supaya accessor Vaccine::eras (dipakai
+        // VaccineDetailResource) tidak kena N+1 — sama alasannya seperti
+        // index() di atas.
+        $vaccine->load('years.era');
 
         return new VaccineDetailResource($vaccine);
     }

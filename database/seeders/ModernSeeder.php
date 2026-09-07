@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Era;
+use App\Models\EraQuiz;
+use App\Models\EraQuizQuestion;
 use App\Models\Section;
 use App\Models\Vaccine;
 use App\Models\Year;
@@ -16,9 +18,15 @@ use Illuminate\Database\Seeder;
  *   - Year 2020 : Pandemi COVID-19 — 4 vaksin (Sinovac, AstraZeneca,
  *                 Pfizer-BioNTech, Moderna) di-assign ke year yang sama.
  *
- * 6 year setelah COVID (2021-2026) sengaja DUMMY, tujuannya untuk menguji
- * roadmap & sequential unlock year di aplikasi (year berikutnya baru
- * terbuka setelah year sebelumnya diselesaikan).
+ * (Revisi — Kuis Sumatif Era / "final boss") 6 year dummy (2021-2026) yang
+ * dulu dipakai untuk menguji sequential unlock lintas tahun DIHAPUS TOTAL.
+ * Era Modern sekarang cuma 2 year (Cacar 1974, COVID 2020) — begitu
+ * keduanya "completed" oleh user, roadmap langsung menampilkan kuis
+ * sumatif era ("final boss") sebagai node terakhir, TANPA year tambahan
+ * apa pun di antaranya (Rules.md R-ERAQUIZ, Schema.md era_quizzes dkk).
+ * Method seedDummyYears()/dummyContentFor() yang lama sudah tidak dipanggil
+ * lagi — dihapus dari file ini (bukan cuma di-nonaktifkan) supaya tidak
+ * membingungkan admin yang baca seeder ini di kemudian hari.
  *
  * (Revisi skema — Header/Rangkuman/Quote/Referensi/Caption)
  * - `summary` (teks) sudah tidak ada, diganti `summary_image` (link gdrive
@@ -36,6 +44,15 @@ use Illuminate\Database\Seeder;
  * - `caption` ditambahkan untuk block image/video yang datanya sudah real
  *   (Cacar & COVID), disusun dari konteks paragraf section yang sama —
  *   tetap perlu diverifikasi ulang oleh admin/tim konten, bukan sumber pasti.
+ * (Revisi lanjutan — Cacar) Header per section, video Program Eradikasi
+ * Cacar Global, dan 2 section baru ("Pendahuluan"/"Sub Materi") sudah
+ * diisi link Google Drive asli untuk year 1974. `summary_image` year
+ * 1974 juga sudah diganti dari placeholder ke link infografis asli.
+ * `quote_text`/`references` year 1974 ditulis lebih "jadi" (bukan lagi
+ * `[Placeholder]` polos) supaya kelihatan bentuk akhirnya di preview,
+ * tapi tetap ditandai perlu verifikasi sumber sebelum dianggap final.
+ * Teks isi 2 section baru ("Pendahuluan"/"Sub Materi") MASIH placeholder
+ * (belum ada draft dari tim konten) — cuma header & gambarnya yang asli.
  */
 class ModernSeeder extends Seeder
 {
@@ -50,9 +67,9 @@ class ModernSeeder extends Seeder
 
         $this->seedCacarYear($era);
         $this->seedCovidYear($era);
-        $this->seedDummyYears($era);
+        $this->seedEraQuiz($era);
 
-        $this->command?->info('ModernSeeder selesai: year Cacar (1974) + year COVID-19 (2020) real, 6 year dummy (2021-2026).');
+        $this->command?->info('ModernSeeder selesai: year Cacar (1974) + year COVID-19 (2020) real, kuis sumatif era (10 soal) ter-publish.');
     }
 
     private function seedCacarYear(Era $era): void
@@ -66,27 +83,39 @@ class ModernSeeder extends Seeder
             ['era_id' => $era->id, 'year' => 1974],
             [
                 'title' => 'Eradikasi Cacar di Indonesia',
-                'summary_image' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_SUMMARY_1974/view', // TODO: ganti infografis asli
-                'quote_text' => '[Placeholder] "Eradikasi cacar adalah bukti bahwa kerja sama global dan kemauan politik bisa mengalahkan penyakit yang pernah membunuh jutaan orang." — ganti dengan kutipan asli (mis. dari WHO/tokoh kesehatan terkait).',
+                'summary_image' => 'https://drive.google.com/file/d/19UKxw51L-sd9uTFbBjJtpFFn3gn4g6BE/view?usp=drive_link',
+                'quote_text' => '"Eradikasi cacar adalah bukti bahwa kerja sama global dan kemauan politik bisa mengalahkan penyakit yang pernah membunuh jutaan orang." — [Perlu verifikasi: cek ulang sumber/atribusi kutipan asli sebelum publish, mis. dari WHO atau tokoh kesehatan terkait program eradikasi cacar.]',
                 'references' => [
-                    '[Placeholder] WHO, "Smallpox Eradication Programme", ganti dengan referensi resmi.',
-                    '[Placeholder] Kementerian Kesehatan RI, dokumentasi program eradikasi cacar 1974.',
+                    'World Health Organization, "Smallpox Eradication Programme" — [Perlu verifikasi: lengkapi tahun terbit & tautan resmi.]',
+                    'Kementerian Kesehatan RI, dokumentasi program eradikasi cacar 1974 — [Perlu verifikasi: cari dokumen/arsip resmi yang bisa dirujuk.]',
                 ],
             ]
         );
 
         $gambarCacar1 = 'https://drive.google.com/file/d/1aTaPkpeFkxifnIEJBMUTsLHh5n-RZLuI/view?usp=drive_link';
         $gambarCacar2 = 'https://drive.google.com/file/d/1SpHxOHhRFgN833jRuhysZfbyRlZ59qiF/view?usp=drive_link';
-        // TODO: video Cacar dulu link YouTube ('https://youtu.be/1qo_9a2jNvY...'),
-        // dihapus sementara karena video kini wajib via Google Drive (Rules.md
-        // R-CMS-06 revisi). Block video di section "Program Eradikasi Cacar
-        // Global" di bawah ikut dihapus sampai ada link Drive pengganti untuk
-        // konten ini (perlu kompres ulang & upload manual, R-CMS-06/limit 50MB).
+
+        // Header per section (baru).
+        $headerWabah = 'https://drive.google.com/file/d/1DJzaRUkDIsRoqKswXqeucngFswINO26R/view?usp=drive_link';
+        $headerPendahuluan = 'https://drive.google.com/file/d/1IPxi5lFe_RhtU3UXMk3ePfLncvnXCmCK/view?usp=drive_link';
+        $headerSubMateri = 'https://drive.google.com/file/d/1JokBhTeSvz2E3hKDVQcLPeM33-ewTL2x/view?usp=drive_link';
+
+        // Gambar konten section "Pendahuluan" (baru) — masing-masing diikuti
+        // block teks placeholder setelahnya, TODO: isi teks aslinya oleh
+        // tim konten (lihat catatan di bawah tiap block).
+        $gambarPemantik = 'https://drive.google.com/file/d/1XTDBD_z1O7GKpseis0L190EQmnz7j7ze/view?usp=drive_link';
+        $gambarSudahSiap = 'https://drive.google.com/file/d/1gBuBMBSbVJnkho0Hi4tpK2WnwjAb7MpL/view?usp=drive_link';
+
+        // Video Cacar — sebelumnya link YouTube (dihapus, lihat catatan
+        // lama), sekarang diisi link Google Drive pengganti (Rules.md
+        // R-CMS-06 revisi). Ditempatkan di section "Program Eradikasi
+        // Cacar Global" (dulu kosong menunggu link ini).
+        $videoCacar = 'https://drive.google.com/file/d/1-H7MCo40mP7w2ha4uPt3T0FiPS4-CdmO/view?usp=drive_link';
 
         $sections = [
             [
                 'title' => 'Wabah Cacar di Indonesia',
-                'header_image' => null, // opsional, belum ada aset
+                'header_image' => $headerWabah,
                 'blocks' => [
                     [
                         'type' => 'text',
@@ -109,6 +138,48 @@ class ModernSeeder extends Seeder
                 ],
             ],
             [
+                // (Baru) Section "Pendahuluan" — pola tiap gambar diikuti
+                // block teks setelahnya. Teks masih PLACEHOLDER karena
+                // belum ada draft aslinya dari tim konten, wajib diganti
+                // sebelum section ini di-publish beneran (is_published
+                // tetap true di seeder supaya kelihatan di preview, tapi
+                // TODO teksnya jangan lolos ke produksi apa adanya).
+                'title' => 'Pendahuluan Program Eradikasi Cacar',
+                'header_image' => $headerPendahuluan,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Placeholder] Teks pembuka pendahuluan program eradikasi cacar — jelaskan konteks awal sebelum masuk ke gambar pemantik di bawah. Ganti dengan teks asli dari tim konten.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                    [
+                        'type' => 'image',
+                        'content' => $gambarPemantik,
+                        'caption' => 'Gambar pemantik (perlu verifikasi konteks & sumber oleh admin).',
+                        'order' => 2,
+                    ],
+                    [
+                        'type' => 'text',
+                        'content' => '[Placeholder] Teks penjelasan setelah gambar pemantik — uraikan apa yang ingin dipancing/dipertanyakan dari gambar tsb ke pembaca. Ganti dengan teks asli dari tim konten.',
+                        'caption' => null,
+                        'order' => 3,
+                    ],
+                    [
+                        'type' => 'image',
+                        'content' => $gambarSudahSiap,
+                        'caption' => 'Gambar "sudah siap" (perlu verifikasi konteks & sumber oleh admin).',
+                        'order' => 4,
+                    ],
+                    [
+                        'type' => 'text',
+                        'content' => '[Placeholder] Teks penjelasan setelah gambar "sudah siap" — lanjutkan narasi menuju materi Program Eradikasi Cacar Global. Ganti dengan teks asli dari tim konten.',
+                        'caption' => null,
+                        'order' => 5,
+                    ],
+                ],
+            ],
+            [
                 'title' => 'Program Eradikasi Cacar Global',
                 'header_image' => null,
                 'blocks' => [
@@ -118,9 +189,28 @@ class ModernSeeder extends Seeder
                         'caption' => null,
                         'order' => 1,
                     ],
-                    // TODO: dulu ada block 'video' di sini (link YouTube,
-                    // dihapus). Tambahkan lagi setelah ada link Google Drive
-                    // pengganti untuk video edukasi/dokumentasi eradikasi cacar.
+                    [
+                        'type' => 'video',
+                        'content' => $videoCacar,
+                        'caption' => 'Dokumentasi/edukasi program eradikasi cacar (perlu verifikasi isi & sumber oleh admin).',
+                        'order' => 2,
+                    ],
+                ],
+            ],
+            [
+                // (Baru) Section "Sub Materi" — belum ada teks/gambar isi
+                // dari tim konten selain header-nya, jadi sementara diisi
+                // 1 block teks placeholder supaya section tidak kosong
+                // total (section tanpa block bisa aneh dirender Flutter).
+                'title' => 'Sub Materi Program Eradikasi Cacar',
+                'header_image' => $headerSubMateri,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Placeholder] Isi sub materi belum tersedia — lengkapi dengan konten tambahan terkait program eradikasi cacar (mis. detail teknis vaksinasi, tokoh terkait, atau data statistik) dari tim konten.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
                 ],
             ],
         ];
@@ -294,64 +384,138 @@ class ModernSeeder extends Seeder
         $year->vaccines()->syncWithoutDetaching($vaccineIds);
     }
 
-    private function seedDummyYears(Era $era): void
+    /**
+     * Kuis Sumatif Era ("final boss") — muncul setelah SELURUH year era
+     * Modern (Cacar 1974 + COVID 2020) completed oleh user (R-ERAQUIZ-02).
+     * 10 soal pilihan ganda tematik seputar isi 2 year di atas, masing-masing
+     * sudah lengkap is_correct + explanation_correct + explanation_incorrect
+     * supaya EraQuiz::canPublish() lolos dan kuis langsung di-publish di sini
+     * (beda dari seedCacarYear/seedCovidYear yang quiz year-nya sengaja
+     * dibiarkan draft — kuis sumatif ini sengaja langsung siap tampil untuk
+     * kebutuhan testing end-to-end roadmap era & flow submit->hasil->rekap).
+     */
+    private function seedEraQuiz(Era $era): void
     {
-        $dummySectionTitles = [
-            'Latar Belakang Peristiwa',
-            'Kebijakan dan Respons Pemerintah',
-            'Dampak dan Pembelajaran',
+        $eraQuiz = EraQuiz::firstOrCreate(
+            ['era_id' => $era->id],
+            ['is_published' => false]
+        );
+
+        $questions = [
+            [
+                'question' => 'Pada tahun berapa Indonesia dinyatakan bebas dari penyakit cacar (smallpox)?',
+                'options' => ['1974', '1980', '1969', '1990'],
+                'correct' => 0,
+                'explanation_correct' => 'Benar! Indonesia dinyatakan bebas cacar pada tahun 1974, mendahului deklarasi eradikasi cacar global oleh WHO pada tahun 1980.',
+                'explanation_incorrect' => 'Kurang tepat. Indonesia dinyatakan bebas cacar pada tahun 1974 — 1980 adalah tahun WHO mendeklarasikan cacar telah diberantas sepenuhnya secara global, bukan tahun Indonesia bebas cacar.',
+            ],
+            [
+                'question' => 'Organisasi internasional apa yang mencanangkan program eradikasi cacar secara global pada dekade 1960-an?',
+                'options' => ['UNICEF', 'World Health Organization (WHO)', 'PBB', 'Palang Merah Internasional'],
+                'correct' => 1,
+                'explanation_correct' => 'Benar! WHO mencanangkan program eradikasi cacar global dengan strategi vaksinasi massal dan surveillance and containment.',
+                'explanation_incorrect' => 'Kurang tepat. Program eradikasi cacar global dicanangkan oleh World Health Organization (WHO), bukan lembaga tsb.',
+            ],
+            [
+                'question' => 'Apa strategi utama yang digunakan dalam program eradikasi cacar di Indonesia?',
+                'options' => [
+                    'Karantina wilayah total',
+                    'Vaksinasi massal dan pengawasan kasus ketat (surveillance and containment)',
+                    'Penutupan seluruh fasilitas kesehatan',
+                    'Larangan mobilitas antar pulau',
+                ],
+                'correct' => 1,
+                'explanation_correct' => 'Benar! Strategi utamanya adalah vaksinasi massal dipadukan dengan pengawasan kasus yang ketat, dijalankan tenaga kesehatan hingga ke pelosok desa.',
+                'explanation_incorrect' => 'Kurang tepat. Strategi utamanya adalah vaksinasi massal dan pengawasan kasus ketat (surveillance and containment), bukan opsi tsb.',
+            ],
+            [
+                'question' => 'Kapan kasus pertama COVID-19 diumumkan secara resmi oleh pemerintah Indonesia?',
+                'options' => ['Januari 2020', 'Maret 2020', 'Desember 2019', 'Juni 2020'],
+                'correct' => 1,
+                'explanation_correct' => 'Benar! Kasus pertama COVID-19 diumumkan resmi oleh pemerintah Indonesia pada awal Maret 2020.',
+                'explanation_incorrect' => 'Kurang tepat. Kasus pertama COVID-19 di Indonesia diumumkan resmi pada awal Maret 2020, bukan pada waktu tsb.',
+            ],
+            [
+                'question' => 'Kebijakan apa yang diterapkan pemerintah Indonesia untuk menekan penyebaran COVID-19 di awal pandemi?',
+                'options' => [
+                    'PSBB (Pembatasan Sosial Berskala Besar)',
+                    'Karantina wilayah permanen',
+                    'Penutupan seluruh perbatasan negara tanpa batas waktu',
+                    'Lockdown militer',
+                ],
+                'correct' => 0,
+                'explanation_correct' => 'Benar! Pemerintah menerapkan PSBB, kemudian dilanjutkan dengan PPKM, untuk menekan laju penularan COVID-19.',
+                'explanation_incorrect' => 'Kurang tepat. Kebijakan yang diterapkan adalah PSBB (Pembatasan Sosial Berskala Besar), bukan opsi tsb.',
+            ],
+            [
+                'question' => 'Sejak kapan program vaksinasi nasional COVID-19 mulai dijalankan secara bertahap di Indonesia?',
+                'options' => ['Maret 2020', 'Januari 2021', 'Desember 2021', 'Agustus 2020'],
+                'correct' => 1,
+                'explanation_correct' => 'Benar! Program vaksinasi nasional COVID-19 mulai dijalankan bertahap sejak Januari 2021, diprioritaskan bagi tenaga kesehatan.',
+                'explanation_incorrect' => 'Kurang tepat. Program vaksinasi nasional COVID-19 mulai dijalankan bertahap sejak Januari 2021, bukan pada waktu tsb.',
+            ],
+            [
+                'question' => 'Kelompok mana yang menjadi prioritas pertama penerima vaksin COVID-19 di Indonesia?',
+                'options' => ['Lansia', 'Tenaga kesehatan', 'Pelajar', 'Pekerja pabrik'],
+                'correct' => 1,
+                'explanation_correct' => 'Benar! Tenaga kesehatan menjadi kelompok prioritas pertama karena berada di garis depan penanganan pandemi.',
+                'explanation_incorrect' => 'Kurang tepat. Prioritas pertama penerima vaksin COVID-19 adalah tenaga kesehatan, sebelum diperluas ke lansia dan kelompok lain.',
+            ],
+            [
+                'question' => 'Vaksin COVID-19 manakah yang menjadi vaksin PERTAMA digunakan dalam program vaksinasi nasional Indonesia?',
+                'options' => ['Pfizer-BioNTech', 'Moderna', 'Sinovac', 'AstraZeneca'],
+                'correct' => 2,
+                'explanation_correct' => 'Benar! Sinovac menjadi vaksin pertama yang digunakan dalam program vaksinasi nasional COVID-19 Indonesia, mulai didistribusikan sejak Januari 2021.',
+                'explanation_incorrect' => 'Kurang tepat. Vaksin pertama yang digunakan dalam program vaksinasi nasional Indonesia adalah Sinovac, bukan opsi tsb.',
+            ],
+            [
+                'question' => 'Vaksin COVID-19 manakah yang menggunakan teknologi berbasis vektor adenovirus?',
+                'options' => ['Sinovac', 'AstraZeneca', 'Pfizer-BioNTech', 'Moderna'],
+                'correct' => 1,
+                'explanation_correct' => 'Benar! AstraZeneca menggunakan teknologi berbasis vektor adenovirus, dikembangkan bersama Universitas Oxford.',
+                'explanation_incorrect' => 'Kurang tepat. Vaksin berbasis vektor adenovirus adalah AstraZeneca, bukan opsi tsb — Pfizer-BioNTech dan Moderna menggunakan teknologi mRNA.',
+            ],
+            [
+                'question' => 'Apa kesamaan antara program eradikasi cacar (1974) dan program vaksinasi COVID-19 di Indonesia?',
+                'options' => [
+                    'Keduanya sama-sama tidak melibatkan kerja sama internasional',
+                    'Keduanya sama-sama mengandalkan vaksinasi berskala besar untuk melindungi masyarakat dari penyakit menular',
+                    'Keduanya sama-sama tidak melibatkan tenaga kesehatan',
+                    'Keduanya sama-sama hanya berlangsung kurang dari 1 tahun',
+                ],
+                'correct' => 1,
+                'explanation_correct' => 'Benar! Baik eradikasi cacar maupun penanganan COVID-19 sama-sama mengandalkan program vaksinasi berskala besar sebagai kunci utama melindungi masyarakat.',
+                'explanation_incorrect' => 'Kurang tepat. Kesamaan utamanya adalah keduanya mengandalkan vaksinasi berskala besar untuk melindungi masyarakat, bukan pada aspek yang disebutkan di opsi tsb.',
+            ],
         ];
 
-        // TODO: 'video' dikeluarkan sementara dari pool acak — dulu
-        // dummyContentFor() generate link YouTube dummy untuk tipe ini
-        // ('youtube.com/watch?v=CONTOH_VIDEO_DUMMY'), sudah tidak valid
-        // karena video kini wajib via Google Drive (Rules.md R-CMS-06
-        // revisi). Tambahkan lagi 'video' ke pool setelah ada link Drive
-        // dummy pengganti untuk testing (lihat dummyContentFor() di bawah,
-        // case 'video' sudah disiapkan polanya, tinggal diaktifkan lagi).
-        $blockPool = ['text', 'image', 'pdf'];
-
-        for ($y = 2021; $y <= 2026; $y++) {
-            $year = Year::updateOrCreate(
-                ['era_id' => $era->id, 'year' => $y],
+        foreach ($questions as $index => $q) {
+            $question = EraQuizQuestion::updateOrCreate(
+                ['era_quiz_id' => $eraQuiz->id, 'question' => $q['question']],
                 [
-                    'title' => "[Dummy] Tahun Modern {$y}",
-                    'summary_image' => "https://drive.google.com/file/d/CONTOH_FILE_ID_SUMMARY_DUMMY_{$y}/view",
-                    'quote_text' => "[Dummy] Kutipan placeholder untuk tahun {$y}, dipakai untuk menguji tampilan halaman rangkuman, bukan konten historis nyata.",
-                    'references' => [
-                        "[Dummy] Referensi placeholder #1 untuk tahun {$y}.",
-                        "[Dummy] Referensi placeholder #2 untuk tahun {$y}.",
-                    ],
+                    'order' => $index + 1,
+                    'explanation_correct' => $q['explanation_correct'],
+                    'explanation_incorrect' => $q['explanation_incorrect'],
                 ]
             );
 
-            foreach ($dummySectionTitles as $index => $title) {
-                $section = Section::updateOrCreate(
-                    ['year_id' => $year->id, 'title' => "{$title} ({$y})"],
-                    [
-                        'order' => $index + 1,
-                        'is_published' => true,
-                        'header_image' => null, // opsional, dummy sengaja dibiarkan kosong
-                    ]
-                );
+            $question->options()->delete();
 
-                $section->contentBlocks()->delete();
-
-                $blockCount = random_int(2, 3);
-                $blocksToCreate = [];
-                for ($b = 1; $b <= $blockCount; $b++) {
-                    $type = $blockPool[array_rand($blockPool)];
-                    $blocksToCreate[] = [
-                        'type' => $type,
-                        'content' => $this->dummyContentFor($type, $y, $index + 1, $b),
-                        'caption' => in_array($type, ['image', 'video'], true)
-                            ? "[Dummy] Caption placeholder block {$type} #{$b} section ke-{$index}, tahun {$y}."
-                            : null,
-                        'order' => $b,
-                    ];
-                }
-                $section->contentBlocks()->createMany($blocksToCreate);
+            $optionsToCreate = [];
+            foreach ($q['options'] as $optIndex => $optionText) {
+                $optionsToCreate[] = [
+                    'option_text' => $optionText,
+                    'is_correct' => $optIndex === $q['correct'],
+                    'order' => $optIndex + 1,
+                ];
             }
+            $question->options()->createMany($optionsToCreate);
+        }
+
+        // R-ERAQUIZ-10: semua soal di atas sudah lengkap explanation_correct
+        // & explanation_incorrect, jadi canPublish() otomatis lolos di sini.
+        if ($eraQuiz->fresh()->canPublish()) {
+            $eraQuiz->update(['is_published' => true]);
         }
     }
 
@@ -373,19 +537,5 @@ class ModernSeeder extends Seeder
             $section->contentBlocks()->delete();
             $section->contentBlocks()->createMany($sectionData['blocks']);
         }
-    }
-
-    private function dummyContentFor(string $type, int $year, int $sectionOrder, int $blockOrder): string
-    {
-        return match ($type) {
-            'text' => "Ini adalah teks dummy untuk section ke-{$sectionOrder} pada year dummy {$year}, dipakai untuk menguji tampilan roadmap & sequential unlock, bukan konten historis nyata.",
-            'image' => "https://drive.google.com/file/d/CONTOH_FILE_ID_DUMMY_{$year}_{$sectionOrder}_{$blockOrder}/view",
-            // (Tidak reachable saat ini karena 'video' dikeluarkan dari
-            // $blockPool — pola placeholder sudah disesuaikan ke Drive
-            // duluan supaya tinggal diaktifkan lagi, bukan youtube lagi.)
-            'video' => "https://drive.google.com/file/d/CONTOH_FILE_ID_VIDEO_DUMMY_{$year}_{$sectionOrder}_{$blockOrder}/view",
-            'pdf' => "https://drive.google.com/file/d/CONTOH_FILE_ID_PDF_DUMMY_{$year}_{$sectionOrder}/view",
-            default => 'dummy',
-        };
     }
 }

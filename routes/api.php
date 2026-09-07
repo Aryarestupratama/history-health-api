@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Auth\EmailVerificationController;
 use App\Http\Controllers\Admin\AdminUser\AdminUserController;
 use App\Http\Controllers\Admin\ContentBlock\ContentBlockController;
 use App\Http\Controllers\Admin\Era\EraController as AdminEraController;
+use App\Http\Controllers\Admin\EraQuiz\EraQuizController as AdminEraQuizController;
 use App\Http\Controllers\Admin\Vaccine\VaccineController as AdminVaccineController;
 use App\Http\Controllers\Admin\Quiz\QuizController as AdminQuizController;
 use App\Http\Controllers\Admin\Section\SectionController as AdminSectionController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Api\HomeController;
 use App\Http\Controllers\Api\Progress\ProgressController;
 use App\Http\Controllers\Api\Card\CardController;
 use App\Http\Controllers\Api\Quiz\UserQuizController;
+use App\Http\Controllers\Api\EraQuiz\UserEraQuizController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -82,6 +84,16 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('quizzes/{quiz}/questions', [AdminQuizController::class, 'storeQuestion']);
     Route::patch('quiz-questions/{question}', [AdminQuizController::class, 'updateQuestion']);
     Route::delete('quiz-questions/{question}', [AdminQuizController::class, 'destroyQuestion']);
+
+    // R-ERAQUIZ: kelola kuis sumatif era ("final boss") — tanpa batas jumlah
+    // soal (beda dari kuis year yang maks. 5), tanpa syarat summary saat
+    // publish. Dikelola sebagai tab baru "Kuis Sumatif" di level Era pada
+    // Content Studio (Design.md, direvisi terpisah).
+    Route::get('eras/{era}/quiz', [AdminEraQuizController::class, 'show']);
+    Route::patch('era-quizzes/{eraQuiz}/publish', [AdminEraQuizController::class, 'publish']);
+    Route::post('era-quizzes/{eraQuiz}/questions', [AdminEraQuizController::class, 'storeQuestion']);
+    Route::patch('era-quiz-questions/{question}', [AdminEraQuizController::class, 'updateQuestion']);
+    Route::delete('era-quiz-questions/{question}', [AdminEraQuizController::class, 'destroyQuestion']);
 });
 
 Route::prefix('public')->group(function () {
@@ -102,6 +114,16 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::get('years/{year}/quiz', [UserQuizController::class, 'show']);
     Route::post('years/{year}/quiz/attempt', [UserQuizController::class, 'submitAttempt']);
     Route::post('years/{year}/quiz/questions/{question}/answer', [UserQuizController::class, 'answerQuestion']);
+
+    // R-ERAQUIZ-02/03: kuis sumatif era ("final boss") — hanya login+verified,
+    // gate "semua year completed" dicek di controller (EraQuizAccessService).
+    // Beda dari kuis year: submit sekaligus di akhir (bukan progresif), boleh
+    // retake (overwrite), dan ADA endpoint result()/recap() terpisah karena
+    // hasil kuis ditampilkan sebagai skor (bukan feedback instan per-soal).
+    Route::get('eras/{era}/quiz', [UserEraQuizController::class, 'show']);
+    Route::post('eras/{era}/quiz/attempt', [UserEraQuizController::class, 'submitAttempt']);
+    Route::get('eras/{era}/quiz/result', [UserEraQuizController::class, 'result']);
+    Route::get('eras/{era}/quiz/recap', [UserEraQuizController::class, 'recap']);
 
     // R-VAC-05: koleksi vaksin (dulu "cards" tokoh) — nama endpoint tetap "cards"
     // untuk minim breaking change di Flutter, tapi resource-nya sudah Vaccine.

@@ -34,6 +34,23 @@ class Vaccine extends Model
         return $this->belongsToMany(Year::class, 'year_vaccine');
     }
 
+    /**
+     * Era unik yang terhubung ke vaksin ini, diturunkan dari years->era
+     * (vaccine tidak punya era_id sendiri, cuma relasi ke year).
+     * VAC-03: satu vaksin bisa terhubung ke >1 year, secara teori lintas
+     * era, jadi ini array bukan single value. Wajib panggil dengan
+     * `years.era` sudah di-eager-load (mis. Vaccine::with('years.era'))
+     * di controller, kalau tidak akan kena N+1.
+     */
+    public function getErasAttribute()
+    {
+        return $this->years
+            ->pluck('era')
+            ->filter()
+            ->unique('id')
+            ->values();
+    }
+
     public function unlocks()
     {
         return $this->hasMany(UserVaccineUnlock::class);
