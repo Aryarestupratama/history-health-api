@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Layers, Syringe, ShieldCheck, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Layers, Syringe, ShieldCheck, Settings, LogOut, BookOpenText } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { APP_NAME, APP_SHORT_INITIALS } from '@/config/branding';
@@ -12,6 +12,7 @@ import VaccineManager from './pages/VaccineManager';
 import AdminManager from './pages/AdminManager';
 import StudioEraYearPicker from './pages/StudioEraYearPicker';
 import WabahWorkspace from './pages/WabahWorkspace';
+import WabahIntroManager from './pages/WabahIntroManager';
 
 // Revisi Design.md §4: sidebar utama jadi Dashboard / Content Studio / Kelola
 // Vaksin. "Era & Tahun" turun jadi housekeeping sekunder (jarang dipakai),
@@ -26,7 +27,10 @@ const NAV_ITEMS = [
   { to: '/admins', label: 'Kelola Admin', icon: ShieldCheck },
 ];
 
-const SECONDARY_NAV_ITEMS = [{ to: '/eras', label: 'Era & Tahun', icon: Settings }];
+const SECONDARY_NAV_ITEMS = [
+  { to: '/eras', label: 'Era & Tahun', icon: Settings },
+  { to: '/wabah-intro', label: 'Pengenalan Wabah', icon: BookOpenText },
+];
 
 function initials(name) {
   if (!name) return '?';
@@ -176,6 +180,17 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Layout><EraYearManager /></Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Konten singleton "Apa itu Wabah" — housekeeping sekunder juga,
+              biasanya diisi sekali lalu jarang diubah. */}
+          <Route
+            path="/wabah-intro"
+            element={
+              <ProtectedRoute>
+                <Layout><WabahIntroManager /></Layout>
               </ProtectedRoute>
             }
           />

@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\Vaccine\VaccineController as AdminVaccineControll
 use App\Http\Controllers\Admin\Quiz\QuizController as AdminQuizController;
 use App\Http\Controllers\Admin\Section\SectionController as AdminSectionController;
 use App\Http\Controllers\Admin\Year\YearController as AdminYearController;
+use App\Http\Controllers\Admin\WabahIntro\WabahIntroController as AdminWabahIntroController;
 
 use App\Http\Controllers\Api\Public\EraController as PublicEraController;
 use App\Http\Controllers\Api\Public\YearController as PublicYearController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\Progress\ProgressController;
 use App\Http\Controllers\Api\Card\CardController;
 use App\Http\Controllers\Api\Quiz\UserQuizController;
 use App\Http\Controllers\Api\EraQuiz\UserEraQuizController;
+use App\Http\Controllers\Api\WabahIntro\WabahIntroController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -94,12 +96,22 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('era-quizzes/{eraQuiz}/questions', [AdminEraQuizController::class, 'storeQuestion']);
     Route::patch('era-quiz-questions/{question}', [AdminEraQuizController::class, 'updateQuestion']);
     Route::delete('era-quiz-questions/{question}', [AdminEraQuizController::class, 'destroyQuestion']);
+
+    // Konten singleton "Apa itu Wabah" — sengaja bukan apiResource (tidak ada
+    // banyak "item", cuma 1 row yang dilihat & diedit admin).
+    Route::get('wabah-intro', [AdminWabahIntroController::class, 'show']);
+    Route::put('wabah-intro', [AdminWabahIntroController::class, 'update']);
 });
 
 Route::prefix('public')->group(function () {
     Route::get('eras', [PublicEraController::class, 'index']);
     Route::get('eras/{era:slug}/years', [PublicYearController::class, 'index']);
     Route::get('sections/{section}', [PublicSectionController::class, 'show']);
+
+    // Konten "Apa itu Wabah" — sengaja di grup public (tanpa auth:sanctum),
+    // guest wajib bisa lihat ini juga sebelum masuk roadmap era manapun
+    // (sama prinsip dengan guest tetap bisa baca section pertama, R-YEAR-03).
+    Route::get('wabah-intro', [WabahIntroController::class, 'show']);
 });
 
 // R-AUTH-03: fitur ini wajib login DAN email terverifikasi.
@@ -111,8 +123,15 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::post('sections/{section}/complete', [ProgressController::class, 'complete']);
 
     // R-QUIZ-02/09: hanya login+verified, gate detail dicek di controller (section belum tuntas).
+    //
+    // CATATAN (dihapus): endpoint lama `POST years/{year}/quiz/attempt`
+    // (submitAttempt(), model submit-semua-jawaban-di-akhir) sudah dibuang
+    // total per revisi backlog progress.md — sudah tidak dipanggil Flutter
+    // sejak redesign kuis jadi progresif per-soal (answerQuestion() di
+    // bawah). JANGAN disamakan dengan `POST eras/{era}/quiz/attempt` di
+    // bawah (kuis sumatif era) — itu route BERBEDA, submit-sekaligus-nya
+    // memang desain final (bukan peninggalan lama) dan TETAP aktif dipakai.
     Route::get('years/{year}/quiz', [UserQuizController::class, 'show']);
-    Route::post('years/{year}/quiz/attempt', [UserQuizController::class, 'submitAttempt']);
     Route::post('years/{year}/quiz/questions/{question}/answer', [UserQuizController::class, 'answerQuestion']);
 
     // R-ERAQUIZ-02/03: kuis sumatif era ("final boss") — hanya login+verified,
