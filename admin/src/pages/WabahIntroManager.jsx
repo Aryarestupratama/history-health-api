@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Info } from 'lucide-react';
 import api from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import PhonePreview from '../components/PhonePreview';
 
 // Sama helper dengan VaccineManager.jsx — versi ringan
 // LinkParserService::toDriveImageUrl (backend) untuk preview live di sisi
@@ -25,7 +24,6 @@ function resolveDrivePhotoUrl(rawUrl) {
 
 const EMPTY_FORM = {
   image_link: '',
-  caption: '',
   is_published: false,
 };
 
@@ -50,7 +48,6 @@ export default function WabahIntroManager() {
       const res = await api.get('/admin/wabah-intro');
       setForm({
         image_link: res.data.image_link || '',
-        caption: res.data.caption || '',
         is_published: !!res.data.is_published,
       });
     } catch (err) {
@@ -68,12 +65,10 @@ export default function WabahIntroManager() {
     try {
       const res = await api.put('/admin/wabah-intro', {
         image_link: form.image_link || null,
-        caption: form.caption || null,
         is_published: form.is_published,
       });
       setForm({
         image_link: res.data.image_link || '',
-        caption: res.data.caption || '',
         is_published: !!res.data.is_published,
       });
       setSuccess(true);
@@ -91,9 +86,9 @@ export default function WabahIntroManager() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Pengenalan Wabah</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Konten "Apa itu Wabah" — muncul sekali secara otomatis saat user (termasuk guest)
-          pertama kali membuka Informasi Sejarah, dan tetap bisa dibuka ulang kapan saja.
-          Hanya ada satu konten untuk seluruh aplikasi.
+          Konten "Apa itu Wabah" — hanya bisa diakses lewat ikon info di header roadmap era
+          pada tab Informasi Sejarah (tidak ada tampilan otomatis). Hanya ada satu konten
+          untuk seluruh aplikasi, berupa infografis saja tanpa teks pendukung.
         </p>
       </div>
 
@@ -112,7 +107,7 @@ export default function WabahIntroManager() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Memuat...</p>
       ) : (
-        <div className="grid gap-6 md:grid-cols-[1fr_260px]">
+        <div className="grid gap-6 md:grid-cols-[1fr_300px]">
           <form id="wabah-intro-form" onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-5">
             <div className="space-y-1.5">
               <Label>Infografis (link Google Drive)</Label>
@@ -120,16 +115,6 @@ export default function WabahIntroManager() {
                 value={form.image_link}
                 onChange={(e) => setForm({ ...form, image_link: e.target.value })}
                 placeholder="https://drive.google.com/file/d/FILE_ID/view..."
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Caption / Teks Pendukung (opsional)</Label>
-              <Textarea
-                value={form.caption}
-                onChange={(e) => setForm({ ...form, caption: e.target.value })}
-                rows={5}
-                placeholder="Teks singkat pelengkap infografis, mis. definisi wabah secara umum."
               />
             </div>
 
@@ -154,24 +139,13 @@ export default function WabahIntroManager() {
             </div>
           </form>
 
-          {/* Preview sederhana, bukan PhonePreview -- belum ada screen type
-              khusus untuk ini di PhonePreview.jsx, bisa ditambahkan
-              belakangan kalau perlu preview HP yang lebih representatif. */}
-          <div className="space-y-2 rounded-lg border p-4">
-            <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Info className="h-3.5 w-3.5" /> Preview Infografis
-            </p>
-            {previewUrl ? (
-              <img src={previewUrl} alt="Preview infografis wabah" className="w-full rounded-md border" />
-            ) : (
-              <div className="flex h-40 items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
-                Belum ada link / link belum valid
-              </div>
-            )}
-            {form.caption && (
-              <p className="text-xs text-muted-foreground">{form.caption}</p>
-            )}
-          </div>
+          {/* PhonePreview screen="wabah-intro" -- sebelumnya <img> sederhana,
+              sekarang konsisten dengan preview HP di Content Studio/Kelola
+              Vaksin (backlog lama "integrasikan preview ke PhonePreview.jsx",
+              sekarang selesai). Sesuaikan path import di atas kalau lokasi
+              PhonePreview.jsx di project Anda beda dari asumsi (satu folder
+              yang sama, ./PhonePreview). */}
+          <PhonePreview screen="wabah-intro" data={{ resolvedImageUrl: previewUrl }} compact />
         </div>
       )}
     </div>

@@ -21,9 +21,7 @@ class UpdateWabahIntroRequest extends FormRequest
             // jalan kalau value-nya memang diisi (bukan null/kosong).
             'image_link' => ['nullable', 'string', new ValidGoogleDriveLink],
 
-            'caption' => ['nullable', 'string'],
-
-            // 'sometimes' — request update caption/image_link saja (tanpa
+            // 'sometimes' — request update image_link saja (tanpa
             // menyertakan is_published) tidak boleh diam-diam mereset
             // status publish jadi false.
             'is_published' => ['sometimes', 'boolean'],

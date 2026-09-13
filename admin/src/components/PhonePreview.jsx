@@ -24,7 +24,7 @@ import { PALETTE, ERA_ACCENTS } from "@/config/branding";
  * lewat prop `data` oleh parent.
  *
  * Props:
- * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "vaccine-detail"
+ * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "vaccine-detail" | "wabah-intro"
  * - data: bentuk berbeda tergantung `screen` — lihat komentar shape di atas
  *   masing-masing screen (SectionDetailScreen sekarang pakai `headerImageUrl`
  *   menggantikan judul, SummaryScreen pakai `summaryImageUrl`/`quoteText`/
@@ -52,6 +52,7 @@ export default function PhonePreview({ screen, data, eraSlug, compact = false })
           {screen === "quiz" && <QuizScreen data={data} accent={accent} />}
           {screen === "era-quiz-recap" && <EraQuizRecapScreen data={data} accent={accent} />}
           {screen === "vaccine-detail" && <VaccineDetailScreen data={data} accent={accent} />}
+          {screen === "wabah-intro" && <WabahIntroScreen data={data} accent={accent} />}
           {!screen && <EmptyState />}
         </div>
       </PhoneFrame>
@@ -741,6 +742,52 @@ function VaccineDetailScreen({ data, accent }) {
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------- Wabah intro tab */
+// data: { resolvedImageUrl }
+//
+// Preview konten singleton "Apa itu Wabah" (INTRO-02/03) — HANYA infografis,
+// tanpa caption/teks pendukung (field caption sudah dihapus total dari
+// spec). Satu-satunya entry point di app aslinya adalah ikon info di
+// header roadmap era, yang membuka ini sebagai bottom sheet — preview di
+// sini menyederhanakan jadi konten dalam frame HP biasa (bukan simulasi
+// bottom sheet), cukup untuk mengecek infografis tampil benar.
+
+function WabahIntroScreen({ data, accent }) {
+  const { resolvedImageUrl } = data ?? {};
+
+  return (
+    <div>
+      <span
+        className="mb-3 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+        style={{ backgroundColor: `${accent}26`, color: accent }}
+      >
+        Apa itu Wabah?
+      </span>
+
+      {resolvedImageUrl ? (
+        <img
+          src={resolvedImageUrl}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="w-full rounded-xl border border-zinc-100 object-cover"
+        />
+      ) : (
+        <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-200 text-zinc-300">
+          <ImageIcon size={28} />
+          <span className="text-[10px]">Link infografis belum valid</span>
+        </div>
+      )}
+
+      <button
+        className="mt-6 w-full rounded-lg py-2.5 text-sm font-medium text-white"
+        style={{ backgroundColor: accent }}
+      >
+        Mengerti
+      </button>
     </div>
   );
 }

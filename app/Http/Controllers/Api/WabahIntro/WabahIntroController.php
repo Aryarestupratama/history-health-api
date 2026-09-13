@@ -5,21 +5,17 @@ namespace App\Http\Controllers\Api\WabahIntro;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\WabahIntroResource;
 use App\Models\WabahIntro;
-use Illuminate\Http\Request;
 
 /**
  * Endpoint publik untuk konten "Apa itu Wabah" — sengaja TIDAK di balik
- * middleware auth, karena guest juga wajib melihat pengenalan ini
- * sebelum masuk ke roadmap era manapun (sama prinsipnya dengan guest
+ * middleware auth, karena guest juga tetap harus bisa mengakses konten
+ * ini lewat ikon info di header roadmap (sama prinsipnya dengan guest
  * yang tetap bisa baca section pertama tahun kronologis pertama tiap
  * era, lihat Architecture.md §4.4).
  *
- * Status "sudah lihat" TIDAK dikirim dari sini:
- * - Untuk guest: ditangani murni di Flutter (local flag), backend tidak
- *   tahu & tidak perlu tahu (guest stateless, PRD.md §5).
- * - Untuk user login: field `has_seen_wabah_intro` sudah otomatis ikut
- *   di response profil/auth user yang sudah ada (User::$fillable),
- *   tidak perlu diduplikasi di endpoint ini.
+ * Tidak ada lagi auto-show maupun status "sudah lihat" — konten ini
+ * hanya diakses lewat satu entry point (ikon info), jadi tidak ada
+ * lagi method markSeen() (dihapus per revisi spec).
  */
 class WabahIntroController extends Controller
 {
@@ -34,18 +30,5 @@ class WabahIntroController extends Controller
         }
 
         return new WabahIntroResource($intro);
-    }
-
-    /**
-     * Tandai user login sudah melihat modal ini (dipanggil Flutter
-     * sekali setelah modal otomatis pertama kali ditutup). Endpoint ini
-     * wajib auth:sanctum (didaftarkan di grup route yang sesuai) --
-     * guest tidak pernah memanggil ini.
-     */
-    public function markSeen(Request $request)
-    {
-        $request->user()->update(['has_seen_wabah_intro' => true]);
-
-        return response()->json(['has_seen_wabah_intro' => true]);
     }
 }

@@ -8,10 +8,11 @@ use App\Services\Content\LinkParserService;
 /**
  * Konten singleton "Apa itu Wabah" — selalu cuma 1 row (id=1).
  *
- * Dipakai sebagai:
- * - Modal otomatis saat user pertama kali buka tab Informasi Sejarah
- * - Konten yang bisa dibuka ulang lewat ikon info di header roadmap
- * - Konten yang sama dibuka dari banner/node "Apa itu Wabah?" di tiap era
+ * Diakses hanya lewat satu entry point: ikon info di header roadmap
+ * era pada tab Informasi Sejarah. Tidak ada lagi auto-show maupun
+ * banner per-era (dihapus per revisi spec).
+ *
+ * Kontennya murni infografis, tanpa teks pendukung (caption dihapus).
  *
  * image_link menyimpan raw link Google Drive apa adanya (pola sama
  * dengan content_blocks.content & vaccines.photo, lihat Schema.md §5).
@@ -24,7 +25,6 @@ class WabahIntro extends Model
 
     protected $fillable = [
         'image_link',
-        'caption',
         'is_published',
     ];
 
