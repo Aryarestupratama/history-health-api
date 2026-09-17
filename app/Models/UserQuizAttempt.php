@@ -8,26 +8,20 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Mengacu migration `2026_08_28_193336_create_user_quiz_attempts_table.php`.
  *
- * BEDA dari `UserEraQuizAttempt` (kuis sumatif era, boleh retake/overwrite,
- * R-ERAQUIZ-08): kuis year IDEMPOTENT — 1 user cuma boleh punya 1 row per
- * quiz (constraint unik `['user_id', 'quiz_id']` di migration), dan
- * `YearCompletionService::isCompleted()` cuma mengecek EXISTENCE row ini
- * (bukan isi `answers`-nya) sebagai salah satu syarat "year completed"
- * (R-PROG-07). Karena itu model ini TIDAK disediakan method
- * `recordAttempt()` model `updateOrCreate()` seperti versi era — dipakai
- * `firstOrCreate()` di pemanggilnya (kuis year TIDAK boleh mengubah hasil
- * yang sudah tersimpan begitu row pertama ada, R-QUIZ-08/idempotent),
- * bukan tugas model ini untuk menegakkan itu, cukup jadi representasi
- * tabel apa adanya.
- *
- * `answers` di migration ditandai "opsional: rekap jawaban user, tidak
- * dipakai untuk skor" — kuis year memang sengaja TIDAK ADA skor sama
- * sekali (beda filosofi dari kuis sumatif era, lihat PRD.md §6 Out of
- * Scope). Kolom ini nullable, jadi TIDAK di-cast paksa ke tipe tertentu
- * kalau memang belum tentu selalu diisi — tetap di-cast 'array' di sini
- * karena Eloquent aman menangani null pada cast array/json (hasilnya
- * null, bukan error), konsisten dengan cara `UserEraQuizAttempt`
- * menangani `answers`.
+ * REVISI BESAR: kuis formatif year kini BERSKOR + punya passing grade 75%
+ * (Quiz::PASSING_GRADE_PERCENTAGE) — beda total dari filosofi lama "tanpa
+ * skor sama sekali". Konsekuensinya:
+ * - Row ini SEKARANG BOLEH ditimpa (retake) kalau user belum lulus, mirip
+ *   pola UserEraQuizAttempt — bukan lagi idempotent/insert-once. Constraint
+ *   unik (`user_id`, `quiz_id`) tetap dipasang di DB, tapi dipakai untuk
+ *   "1 user 1 row per quiz yang di-overwrite", bukan lagi "1 user 1 row
+ *   permanen tidak berubah".
+ * - `YearCompletionService::isCompleted()` sekarang cek row ini ADA *dan*
+ *   `isPassing()` true dari attempt TERKINI (bukan cuma existence row),
+ *   R-PROG-07 (revisi).
+ * - `answers` sekarang aktif dipakai untuk hitung skor on-the-fly (bukan
+ *   cuma rekap pasif) — dibandingkan ke `is_correct` tiap
+ *   `quiz_question_option_id` yang tersimpan di dalamnya.
  */
 class UserQuizAttempt extends Model
 {
@@ -58,5 +52,77 @@ class UserQuizAttempt extends Model
     public function quiz()
     {
         return $this->belongsTo(Quiz::class);
+    }
+
+    /**
+     * R-QUIZ-08 (revisi total — dulu idempotent, sekarang retake-overwrite):
+     * pola sama persis dengan UserEraQuizAttempt::recordAttempt(), pakai
+     * updateOrCreate() bukan firstOrCreate(). Dipanggil setiap kali user
+     * submit/selesai kuis formatif, baik attempt pertama maupun retake
+     * setelah gagal (skor < passing grade).
+     */
+    public static function recordAttempt(int $userId, int $quizId, array $answers): self
+    {
+        return static::updateOrCreate(
+            ['user_id' => $userId, 'quiz_id' => $quizId],
+            ['answers' => $answers, 'completed_at' => now()]
+        );
+    }
+
+    /**
+     * Jumlah jawaban benar pada attempt TERKINI (dari `answers` yang
+     * tersimpan saat ini), dihitung on-the-fly — bukan kolom tersimpan.
+     * `answers` berbentuk object map { "<quiz_question_id>": <quiz_question_option_id>, ... }.
+     */
+    public function correctCount(): int
+    {
+        $selectedOptionIds = array_values($this->answers ?? []);
+
+        if (empty($selectedOptionIds)) {
+            return 0;
+        }
+
+        $correctOptionIds = QuizQuestionOption::whereIn('id', $selectedOptionIds)
+            ->where('is_correct', true)
+            ->pluck('id')
+            ->all();
+
+        return count(array_intersect($selectedOptionIds, $correctOptionIds));
+    }
+
+    /**
+     * Total soal yang dijawab pada attempt ini. Untuk kuis formatif ini
+     * seharusnya selalu sama dengan Quiz::QUESTION_COUNT (10), karena semua
+     * soal wajib dijawab sebelum submit — tapi tetap dihitung dari isi
+     * `answers` (bukan hardcode 10) supaya konsisten dengan pola
+     * UserEraQuizAttempt::totalCount().
+     */
+    public function totalCount(): int
+    {
+        return count($this->answers ?? []);
+    }
+
+    /**
+     * Skor dalam persen (0-100), dibulatkan 2 desimal. Selalu dihitung
+     * ulang dari `answers` TERKINI — tidak ada kolom skor tersimpan.
+     */
+    public function scorePercentage(): float
+    {
+        $total = $this->totalCount();
+
+        return $total > 0
+            ? round($this->correctCount() / $total * 100, 2)
+            : 0.0;
+    }
+
+    /**
+     * R-QUIZ-09 (baru): lulus jika skor >= Quiz::PASSING_GRADE_PERCENTAGE
+     * (75%). Dipakai YearCompletionService::isCompleted() sebagai syarat
+     * "year completed", dan dipakai layar Hasil untuk tampilkan status
+     * lulus/tidak lulus.
+     */
+    public function isPassing(): bool
+    {
+        return $this->scorePercentage() >= Quiz::PASSING_GRADE_PERCENTAGE;
     }
 }

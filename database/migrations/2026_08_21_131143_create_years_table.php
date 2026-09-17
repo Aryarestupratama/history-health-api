@@ -14,13 +14,14 @@ return new class extends Migration
             $table->integer('year');
             $table->string('title');
 
-            // (Revisi) `summary` (dulu teks rangkuman) diganti jadi `summary_image` —
-            // rangkuman wabah sekarang berupa infografis, disimpan sebagai raw link
-            // Google Drive (diparse ke direct-view URL di response layer, sama pola
-            // dengan `content_blocks.content` tipe image / `vaccines.photo`).
-            // Tidak wajib diisi sebelum section publish, tapi wajib terisi sebelum
-            // quiz year tsb bisa di-publish (R-QUIZ-05 tetap berlaku ke kolom ini).
-            $table->string('summary_image')->nullable();
+            // (Revisi — Rangkuman Interaktif) `summary_image` DIHAPUS. Rangkuman
+            // wabah tidak lagi berupa 1 link infografis statis — digantikan total
+            // oleh tabel `year_summaries` (+ `year_summary_points` +
+            // `year_summary_point_options`), pola "correct statement": 7 poin
+            // tetap per year, tiap poin 1 kalimat benar + 2 kalimat pengecoh.
+            // Lihat migration create_year_summaries_table & seterusnya.
+            // Syarat publish quiz (R-QUIZ-05) yang dulu mengecek kolom ini,
+            // sekarang mengecek YearSummary::canPublish().
 
             // (Baru) Quote — 1 teks kutipan per wabah, tampil di halaman yang sama
             // dengan rangkuman (urutan: rangkuman > quote > referensi > tombol kuis).

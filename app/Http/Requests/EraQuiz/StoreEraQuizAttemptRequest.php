@@ -2,20 +2,23 @@
 
 namespace App\Http\Requests\EraQuiz;
 
-use App\Models\EraQuizQuestionOption;
+use App\Models\EraQuiz;
+use App\Models\QuizQuestionOption;
 use Illuminate\Contracts\Validation\Validator as ValidatorContract;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Beda mendasar dari StoreQuizAttemptRequest (year): di kuis year, submit
- * boleh partial (dipakai flow lama) karena sekarang jawaban year disimpan
- * progresif per-soal lewat StoreQuizAnswerRequest. Kuis sumatif era TIDAK
- * progresif — 1 soal 1 halaman tapi submit baru terjadi di soal terakhir,
- * jadi request ini WAJIB berisi jawaban untuk SEMUA soal yang ada di
- * eraQuiz (R-ERAQUIZ-04), tidak boleh ada yang terlewat.
+ * REVISI BESAR: soal sumatif era sekarang ditarik dari bank FORMATIF
+ * (quiz_questions/quiz_question_options) milik tiap year dalam era ini —
+ * bank soal era sendiri (era_quiz_questions) dihapus total. Validasi di
+ * sini disesuaikan: exists ke quiz_question_options, dan pengecekan
+ * kepemilikan soal jadi "question_id memang milik salah satu quiz year
+ * dalam era ini" (bukan lagi ke era_quiz_id).
  *
- * Format body SAMA dengan pola quiz year:
- * { "answers": { "<question_id>": <option_id>, ... } }
+ * Format body SAMA: { "answers": { "<question_id>": <option_id>, ... } },
+ * WAJIB tepat EraQuiz::ATTEMPT_QUESTION_COUNT (20) — jumlah ini didapat
+ * dari distribusi proporsional per year (EraQuiz::questionQuotaPerYear()),
+ * bukan seleksi bebas dari pool besar lagi.
  */
 class StoreEraQuizAttemptRequest extends FormRequest
 {
@@ -27,8 +30,8 @@ class StoreEraQuizAttemptRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'answers' => ['required', 'array'],
-            'answers.*' => ['required', 'integer', 'exists:era_quiz_question_options,id'],
+            'answers' => ['required', 'array', 'size:'.EraQuiz::ATTEMPT_QUESTION_COUNT],
+            'answers.*' => ['required', 'integer', 'exists:quiz_question_options,id'],
         ];
     }
 
@@ -37,6 +40,7 @@ class StoreEraQuizAttemptRequest extends FormRequest
         return [
             'answers.required' => 'Jawaban wajib diisi.',
             'answers.array' => 'Format jawaban tidak valid.',
+            'answers.size' => 'Jawaban harus mencakup tepat '.EraQuiz::ATTEMPT_QUESTION_COUNT.' soal yang ditampilkan.',
             'answers.*.required' => 'Setiap soal wajib dijawab sebelum submit.',
             'answers.*.integer' => 'Setiap jawaban harus berupa id opsi yang valid.',
             'answers.*.exists' => 'Opsi jawaban tidak ditemukan.',
@@ -44,40 +48,36 @@ class StoreEraQuizAttemptRequest extends FormRequest
     }
 
     /**
-     * Pastikan: (1) jawaban mencakup SELURUH soal milik eraQuiz — tidak
-     * boleh ada yang belum terjawab (beda dari kuis year yang boleh
-     * partial), dan (2) tiap option_id memang milik question_id tsb —
-     * sama pola pengecekan relasi dengan StoreQuizAttemptRequest.
+     * Pastikan: (1) setiap question_id yang dikirim memang milik quiz
+     * FORMATIF salah satu year dalam era ini (bukan year dari era lain),
+     * dan (2) tiap option_id memang milik question_id tsb.
      */
     public function withValidator(ValidatorContract $validator): void
     {
         $validator->after(function (ValidatorContract $validator) {
             $answers = $this->input('answers', []);
-            $eraQuiz = $this->route('era')?->eraQuiz;
+            $era = $this->route('era');
 
-            if (! $eraQuiz) {
+            if (! $era) {
                 return;
             }
 
-            $questionIds = $eraQuiz->questions()->pluck('id');
-
-            $unanswered = $questionIds->diff(
-                collect(array_keys($answers))->map(fn ($id) => (int) $id)
-            );
-
-            if ($unanswered->isNotEmpty()) {
-                $validator->errors()->add('answers', 'Semua soal wajib dijawab sebelum submit kuis sumatif.');
-            }
+            // question_id valid = quiz_questions milik quiz milik year yang
+            // era_id-nya sama dengan era ini.
+            $validQuestionIds = \App\Models\QuizQuestion::whereHas(
+                'quiz.year',
+                fn ($q) => $q->where('era_id', $era->id)
+            )->pluck('id');
 
             foreach ($answers as $questionId => $optionId) {
-                if (! $questionIds->contains((int) $questionId)) {
-                    $validator->errors()->add('answers', "Soal dengan id {$questionId} bukan bagian dari kuis sumatif ini.");
+                if (! $validQuestionIds->contains((int) $questionId)) {
+                    $validator->errors()->add('answers', "Soal dengan id {$questionId} bukan bagian dari era ini.");
 
                     continue;
                 }
 
-                $belongsToQuestion = EraQuizQuestionOption::where('id', $optionId)
-                    ->where('era_quiz_question_id', $questionId)
+                $belongsToQuestion = QuizQuestionOption::where('id', $optionId)
+                    ->where('quiz_question_id', $questionId)
                     ->exists();
 
                 if (! $belongsToQuestion) {

@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\Vaccine\VaccineController as AdminVaccineControll
 use App\Http\Controllers\Admin\Quiz\QuizController as AdminQuizController;
 use App\Http\Controllers\Admin\Section\SectionController as AdminSectionController;
 use App\Http\Controllers\Admin\Year\YearController as AdminYearController;
+use App\Http\Controllers\Admin\YearSummary\YearSummaryController as AdminYearSummaryController;
 use App\Http\Controllers\Admin\WabahIntro\WabahIntroController as AdminWabahIntroController;
 
 use App\Http\Controllers\Api\Public\EraController as PublicEraController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Api\Progress\ProgressController;
 use App\Http\Controllers\Api\Card\CardController;
 use App\Http\Controllers\Api\Quiz\UserQuizController;
 use App\Http\Controllers\Api\EraQuiz\UserEraQuizController;
+use App\Http\Controllers\Api\YearSummary\UserYearSummaryController;
 use App\Http\Controllers\Api\WabahIntro\WabahIntroController;
 
 use Illuminate\Support\Facades\Route;
@@ -80,22 +82,29 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::delete('sections/{section}/content-blocks/{contentBlock}', [ContentBlockController::class, 'destroy']);
     Route::post('sections/{section}/content-blocks/reorder', [ContentBlockController::class, 'reorder']);
 
-    // CMS-06: kelola kuis internal per year (soal maks. 5 + opsi jawaban).
+    // CMS-06: kelola kuis internal per year (soal TEPAT 10 + opsi jawaban).
     Route::get('years/{year}/quiz', [AdminQuizController::class, 'show']);
     Route::patch('quizzes/{quiz}/publish', [AdminQuizController::class, 'publish']);
     Route::post('quizzes/{quiz}/questions', [AdminQuizController::class, 'storeQuestion']);
     Route::patch('quiz-questions/{question}', [AdminQuizController::class, 'updateQuestion']);
     Route::delete('quiz-questions/{question}', [AdminQuizController::class, 'destroyQuestion']);
 
-    // R-ERAQUIZ: kelola kuis sumatif era ("final boss") — tanpa batas jumlah
-    // soal (beda dari kuis year yang maks. 5), tanpa syarat summary saat
-    // publish. Dikelola sebagai tab baru "Kuis Sumatif" di level Era pada
-    // Content Studio (Design.md, direvisi terpisah).
+    // R-SUM: kelola Rangkuman Interaktif per year (7 poin tetap x 3 opsi,
+    // R-SUM-01/02) — beda dari kuis, TIDAK ada storeQuestion/destroyQuestion
+    // karena jumlah poin fixed (skeleton di-generate otomatis di show()),
+    // admin cuma isi teksnya lewat updatePoint().
+    Route::get('years/{year}/summary', [AdminYearSummaryController::class, 'show']);
+    Route::patch('year-summary-points/{point}', [AdminYearSummaryController::class, 'updatePoint']);
+    Route::patch('year-summaries/{yearSummary}/publish', [AdminYearSummaryController::class, 'publish']);
+
+    // R-ERAQUIZ (REVISI TOTAL): kuis sumatif era ("final boss") TIDAK LAGI
+    // punya bank soal sendiri — soal ditarik otomatis dari kuis formatif
+    // (quiz_questions) tiap year saat user mengerjakan. Admin cukup toggle
+    // publish() di sini begitu SEMUA year di era ini sudah publish kuis
+    // formatifnya masing-masing (dikelola di tab Kuis pada WabahWorkspace,
+    // bukan lagi di tab/komponen terpisah level Era).
     Route::get('eras/{era}/quiz', [AdminEraQuizController::class, 'show']);
     Route::patch('era-quizzes/{eraQuiz}/publish', [AdminEraQuizController::class, 'publish']);
-    Route::post('era-quizzes/{eraQuiz}/questions', [AdminEraQuizController::class, 'storeQuestion']);
-    Route::patch('era-quiz-questions/{question}', [AdminEraQuizController::class, 'updateQuestion']);
-    Route::delete('era-quiz-questions/{question}', [AdminEraQuizController::class, 'destroyQuestion']);
 
     // Konten singleton "Apa itu Wabah" — sengaja bukan apiResource (tidak ada
     // banyak "item", cuma 1 row yang dilihat & diedit admin).
@@ -133,6 +142,21 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // memang desain final (bukan peninggalan lama) dan TETAP aktif dipakai.
     Route::get('years/{year}/quiz', [UserQuizController::class, 'show']);
     Route::post('years/{year}/quiz/questions/{question}/answer', [UserQuizController::class, 'answerQuestion']);
+    // R-QUIZ-08 (baru — boleh retake sampai lulus): reset attempt yang
+    // belum lulus (skor < 75%) supaya bisa dikerjakan ulang dari soal
+    // pertama. Ditolak 422 kalau attempt sudah lulus (lihat
+    // QuizAttemptService::retry()).
+    Route::post('years/{year}/quiz/retry', [UserQuizController::class, 'retry']);
+
+    // SUM-01/02/05/06: Rangkuman Interaktif — gate "semua section completed"
+    // dicek inline di controller (sama pola dengan UserQuizController).
+    // checkAnswer() per poin TIDAK menyimpan apa pun ke DB (feedback instan
+    // murni dihitung ulang tiap request); submit() di poin ke-7 yang baru
+    // mempersist status akhir (overwrite kalau retake, R-SUM-11) sekaligus
+    // jadi syarat baru tombol "Kerjakan Kuis" (SUM-06).
+    Route::get('years/{year}/summary', [UserYearSummaryController::class, 'show']);
+    Route::post('years/{year}/summary/points/{point}/answer', [UserYearSummaryController::class, 'checkAnswer']);
+    Route::post('years/{year}/summary/complete', [UserYearSummaryController::class, 'submit']);
 
     // R-ERAQUIZ-02/03: kuis sumatif era ("final boss") — hanya login+verified,
     // gate "semua year completed" dicek di controller (EraQuizAccessService).

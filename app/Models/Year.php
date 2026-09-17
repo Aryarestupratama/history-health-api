@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Services\Content\LinkParserService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,7 +13,9 @@ class Year extends Model
         'era_id',
         'year',
         'title',
-        'summary_image', // (revisi) dulu `summary` (teks), sekarang link gdrive infografis
+        // (Revisi — Rangkuman Interaktif) `summary_image` DIHAPUS dari sini.
+        // Rangkuman wabah kini di relasi summary() -> YearSummary (7 poin
+        // correct-statement), bukan lagi 1 kolom link infografis di years.
         'quote_text',    // (baru) 1 kutipan teks per wabah
         'references',    // (baru) list teks referensi, disimpan sbg JSON array
     ];
@@ -25,8 +26,6 @@ class Year extends Model
             'references' => 'array',
         ];
     }
-
-    protected $appends = ['resolved_summary_image_url'];
 
     public function era()
     {
@@ -49,15 +48,12 @@ class Year extends Model
     }
 
     /**
-     * URL siap pakai (direct-view) dari `summary_image`, atau null kalau
-     * belum diisi admin (rangkuman infografis belum ada).
+     * Rangkuman Interaktif ("correct statement") milik year ini —
+     * menggantikan `summary_image` (dulu 1 link infografis statis).
+     * 1 year hanya punya 1 YearSummary (unique constraint di migration).
      */
-    public function getResolvedSummaryImageUrlAttribute(): ?string
+    public function summary()
     {
-        if (empty($this->summary_image)) {
-            return null;
-        }
-
-        return app(LinkParserService::class)->toDriveImageUrl($this->summary_image);
+        return $this->hasOne(YearSummary::class);
     }
 }

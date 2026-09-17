@@ -29,6 +29,25 @@ class UserEraQuizController extends Controller
      * kuis year), tapi TIDAK ada kunci jawaban yang dikirim di sini — sama
      * filosofi dengan UserQuizController::show().
      */
+    /**
+     * GET /api/eras/{era}/quiz
+     * R-ERAQUIZ-02: hanya bisa diambil jika SELURUH year dalam era ini
+     * sudah "completed" oleh user. R-ERAQUIZ-03: guest tidak bisa akses
+     * (endpoint ini ada di grup middleware auth:sanctum + verified).
+     *
+     * R-ERAQUIZ-11 (revisi PENTING): dulu endpoint ini mengirim SELURUH
+     * pool soal era (`$eraQuiz->questions`). Sekarang pool tidak lagi
+     * dibatasi 20 (bisa jauh lebih besar, gabungan semua year), jadi
+     * endpoint ini memanggil `EraQuizAttemptService::questionsForAttempt()`
+     * untuk mengambil 20 soal HASIL RANDOMIZE — inilah yang dikirim ke
+     * Flutter & yang wajib dijawab semua saat submit (lihat
+     * StoreEraQuizAttemptRequest, juga direvisi). Dipanggil ulang setiap
+     * kali endpoint ini diakses, jadi 20 soal bisa berbeda tiap kali user
+     * membuka/memulai kuis (termasuk retake).
+     *
+     * response juga menyertakan `passing_grade` (75) supaya Flutter bisa
+     * tampilkan layar info sebelum user mulai mengerjakan.
+     */
     public function show(Request $request, Era $era)
     {
         $eraQuiz = $era->eraQuiz;
@@ -43,9 +62,31 @@ class UserEraQuizController extends Controller
             ], 403);
         }
 
-        return $eraQuiz->load(['questions' => function ($q) {
-            $q->select('id', 'era_quiz_id', 'order', 'question');
-        }, 'questions.options:id,era_quiz_question_id,option_text,order']);
+        // FIX: dulu ada ->load('options:...') di sini, tapi itu justru
+        // sumber bug "Collection::load does not exist" — questionsForAttempt()
+        // (EraQuiz::randomQuestions()) sekarang SUDAH eager-load 'options'
+        // sendiri, jadi tidak perlu (dan tidak boleh) ->load() lagi di sini.
+        $questions = $this->attempts->questionsForAttempt($eraQuiz);
+
+        return response()->json([
+            'era_quiz_id' => $eraQuiz->id,
+            'passing_grade' => \App\Models\EraQuiz::PASSING_GRADE_PERCENTAGE,
+            'question_count' => \App\Models\EraQuiz::ATTEMPT_QUESTION_COUNT,
+            'questions' => $questions->map(fn ($q) => [
+                'id' => $q->id,
+                'order' => $q->order,
+                'question' => $q->question,
+                'options' => $q->options->map(fn ($o) => [
+                    'id' => $o->id,
+                    'option_text' => $o->option_text,
+                    // FIX (bug: "type 'Null' is not a subtype of type
+                    // 'num' in type cast" di Flutter) — field ini sempat
+                    // hilang dari mapping, padahal EraQuizQuestionOption
+                    // (Dart) mewajibkan 'order' non-null.
+                    'order' => $o->order,
+                ]),
+            ]),
+        ]);
     }
 
     /**
@@ -84,6 +125,7 @@ class UserEraQuizController extends Controller
             // Kalimat template selamat, dipakai langsung di halaman Hasil.
             'message' => "Selamat! Kamu sudah menyelesaikan kuis sumatif era {$era->name}.",
             'completed_at' => $attempt->completed_at,
+            'passing_grade' => \App\Models\EraQuiz::PASSING_GRADE_PERCENTAGE,
             'result' => $result,
         ]);
     }
@@ -100,6 +142,11 @@ class UserEraQuizController extends Controller
 
         return response()->json([
             'completed_at' => $attempt->completed_at,
+            // FIX (bug: "type 'Null' is not a subtype of type 'num' in
+            // type cast" di Flutter) — field ini sudah ditambahkan di
+            // submitAttempt() tapi kelewat disamakan di sini. Model Dart
+            // EraQuizResultResponse.passingGrade mewajibkan int non-null.
+            'passing_grade' => \App\Models\EraQuiz::PASSING_GRADE_PERCENTAGE,
             'result' => $this->attempts->buildResult($attempt),
         ]);
     }
@@ -117,6 +164,7 @@ class UserEraQuizController extends Controller
         $recap = $this->attempts->buildRecap($attempt)->map(fn ($item) => [
             'question_id' => $item['question']->id,
             'question' => $item['question']->question,
+            'year' => $item['year'] ? ['id' => $item['year']->id, 'year' => $item['year']->year] : null,
             'options' => $item['question']->options->map(fn ($option) => [
                 'id' => $option->id,
                 'option_text' => $option->option_text,

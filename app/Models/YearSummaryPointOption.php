@@ -5,12 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class EraQuizQuestionOption extends Model
+class YearSummaryPointOption extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'era_quiz_question_id',
+        'year_summary_point_id',
         'option_text',
         'is_correct',
         'order',
@@ -20,12 +20,11 @@ class EraQuizQuestionOption extends Model
     {
         return [
             'is_correct' => 'boolean',
-            'order' => 'integer',
         ];
     }
 
-    public function question()
+    public function point()
     {
-        return $this->belongsTo(EraQuizQuestion::class, 'era_quiz_question_id');
+        return $this->belongsTo(YearSummaryPoint::class, 'year_summary_point_id');
     }
 }

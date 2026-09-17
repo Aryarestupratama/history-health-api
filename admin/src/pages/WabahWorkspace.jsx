@@ -21,13 +21,17 @@ export default function WabahWorkspace() {
   const { yearId } = useParams();
   const { confirm: confirmDialog, dialog } = useConfirm();
 
-  const [year, setYear] = useState(null); // { id, year, title, summary_image, resolved_summary_image_url, quote_text, references, era: {slug,name}, sections: [], vaccines: [], quiz: {...} }
+  const [year, setYear] = useState(null); // { id, year, title, quote_text, references, era: {slug,name}, sections: [], vaccines: [], quiz: {...}, summary: {id, is_published, points:[...]} }
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("section");
 
   // state khusus per tab, disinkronkan ke PhonePreview secara live
   const [activeSectionId, setActiveSectionId] = useState(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  // (Baru) poin Rangkuman Interaktif yang sedang diedit/dipreview — sama
+  // pola dengan activeQuestionIndex di atas (kuis), tapi selalu 0-6 karena
+  // jumlah poin fixed 7 (R-SUM-01), tidak pernah bertambah/berkurang.
+  const [activeSummaryPointIndex, setActiveSummaryPointIndex] = useState(0);
 
   // Status simpan per tab ("idle" | "dirty" | "saving" | "saved" | "error").
   // Dipakai HANYA untuk tombol Simpan (enable/disable + label) di masing-masing
@@ -67,6 +71,11 @@ export default function WabahWorkspace() {
   const [sectionHeaderImageDirty, setSectionHeaderImageDirty] = useState(new Set());
   const [sectionBlockDirty, setSectionBlockDirty] = useState(new Set());
   const [summaryDirty, setSummaryDirty] = useState(false);
+  // (Baru) Set<pointId> — poin Rangkuman Interaktif mana yang 3 opsinya
+  // berubah, terpisah dari summaryDirty (yang sekarang cuma quote_text +
+  // references) karena keduanya disimpan lewat endpoint BERBEDA:
+  // PUT /admin/years/{id} vs PATCH /admin/year-summary-points/{id}.
+  const [summaryPointsDirty, setSummaryPointsDirty] = useState(new Set());
   const [vaccinesDirty, setVaccinesDirty] = useState(false);
   const [quizFieldDirty, setQuizFieldDirty] = useState(new Map());
 
@@ -75,6 +84,7 @@ export default function WabahWorkspace() {
     sectionHeaderImageDirty.size > 0 ||
     sectionBlockDirty.size > 0 ||
     summaryDirty ||
+    summaryPointsDirty.size > 0 ||
     vaccinesDirty ||
     quizFieldDirty.size > 0;
 
@@ -83,6 +93,7 @@ export default function WabahWorkspace() {
     setSectionHeaderImageDirty(new Set());
     setSectionBlockDirty(new Set());
     setSummaryDirty(false);
+    setSummaryPointsDirty(new Set());
     setVaccinesDirty(false);
     setQuizFieldDirty(new Map());
   }
@@ -207,12 +218,15 @@ export default function WabahWorkspace() {
       return {
         screen: "summary",
         data: {
-          // (Revisi) Rangkuman sekarang infografis (gambar), bukan teks —
-          // `resolved_summary_image_url` sudah di-resolve backend (appended
-          // attribute model Year), null kalau admin belum isi.
-          summaryImageUrl: year.resolved_summary_image_url ?? null,
-          // (Baru) Quote & Referensi — tampil di layar yang sama, urutan
-          // sesuai Flutter: rangkuman > quote > referensi > tombol kuis.
+          // (Revisi — Rangkuman Interaktif) `summaryImageUrl` DIHAPUS —
+          // rangkuman sekarang 7 poin correct-statement (year.summary.points),
+          // preview cuma render poin yang sedang aktif diedit
+          // (activeSummaryPointIndex), sama pola dengan QuizScreen yang
+          // render 1 soal aktif sesuai activeQuestionIndex.
+          points: year.summary?.points ?? [],
+          activePointIndex: activeSummaryPointIndex,
+          // Quote & Referensi — tampil di layar yang sama, urutan sesuai
+          // Flutter: rangkuman > quote > referensi > tombol kuis.
           quoteText: year.quote_text ?? null,
           references: year.references ?? [],
           vaccines: year.vaccines ?? [],
@@ -238,7 +252,7 @@ export default function WabahWorkspace() {
     }
 
     return { screen: null, data: null };
-  }, [year, activeTab, activeSectionId, activeQuestionIndex]);
+  }, [year, activeTab, activeSectionId, activeQuestionIndex, activeSummaryPointIndex]);
 
   if (loading || !year) {
     return <div className="p-8 text-sm text-zinc-400">Memuat workspace…</div>;
@@ -305,8 +319,12 @@ export default function WabahWorkspace() {
               setError={(m) => setErrorFor("summary", m)}
               summaryDirty={summaryDirty}
               setSummaryDirty={setSummaryDirty}
+              summaryPointsDirty={summaryPointsDirty}
+              setSummaryPointsDirty={setSummaryPointsDirty}
               vaccinesDirty={vaccinesDirty}
               setVaccinesDirty={setVaccinesDirty}
+              activePointIndex={activeSummaryPointIndex}
+              setActivePointIndex={setActiveSummaryPointIndex}
             />
           )}
           {activeTab === "quiz" && (
@@ -954,21 +972,34 @@ function SummaryVaccineTab({
   setStatus,
   summaryDirty,
   setSummaryDirty,
+  summaryPointsDirty,
+  setSummaryPointsDirty,
   vaccinesDirty,
   setVaccinesDirty,
+  activePointIndex,
+  setActivePointIndex,
 }) {
   const [allVaccines, setAllVaccines] = useState([]);
+  const summary = year.summary;
+  const points = summary?.points ?? [];
 
   useEffect(() => {
     apiClient.get("/admin/vaccines").then(({ data }) => setAllVaccines(data));
   }, []);
 
-  // (Revisi) summary (teks) -> summary_image (link gdrive infografis).
-  function editSummaryImage(summaryImage) {
-    setYear({ ...year, summary_image: summaryImage });
-    setSummaryDirty(true);
-    setStatus("dirty");
-  }
+  // GET /admin/years/{year}/summary — YearSummaryController::show()
+  // firstOrCreate rangkuman + auto-generate skeleton 7 poin x 3 opsi kosong
+  // (ensureSkeleton()) kalau belum ada. Sama pola lazy-fetch dengan
+  // QuizTab (year.quiz dimuat shallow oleh YearController::show(), detail
+  // lengkap baru diambil di sini saat tab-nya benar-benar dibuka).
+  useEffect(() => {
+    if (!summary || summary.points === undefined) {
+      apiClient.get(`/admin/years/${year.id}/summary`).then(({ data }) => {
+        setYear((prev) => ({ ...prev, summary: data }));
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary]);
 
   // (Baru) Quote — 1 teks kutipan per wabah.
   function editQuoteText(quoteText) {
@@ -986,6 +1017,31 @@ function SummaryVaccineTab({
     setStatus("dirty");
   }
 
+  // Ganti isi 1 opsi pada poin aktif — TIDAK langsung PATCH ke backend,
+  // cuma ubah state lokal + tandai poin ini dirty (sama pola dengan
+  // updateQuestion() di QuizTab), dikirim sungguhan saat admin klik Simpan.
+  function updatePointOption(pointId, optionIndex, patch) {
+    const nextPoints = points.map((p) => {
+      if (p.id !== pointId) return p;
+      return { ...p, options: p.options.map((o, i) => (i === optionIndex ? { ...o, ...patch } : o)) };
+    });
+    setYear({ ...year, summary: { ...summary, points: nextPoints } });
+    setSummaryPointsDirty((prev) => new Set(prev).add(pointId));
+    setStatus("dirty");
+  }
+
+  // R-SUM-02: tepat 1 opsi ditandai benar per poin — sama pola dengan
+  // OptionsEditor::setCorrect() di tab Kuis.
+  function setCorrectOption(pointId, optionIndex) {
+    const nextPoints = points.map((p) => {
+      if (p.id !== pointId) return p;
+      return { ...p, options: p.options.map((o, i) => ({ ...o, is_correct: i === optionIndex })) };
+    });
+    setYear({ ...year, summary: { ...summary, points: nextPoints } });
+    setSummaryPointsDirty((prev) => new Set(prev).add(pointId));
+    setStatus("dirty");
+  }
+
   function toggleVaccine(vaccine) {
     const selected = (year.vaccines ?? []).some((v) => v.id === vaccine.id);
     const nextVaccines = selected
@@ -996,19 +1052,45 @@ function SummaryVaccineTab({
     setStatus("dirty");
   }
 
+  async function togglePublishSummary() {
+    try {
+      // YearSummaryController::publish() baca is_published dari body request
+      const { data } = await apiClient.patch(`/admin/year-summaries/${summary.id}/publish`, {
+        is_published: !summary.is_published,
+      });
+      setYear({ ...year, summary: { ...summary, ...data } });
+    } catch (e) {
+      alert(
+        e?.response?.data?.message ??
+          "Gagal publish (butuh seluruh 7 poin terisi, tiap poin 3 opsi dengan tepat 1 ditandai benar)"
+      );
+    }
+  }
+
   async function handleSave() {
     setStatus("saving");
     try {
       if (summaryDirty) {
         const { data } = await apiClient.put(`/admin/years/${year.id}`, {
-          summary_image: year.summary_image || null,
           quote_text: year.quote_text || null,
           references: year.references ?? [],
         });
-        // Merge respons (termasuk resolved_summary_image_url terbaru) -- perlu
-        // supaya preview HP langsung akurat begitu link Drive baru divalidasi
-        // & tersimpan, bukan cuma mengandalkan state lokal yang belum resolved.
         setYear((prev) => ({ ...prev, ...data }));
+      }
+      if (summaryPointsDirty.size > 0) {
+        // 1 PATCH per poin yang berubah — sama pola dengan handleSaveQuiz()
+        // (Promise.all per soal dirty), bukan 1 endpoint batch untuk semua
+        // 7 poin sekaligus (lebih simpel & konsisten dengan pola existing).
+        await Promise.all(
+          Array.from(summaryPointsDirty).map((pointId) => {
+            const point = points.find((p) => p.id === pointId);
+            if (!point) return Promise.resolve();
+            return apiClient.patch(`/admin/year-summary-points/${pointId}`, {
+              options: point.options.map((o) => ({ option_text: o.option_text, is_correct: o.is_correct })),
+            });
+          })
+        );
+        setSummaryPointsDirty(new Set());
       }
       if (vaccinesDirty) {
         const { data } = await apiClient.post(`/admin/years/${year.id}/assign-vaccines`, {
@@ -1025,29 +1107,92 @@ function SummaryVaccineTab({
     }
   }
 
+  const activePoint = points[activePointIndex];
+  // Hint client-side (bukan pengganti validasi backend) — poin yang salah
+  // satu dari 3 teks opsinya masih kosong, sama filosofi dengan
+  // missingExplanationCount di tab Kuis.
+  const incompletePointCount = points.filter((p) => (p.options ?? []).some((o) => !o.option_text?.trim())).length;
+
   return (
     <div className="space-y-8">
       {/* Urutan section di bawah SENGAJA mengikuti urutan tampil di layar
-          end-user (Design.md §3.3.4): Rangkuman > Quote > Referensi > tombol
-          Kuis (tombol Kuis-nya sendiri ada di tab Kuis terpisah). */}
+          end-user (Design.md §3.3.4, revisi Rangkuman Interaktif): 7 Poin
+          Rangkuman > Quote > Referensi > tombol Kuis (tombol Kuis-nya
+          sendiri ada di tab Kuis terpisah). */}
 
       <div>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Rangkuman Wabah (years.summary_image)
+            Rangkuman Interaktif ({points.length}/7 poin)
           </p>
-          {summaryDirty && <UnsavedFieldBadge />}
+          {summary && (
+            <Button size="sm" variant="outline" onClick={togglePublishSummary}>
+              {summary.is_published ? "Unpublish" : "Publish"}
+            </Button>
+          )}
         </div>
-        <Input
-          value={year.summary_image ?? ""}
-          onChange={(e) => editSummaryImage(e.target.value)}
-          placeholder="Link Google Drive (infografis rangkuman)…"
-        />
-        <p className="mt-1 text-[11px] text-zinc-400">
-          Rangkuman kini berupa gambar infografis (link Google Drive), bukan teks. Wajib terisi
-          sebelum kuis bisa di-publish. Klik tombol Simpan di bawah untuk menyimpan perubahan
-          rangkuman, quote, referensi & vaksin sekaligus.
-        </p>
+
+        {!summary ? (
+          <EmptyPanel text="Memuat rangkuman…" />
+        ) : (
+          <>
+            <div className="mb-3 flex gap-2">
+              {points.map((p, i) => (
+                <button
+                  key={p.id}
+                  onClick={() => setActivePointIndex(i)}
+                  className={`relative h-8 w-8 rounded-full text-xs font-medium ${
+                    activePointIndex === i ? "bg-gamify text-white" : "bg-zinc-100 text-zinc-500"
+                  }`}
+                >
+                  {i + 1}
+                  {summaryPointsDirty.has(p.id) && (
+                    <span
+                      className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-orange-400"
+                      title="Ada opsi belum disimpan di poin ini"
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {activePoint && (
+              <div className="space-y-2 rounded-lg border border-zinc-100 p-4">
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">
+                    Poin {activePointIndex + 1} — 1 kalimat benar + 2 kalimat pengecoh (mirip, beda sedikit)
+                  </p>
+                  {summaryPointsDirty.has(activePoint.id) && <UnsavedFieldBadge />}
+                </div>
+                {(activePoint.options ?? []).map((option, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      checked={!!option.is_correct}
+                      onChange={() => setCorrectOption(activePoint.id, i)}
+                      title="Tandai sebagai kalimat benar"
+                    />
+                    <Input
+                      value={option.option_text ?? ""}
+                      placeholder={option.is_correct ? "Kalimat benar…" : `Kalimat pengecoh ${i + 1}…`}
+                      onChange={(e) => updatePointOption(activePoint.id, i, { option_text: e.target.value })}
+                    />
+                  </div>
+                ))}
+                <p className="pt-1 text-[11px] text-zinc-400">
+                  Klik bulatan di kiri untuk menandai opsi mana yang jadi kalimat benar (wajib tepat 1).
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {incompletePointCount > 0 && (
+          <p className="mt-2 text-xs text-amber-600">
+            {incompletePointCount} poin masih ada opsi kosong — wajib lengkap dulu sebelum rangkuman bisa
+            dipublish.
+          </p>
+        )}
       </div>
 
       <div>
@@ -1142,7 +1287,10 @@ function QuizTab({
 
   async function addQuestion() {
     if (!quiz) return;
-    if (questions.length >= 5) return alert("Maksimal 5 soal per kuis (R-QUIZ-06)");
+    // R-QUIZ-06 (revisi): batas sekarang 10 (dulu 5) — TAPI publish tetap
+    // butuh TEPAT 10, bukan "sampai 10 boleh kurang" (lihat Quiz::canPublish()
+    // backend & label "Soal (n/10)" di bawah).
+    if (questions.length >= 10) return alert("Maksimal 10 soal per kuis (R-QUIZ-06).");
     const { data } = await apiClient.post(`/admin/quizzes/${quiz.id}/questions`, {
       question: "",
       // R-QUIZ-04/R-QUIZ-10 (revisi terbaru — feedback kuis 2 kolom): sama
@@ -1196,7 +1344,10 @@ function QuizTab({
       });
       setYear({ ...year, quiz: { ...quiz, ...data } });
     } catch (e) {
-      alert(e?.response?.data?.message ?? "Gagal publish (butuh min. 1 soal + rangkuman terisi");
+      alert(
+        e?.response?.data?.message ??
+          "Gagal publish (butuh TEPAT 10 soal + rangkuman terisi). Kuis kini berskor, passing grade 75% (tetap, tidak bisa diubah admin)."
+      );
     }
   }
 
@@ -1245,11 +1396,20 @@ function QuizTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-          Soal ({questions.length}/5)
-        </p>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+            Soal ({questions.length}/10)
+          </p>
+          {/* R-QUIZ-11 (baru): passing grade fixed 75%, tidak bisa diubah
+              admin — info-only supaya admin tahu kenapa publish butuh TEPAT
+              10 soal (bukan sekadar "boleh kurang"), dan kenapa user bisa
+              mengerjakan ulang kalau nilainya di bawah 75%. */}
+          <p className="text-[11px] text-zinc-400">
+            Berskor · passing grade 75% · boleh dikerjakan ulang user sampai lulus
+          </p>
+        </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={addQuestion} disabled={questions.length >= 5}>
+          <Button variant="outline" size="sm" onClick={addQuestion} disabled={questions.length >= 10}>
             <Plus size={12} /> Soal
           </Button>
           <Button size="sm" variant="outline" onClick={togglePublish}>

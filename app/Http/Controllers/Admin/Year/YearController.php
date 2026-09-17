@@ -14,7 +14,14 @@ class YearController extends Controller
     public function index(Request $request)
     {
         $query = Year::query()
-            ->with(['quiz:id,year_id,is_published'])
+            ->with([
+                'quiz:id,year_id,is_published',
+                // (Baru) Rangkuman Interaktif — sama pola eager-load dengan
+                // 'quiz' di atas, dipakai admin panel buat nampilin badge
+                // status publish rangkuman di list year (mis. warna beda
+                // kalau belum publish), tanpa perlu request terpisah per row.
+                'summary:id,year_id,is_published',
+            ])
             ->orderBy('year');
 
         if ($request->filled('era_id')) {
@@ -33,7 +40,7 @@ class YearController extends Controller
 
     public function show(Year $year)
     {
-        return $year->load(['sections', 'vaccines', 'quiz']);
+        return $year->load(['sections', 'vaccines', 'quiz', 'summary']);
     }
 
     public function update(UpdateYearRequest $request, Year $year)

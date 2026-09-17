@@ -28,7 +28,8 @@ class QuizController extends Controller
 
     /**
      * PATCH /admin/quizzes/{quiz}/publish — toggle publish.
-     * R-QUIZ-05: minimal 1 soal + years.summary terisi.
+     * R-QUIZ-05/06 (revisi): TEPAT 10 soal (bukan lagi "minimal 1") +
+     * years.summary terisi.
      */
     public function publish(Request $request, Quiz $quiz)
     {
@@ -36,7 +37,7 @@ class QuizController extends Controller
 
         if ($wantsPublish && ! $quiz->canPublish()) {
             return response()->json([
-                'message' => 'Kuis belum bisa dipublish. Pastikan minimal 1 soal sudah dibuat, rangkuman tahun (years.summary) sudah terisi, dan setiap soal sudah punya penjelasan untuk jawaban benar maupun salah (explanation_correct & explanation_incorrect).',
+                'message' => 'Kuis belum bisa dipublish. Pastikan TEPAT '.Quiz::QUESTION_COUNT.' soal sudah dibuat (tidak boleh kurang/lebih), rangkuman tahun (years.summary) sudah terisi, dan setiap soal sudah punya penjelasan untuk jawaban benar maupun salah (explanation_correct & explanation_incorrect).',
             ], 422);
         }
 
@@ -47,14 +48,16 @@ class QuizController extends Controller
 
     /**
      * POST /admin/quizzes/{quiz}/questions
-     * R-QUIZ-06: maksimal 5 soal, divalidasi di sini (bukan constraint DB).
+     * R-QUIZ-06 (revisi): maksimal Quiz::QUESTION_COUNT (10) soal — dulu
+     * cuma maks 5. Publish tetap butuh TEPAT 10 (dicek di Quiz::canPublish()),
+     * limit di sini cuma mencegah admin bikin soal ke-11 dst.
      * R-QUIZ-07: multiple_choice wajib >=2 opsi dengan tepat satu is_correct.
      */
     public function storeQuestion(StoreQuizQuestionRequest $request, Quiz $quiz)
     {
-        if ($quiz->questions()->count() >= 5) {
+        if ($quiz->questions()->count() >= Quiz::QUESTION_COUNT) {
             return response()->json([
-                'message' => 'Maksimal 5 soal per kuis (R-QUIZ-06).',
+                'message' => 'Maksimal '.Quiz::QUESTION_COUNT.' soal per kuis (R-QUIZ-06).',
             ], 422);
         }
 

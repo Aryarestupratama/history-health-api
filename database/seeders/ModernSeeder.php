@@ -4,10 +4,12 @@ namespace Database\Seeders;
 
 use App\Models\Era;
 use App\Models\EraQuiz;
-use App\Models\EraQuizQuestion;
 use App\Models\Section;
 use App\Models\Vaccine;
 use App\Models\Year;
+use App\Models\YearSummary;
+use App\Models\YearSummaryPoint;
+use App\Models\YearSummaryPointOption;
 use Illuminate\Database\Seeder;
 
 /**
@@ -53,6 +55,19 @@ use Illuminate\Database\Seeder;
  * tapi tetap ditandai perlu verifikasi sumber sebelum dianggap final.
  * Teks isi 2 section baru ("Pendahuluan"/"Sub Materi") MASIH placeholder
  * (belum ada draft dari tim konten) — cuma header & gambarnya yang asli.
+ *
+ * (Revisi terbaru — Rangkuman Interaktif) `summary_image` (infografis
+ * statis) DIHAPUS TOTAL dari `years`, digantikan tabel terpisah
+ * `year_summaries` → `year_summary_points` (tepat 7 poin) →
+ * `year_summary_point_options` (tepat 3 opsi/poin, 1 benar + 2 pengecoh)
+ * — pola "correct statement", lihat Schema.md §2.19–2.22, Rules.md Bab 11.
+ * `quote_text`/`references` TIDAK terpengaruh, tetap di kolom `years` yang
+ * sama seperti sebelumnya. Method baru `createYearSummary()` menggantikan
+ * penulisan langsung `summary_image` di `Year::updateOrCreate()`.
+ * 7 poin Cacar (1974) disusun dari brief/isi section yang sudah real di
+ * bawah — cukup representatif, tapi tetap disarankan direview tim konten.
+ * 7 poin COVID (2020) masih ditandai "[Placeholder]" karena datanya sendiri
+ * (quote/referensi) juga masih placeholder — pola penandaan sama.
  */
 class ModernSeeder extends Seeder
 {
@@ -67,9 +82,17 @@ class ModernSeeder extends Seeder
 
         $this->seedCacarYear($era);
         $this->seedCovidYear($era);
-        $this->seedEraQuiz($era);
 
-        $this->command?->info('ModernSeeder selesai: year Cacar (1974) + year COVID-19 (2020) real, kuis sumatif era (10 soal) ter-publish.');
+        $yearCacar = Year::where('era_id', $era->id)->where('year', 1974)->first();
+        $yearCovid = Year::where('era_id', $era->id)->where('year', 2020)->first();
+
+        if ($yearCacar && $yearCovid) {
+            $this->seedEraQuiz($era);
+        } else {
+            $this->command?->warn('Year Cacar (1974) atau COVID (2020) tidak ditemukan, seedEraQuiz dilewati.');
+        }
+
+        $this->command?->info('ModernSeeder selesai: year Cacar (1974) + year COVID-19 (2020) real, Rangkuman Interaktif (7 poin) ter-publish untuk keduanya, kuis sumatif era ter-publish (soal ditarik otomatis dari kuis formatif tiap year: 10 Cacar + 10 COVID, 20 total per attempt).');
     }
 
     private function seedCacarYear(Era $era): void
@@ -83,7 +106,6 @@ class ModernSeeder extends Seeder
             ['era_id' => $era->id, 'year' => 1974],
             [
                 'title' => 'Eradikasi Cacar di Indonesia',
-                'summary_image' => 'https://drive.google.com/file/d/19UKxw51L-sd9uTFbBjJtpFFn3gn4g6BE/view?usp=drive_link',
                 'quote_text' => '"Eradikasi cacar adalah bukti bahwa kerja sama global dan kemauan politik bisa mengalahkan penyakit yang pernah membunuh jutaan orang." — [Perlu verifikasi: cek ulang sumber/atribusi kutipan asli sebelum publish, mis. dari WHO atau tokoh kesehatan terkait program eradikasi cacar.]',
                 'references' => [
                     'World Health Organization, "Smallpox Eradication Programme" — [Perlu verifikasi: lengkapi tahun terbit & tautan resmi.]',
@@ -91,6 +113,68 @@ class ModernSeeder extends Seeder
                 ],
             ]
         );
+
+        // Rangkuman Interaktif (7 poin correct-statement) — disusun dari
+        // brief/isi section real di bawah, cukup representatif tapi tetap
+        // disarankan direview tim konten sebelum dianggap final.
+        $this->createYearSummary($year, [
+            [
+                'options' => [
+                    'Cacar sudah muncul di Indonesia secara sporadis sejak masa kolonial hingga awal tahun 1970-an.',
+                    'Cacar baru pertama kali muncul di Indonesia pada awal tahun 1970-an, tanpa riwayat sebelumnya.',
+                    'Cacar hanya pernah muncul di Indonesia pada masa penjajahan Belanda, sebelum abad ke-20.',
+                ],
+                'correct' => 0,
+            ],
+            [
+                'options' => [
+                    'Cacar hanya menyebar lewat gigitan nyamuk dan jarang menimbulkan kematian.',
+                    'Cacar menyebar lewat kontak langsung maupun droplet udara, dengan tingkat kematian tinggi terutama pada anak-anak.',
+                    'Cacar menyebar lewat air minum yang terkontaminasi, dengan tingkat kematian rendah di segala usia.',
+                ],
+                'correct' => 1,
+            ],
+            [
+                'options' => [
+                    'PBB mencanangkan program eradikasi cacar secara global pada dekade 1950-an.',
+                    'UNICEF mencanangkan program eradikasi cacar secara global pada dekade 1970-an.',
+                    'World Health Organization (WHO) mencanangkan program eradikasi cacar secara global pada dekade 1960-an.',
+                ],
+                'correct' => 2,
+            ],
+            [
+                'options' => [
+                    'Strategi utama program ini adalah vaksinasi massal dan pengawasan kasus ketat (surveillance and containment).',
+                    'Strategi utama program ini adalah karantina wilayah total tanpa vaksinasi sama sekali.',
+                    'Strategi utama program ini adalah penutupan seluruh fasilitas kesehatan untuk sementara waktu.',
+                ],
+                'correct' => 0,
+            ],
+            [
+                'options' => [
+                    'Vaksinasi cacar hanya dilakukan di kota-kota besar karena keterbatasan tenaga kesehatan.',
+                    'Tenaga kesehatan dikerahkan hingga ke pelosok desa untuk memberi vaksin sekaligus mendeteksi dini kasus baru.',
+                    'Deteksi kasus cacar dilakukan lewat sensus penduduk tahunan, tanpa disertai vaksinasi langsung.',
+                ],
+                'correct' => 1,
+            ],
+            [
+                'options' => [
+                    'Indonesia dinyatakan bebas dari penyakit cacar pada tahun 1980.',
+                    'Indonesia dinyatakan bebas dari penyakit cacar pada tahun 1969.',
+                    'Indonesia dinyatakan bebas dari penyakit cacar pada tahun 1974.',
+                ],
+                'correct' => 2,
+            ],
+            [
+                'options' => [
+                    'Pencapaian bebas cacar Indonesia mendahului deklarasi WHO tahun 1980 yang menyatakan cacar sudah diberantas sepenuhnya dari dunia.',
+                    'Pencapaian bebas cacar Indonesia terjadi setelah deklarasi WHO tahun 1980 tentang eradikasi cacar global.',
+                    'Deklarasi WHO tentang eradikasi cacar global baru terjadi pada tahun 1990, jauh setelah Indonesia bebas cacar.',
+                ],
+                'correct' => 0,
+            ],
+        ]);
 
         $gambarCacar1 = 'https://drive.google.com/file/d/1aTaPkpeFkxifnIEJBMUTsLHh5n-RZLuI/view?usp=drive_link';
         $gambarCacar2 = 'https://drive.google.com/file/d/1SpHxOHhRFgN833jRuhysZfbyRlZ59qiF/view?usp=drive_link';
@@ -245,7 +329,6 @@ class ModernSeeder extends Seeder
             ['era_id' => $era->id, 'year' => 2020],
             [
                 'title' => 'Pandemi COVID-19',
-                'summary_image' => 'https://drive.google.com/file/d/CONTOH_FILE_ID_SUMMARY_2020/view', // TODO: ganti infografis asli
                 'quote_text' => '[Placeholder] "Pandemi mengajarkan kita bahwa kesehatan satu orang adalah urusan bersama." — ganti dengan kutipan asli (mis. dari pejabat kesehatan/tokoh terkait penanganan COVID-19).',
                 'references' => [
                     '[Placeholder] Kementerian Kesehatan RI, Pedoman Pencegahan dan Pengendalian COVID-19.',
@@ -254,6 +337,68 @@ class ModernSeeder extends Seeder
                 ],
             ]
         );
+
+        // Rangkuman Interaktif (7 poin) — masih PLACEHOLDER seperti quote/
+        // referensi di atas, wajib diverifikasi/diganti tim konten sebelum
+        // year ini dianggap final.
+        $this->createYearSummary($year, [
+            [
+                'options' => [
+                    '[Placeholder] Pandemi COVID-19 berlangsung di Indonesia sejak tahun 2020 hingga 2023.',
+                    '[Placeholder] Pandemi COVID-19 berlangsung di Indonesia sejak tahun 2019 hingga 2021.',
+                    '[Placeholder] Pandemi COVID-19 berlangsung di Indonesia sejak tahun 2021 hingga 2024.',
+                ],
+                'correct' => 0,
+            ],
+            [
+                'options' => [
+                    '[Placeholder] Kasus pertama COVID-19 diumumkan resmi pemerintah pada akhir Januari 2020.',
+                    '[Placeholder] Kasus pertama COVID-19 diumumkan resmi pemerintah pada awal Maret 2020.',
+                    '[Placeholder] Kasus pertama COVID-19 diumumkan resmi pemerintah pada pertengahan Desember 2019.',
+                ],
+                'correct' => 1,
+            ],
+            [
+                'options' => [
+                    '[Placeholder] Pemerintah menerapkan lockdown militer penuh sejak awal pandemi.',
+                    '[Placeholder] Pemerintah hanya mengandalkan imbauan tanpa kebijakan pembatasan resmi.',
+                    '[Placeholder] Pemerintah menerapkan PSBB, kemudian dilanjutkan PPKM, untuk menekan laju penularan.',
+                ],
+                'correct' => 2,
+            ],
+            [
+                'options' => [
+                    '[Placeholder] Program vaksinasi nasional COVID-19 mulai dijalankan bertahap sejak Januari 2021.',
+                    '[Placeholder] Program vaksinasi nasional COVID-19 mulai dijalankan bertahap sejak Maret 2020.',
+                    '[Placeholder] Program vaksinasi nasional COVID-19 mulai dijalankan bertahap sejak Desember 2021.',
+                ],
+                'correct' => 0,
+            ],
+            [
+                'options' => [
+                    '[Placeholder] Lansia menjadi kelompok prioritas pertama penerima vaksin COVID-19.',
+                    '[Placeholder] Tenaga kesehatan menjadi kelompok prioritas pertama penerima vaksin COVID-19.',
+                    '[Placeholder] Pelajar menjadi kelompok prioritas pertama penerima vaksin COVID-19.',
+                ],
+                'correct' => 1,
+            ],
+            [
+                'options' => [
+                    '[Placeholder] AstraZeneca menjadi vaksin pertama yang digunakan dalam program vaksinasi nasional Indonesia.',
+                    '[Placeholder] Pfizer-BioNTech menjadi vaksin pertama yang digunakan dalam program vaksinasi nasional Indonesia.',
+                    '[Placeholder] Sinovac menjadi vaksin pertama yang digunakan dalam program vaksinasi nasional Indonesia.',
+                ],
+                'correct' => 2,
+            ],
+            [
+                'options' => [
+                    '[Placeholder] Empat jenis vaksin digunakan dalam program vaksinasi nasional: Sinovac, AstraZeneca, Pfizer-BioNTech, dan Moderna.',
+                    '[Placeholder] Hanya dua jenis vaksin yang digunakan dalam program vaksinasi nasional: Sinovac dan AstraZeneca.',
+                    '[Placeholder] Lima jenis vaksin digunakan dalam program vaksinasi nasional, termasuk Johnson & Johnson.',
+                ],
+                'correct' => 0,
+            ],
+        ]);
 
         $gambarCovid1 = 'https://drive.google.com/file/d/16_dq-S932UpgYfiJhm9UJK1_So5pE7xX/view?usp=drive_link';
         $gambarCovid2 = 'https://drive.google.com/file/d/1rd1QhrnW7IpMRv8BK4xxIMud-jqp3h13/view?usp=drive_link';
@@ -387,12 +532,21 @@ class ModernSeeder extends Seeder
     /**
      * Kuis Sumatif Era ("final boss") — muncul setelah SELURUH year era
      * Modern (Cacar 1974 + COVID 2020) completed oleh user (R-ERAQUIZ-02).
-     * 10 soal pilihan ganda tematik seputar isi 2 year di atas, masing-masing
-     * sudah lengkap is_correct + explanation_correct + explanation_incorrect
-     * supaya EraQuiz::canPublish() lolos dan kuis langsung di-publish di sini
-     * (beda dari seedCacarYear/seedCovidYear yang quiz year-nya sengaja
-     * dibiarkan draft — kuis sumatif ini sengaja langsung siap tampil untuk
-     * kebutuhan testing end-to-end roadmap era & flow submit->hasil->rekap).
+     *
+     * Soal kini dikelompokkan per year_id (year_id WAJIB diisi, R-ERAQUIZ baru
+     * — lihat migration era_quiz_questions). Total soal gabungan minimal 20
+     * (10 per year x 2 year) supaya randomize 20 soal saat user mengerjakan
+     * selalu terpenuhi (syarat publish baru EraQuiz::canPublish()) — beda
+     * dari versi lama yang cuma 10 soal flat tanpa year_id.
+     */
+    /**
+     * REVISI TOTAL: kuis sumatif era TIDAK LAGI punya bank soal sendiri —
+     * soal ditarik otomatis dari kuis FORMATIF (quiz_questions) tiap year
+     * saat user mengerjakan (lihat EraQuiz::randomQuestions()). Seeder ini
+     * cukup memastikan record EraQuiz ada, lalu publish OTOMATIS kalau
+     * seluruh year di era ini sudah punya kuis formatif published (yang
+     * sudah dijamin oleh seedCacarYear()/seedCovidYear() via QuizSeeder,
+     * masing-masing 10 soal lengkap).
      */
     private function seedEraQuiz(Era $era): void
     {
@@ -401,121 +555,72 @@ class ModernSeeder extends Seeder
             ['is_published' => false]
         );
 
-        $questions = [
-            [
-                'question' => 'Pada tahun berapa Indonesia dinyatakan bebas dari penyakit cacar (smallpox)?',
-                'options' => ['1974', '1980', '1969', '1990'],
-                'correct' => 0,
-                'explanation_correct' => 'Benar! Indonesia dinyatakan bebas cacar pada tahun 1974, mendahului deklarasi eradikasi cacar global oleh WHO pada tahun 1980.',
-                'explanation_incorrect' => 'Kurang tepat. Indonesia dinyatakan bebas cacar pada tahun 1974 — 1980 adalah tahun WHO mendeklarasikan cacar telah diberantas sepenuhnya secara global, bukan tahun Indonesia bebas cacar.',
-            ],
-            [
-                'question' => 'Organisasi internasional apa yang mencanangkan program eradikasi cacar secara global pada dekade 1960-an?',
-                'options' => ['UNICEF', 'World Health Organization (WHO)', 'PBB', 'Palang Merah Internasional'],
-                'correct' => 1,
-                'explanation_correct' => 'Benar! WHO mencanangkan program eradikasi cacar global dengan strategi vaksinasi massal dan surveillance and containment.',
-                'explanation_incorrect' => 'Kurang tepat. Program eradikasi cacar global dicanangkan oleh World Health Organization (WHO), bukan lembaga tsb.',
-            ],
-            [
-                'question' => 'Apa strategi utama yang digunakan dalam program eradikasi cacar di Indonesia?',
-                'options' => [
-                    'Karantina wilayah total',
-                    'Vaksinasi massal dan pengawasan kasus ketat (surveillance and containment)',
-                    'Penutupan seluruh fasilitas kesehatan',
-                    'Larangan mobilitas antar pulau',
-                ],
-                'correct' => 1,
-                'explanation_correct' => 'Benar! Strategi utamanya adalah vaksinasi massal dipadukan dengan pengawasan kasus yang ketat, dijalankan tenaga kesehatan hingga ke pelosok desa.',
-                'explanation_incorrect' => 'Kurang tepat. Strategi utamanya adalah vaksinasi massal dan pengawasan kasus ketat (surveillance and containment), bukan opsi tsb.',
-            ],
-            [
-                'question' => 'Kapan kasus pertama COVID-19 diumumkan secara resmi oleh pemerintah Indonesia?',
-                'options' => ['Januari 2020', 'Maret 2020', 'Desember 2019', 'Juni 2020'],
-                'correct' => 1,
-                'explanation_correct' => 'Benar! Kasus pertama COVID-19 diumumkan resmi oleh pemerintah Indonesia pada awal Maret 2020.',
-                'explanation_incorrect' => 'Kurang tepat. Kasus pertama COVID-19 di Indonesia diumumkan resmi pada awal Maret 2020, bukan pada waktu tsb.',
-            ],
-            [
-                'question' => 'Kebijakan apa yang diterapkan pemerintah Indonesia untuk menekan penyebaran COVID-19 di awal pandemi?',
-                'options' => [
-                    'PSBB (Pembatasan Sosial Berskala Besar)',
-                    'Karantina wilayah permanen',
-                    'Penutupan seluruh perbatasan negara tanpa batas waktu',
-                    'Lockdown militer',
-                ],
-                'correct' => 0,
-                'explanation_correct' => 'Benar! Pemerintah menerapkan PSBB, kemudian dilanjutkan dengan PPKM, untuk menekan laju penularan COVID-19.',
-                'explanation_incorrect' => 'Kurang tepat. Kebijakan yang diterapkan adalah PSBB (Pembatasan Sosial Berskala Besar), bukan opsi tsb.',
-            ],
-            [
-                'question' => 'Sejak kapan program vaksinasi nasional COVID-19 mulai dijalankan secara bertahap di Indonesia?',
-                'options' => ['Maret 2020', 'Januari 2021', 'Desember 2021', 'Agustus 2020'],
-                'correct' => 1,
-                'explanation_correct' => 'Benar! Program vaksinasi nasional COVID-19 mulai dijalankan bertahap sejak Januari 2021, diprioritaskan bagi tenaga kesehatan.',
-                'explanation_incorrect' => 'Kurang tepat. Program vaksinasi nasional COVID-19 mulai dijalankan bertahap sejak Januari 2021, bukan pada waktu tsb.',
-            ],
-            [
-                'question' => 'Kelompok mana yang menjadi prioritas pertama penerima vaksin COVID-19 di Indonesia?',
-                'options' => ['Lansia', 'Tenaga kesehatan', 'Pelajar', 'Pekerja pabrik'],
-                'correct' => 1,
-                'explanation_correct' => 'Benar! Tenaga kesehatan menjadi kelompok prioritas pertama karena berada di garis depan penanganan pandemi.',
-                'explanation_incorrect' => 'Kurang tepat. Prioritas pertama penerima vaksin COVID-19 adalah tenaga kesehatan, sebelum diperluas ke lansia dan kelompok lain.',
-            ],
-            [
-                'question' => 'Vaksin COVID-19 manakah yang menjadi vaksin PERTAMA digunakan dalam program vaksinasi nasional Indonesia?',
-                'options' => ['Pfizer-BioNTech', 'Moderna', 'Sinovac', 'AstraZeneca'],
-                'correct' => 2,
-                'explanation_correct' => 'Benar! Sinovac menjadi vaksin pertama yang digunakan dalam program vaksinasi nasional COVID-19 Indonesia, mulai didistribusikan sejak Januari 2021.',
-                'explanation_incorrect' => 'Kurang tepat. Vaksin pertama yang digunakan dalam program vaksinasi nasional Indonesia adalah Sinovac, bukan opsi tsb.',
-            ],
-            [
-                'question' => 'Vaksin COVID-19 manakah yang menggunakan teknologi berbasis vektor adenovirus?',
-                'options' => ['Sinovac', 'AstraZeneca', 'Pfizer-BioNTech', 'Moderna'],
-                'correct' => 1,
-                'explanation_correct' => 'Benar! AstraZeneca menggunakan teknologi berbasis vektor adenovirus, dikembangkan bersama Universitas Oxford.',
-                'explanation_incorrect' => 'Kurang tepat. Vaksin berbasis vektor adenovirus adalah AstraZeneca, bukan opsi tsb — Pfizer-BioNTech dan Moderna menggunakan teknologi mRNA.',
-            ],
-            [
-                'question' => 'Apa kesamaan antara program eradikasi cacar (1974) dan program vaksinasi COVID-19 di Indonesia?',
-                'options' => [
-                    'Keduanya sama-sama tidak melibatkan kerja sama internasional',
-                    'Keduanya sama-sama mengandalkan vaksinasi berskala besar untuk melindungi masyarakat dari penyakit menular',
-                    'Keduanya sama-sama tidak melibatkan tenaga kesehatan',
-                    'Keduanya sama-sama hanya berlangsung kurang dari 1 tahun',
-                ],
-                'correct' => 1,
-                'explanation_correct' => 'Benar! Baik eradikasi cacar maupun penanganan COVID-19 sama-sama mengandalkan program vaksinasi berskala besar sebagai kunci utama melindungi masyarakat.',
-                'explanation_incorrect' => 'Kurang tepat. Kesamaan utamanya adalah keduanya mengandalkan vaksinasi berskala besar untuk melindungi masyarakat, bukan pada aspek yang disebutkan di opsi tsb.',
-            ],
-        ];
+        if ($eraQuiz->fresh()->canPublish()) {
+            $eraQuiz->update(['is_published' => true]);
+        }
+    }
 
-        foreach ($questions as $index => $q) {
-            $question = EraQuizQuestion::updateOrCreate(
-                ['era_quiz_id' => $eraQuiz->id, 'question' => $q['question']],
-                [
-                    'order' => $index + 1,
-                    'explanation_correct' => $q['explanation_correct'],
-                    'explanation_incorrect' => $q['explanation_incorrect'],
-                ]
+
+    /**
+     * Buat/replace Rangkuman Interaktif (7 poin correct-statement) untuk
+     * satu year. Mirror pola createSections()/seedEraQuiz() — hapus data
+     * lama lalu buat ulang, supaya seeder aman dijalankan berkali-kali
+     * (idempotent lewat updateOrCreate di level year_summaries).
+     *
+     * @param array<int, array{options: array<int, string>, correct: int}> $points
+     *   Tepat 7 item wajib diberikan (divalidasi runtime di bawah, bukan
+     *   cuma di aplikasi admin) — tiap item wajib tepat 3 'options', dan
+     *   'correct' adalah index (0-2) opsi yang berisi kalimat rangkuman
+     *   asli (bukan pengecoh).
+     */
+    private function createYearSummary(Year $year, array $points): void
+    {
+        if (count($points) !== 7) {
+            throw new \InvalidArgumentException(
+                "Rangkuman Interaktif year #{$year->id} harus tepat 7 poin, diberikan " . count($points) . '.'
             );
+        }
 
-            $question->options()->delete();
+        $yearSummary = YearSummary::updateOrCreate(
+            ['year_id' => $year->id],
+            [] // is_published diset di akhir method setelah 7 poin & opsinya lengkap
+        );
+
+        // Hapus poin lama dulu (cascade menghapus year_summary_point_options
+        // ikutannya lewat foreign key) supaya seeder idempotent kalau
+        // dijalankan ulang dengan isi poin yang berbeda.
+        $yearSummary->points()->delete();
+
+        foreach ($points as $index => $pointData) {
+            if (count($pointData['options']) !== 3) {
+                throw new \InvalidArgumentException(
+                    "Poin ke-" . ($index + 1) . " year #{$year->id} harus tepat 3 opsi, diberikan " . count($pointData['options']) . '.'
+                );
+            }
+
+            $point = YearSummaryPoint::create([
+                'year_summary_id' => $yearSummary->id,
+                'order' => $index + 1,
+            ]);
 
             $optionsToCreate = [];
-            foreach ($q['options'] as $optIndex => $optionText) {
+            foreach ($pointData['options'] as $optIndex => $optionText) {
                 $optionsToCreate[] = [
+                    'year_summary_point_id' => $point->id,
                     'option_text' => $optionText,
-                    'is_correct' => $optIndex === $q['correct'],
+                    'is_correct' => $optIndex === $pointData['correct'],
                     'order' => $optIndex + 1,
                 ];
             }
-            $question->options()->createMany($optionsToCreate);
+            YearSummaryPointOption::insert($optionsToCreate);
         }
 
-        // R-ERAQUIZ-10: semua soal di atas sudah lengkap explanation_correct
-        // & explanation_incorrect, jadi canPublish() otomatis lolos di sini.
-        if ($eraQuiz->fresh()->canPublish()) {
-            $eraQuiz->update(['is_published' => true]);
+        // R-SUM-03: tepat 7 poin sudah dijamin di atas, tiap poin tepat 3
+        // opsi dengan tepat 1 benar juga sudah dijamin — canPublish() di
+        // sini murni double-check sesuai konvensi Quiz::canPublish()/
+        // EraQuiz::canPublish() yang sudah ada, bukan syarat tambahan baru.
+        if ($yearSummary->fresh()->canPublish()) {
+            $yearSummary->update(['is_published' => true]);
         }
     }
 

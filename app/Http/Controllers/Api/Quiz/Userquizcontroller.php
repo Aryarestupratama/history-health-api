@@ -4,17 +4,20 @@ namespace App\Http\Controllers\Api\Quiz;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quiz\StoreQuizAnswerRequest;
-use App\Models\UserQuizAttempt;
+use App\Models\Quiz;
 use App\Models\QuizQuestion;
 use App\Models\Year;
 use App\Services\Progress\YearCompletionService;
+use App\Services\Quiz\QuizAttemptService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class UserQuizController extends Controller
 {
-    public function __construct(private YearCompletionService $yearCompletion)
-    {
+    public function __construct(
+        private YearCompletionService $yearCompletion,
+        private QuizAttemptService $attempts,
+    ) {
     }
 
     /**
@@ -22,6 +25,15 @@ class UserQuizController extends Controller
      * R-QUIZ-02: hanya bisa diambil jika seluruh section published di year
      * tsb sudah completed oleh user. R-QUIZ-09: guest tidak bisa akses sama
      * sekali — endpoint ini ada di grup middleware auth:sanctum + verified.
+     *
+     * R-QUIZ-11 (baru): response sekarang menyertakan `passing_grade` (75)
+     * & `question_count` (Quiz::QUESTION_COUNT, 10) supaya Flutter bisa
+     * tampilkan layar info "Nilai minimum kelulusan: 75%" SEBELUM user
+     * masuk ke soal pertama — ditampilkan di layar ini, bukan endpoint
+     * terpisah, supaya Flutter cukup 1x call sebelum render layar mulai.
+     * Ikut disertakan status attempt terkini (`attempt_status`,
+     * `latest_score`) supaya Flutter tahu harus render "Mulai Kuis",
+     * "Lanjutkan", atau "Kerjakan Ulang (belum lulus)".
      */
     public function show(Request $request, Year $year)
     {
@@ -31,44 +43,77 @@ class UserQuizController extends Controller
             throw new NotFoundHttpException();
         }
 
-        $publishedSections = $year->sections()->published()->get();
-        $completedCount = $request->user()->progress()
-            ->whereIn('section_id', $publishedSections->pluck('id'))
-            ->count();
-
-        if ($completedCount < $publishedSections->count()) {
+        if (! $this->sectionsCompleted($request, $year)) {
             return response()->json([
                 'message' => 'Selesaikan seluruh section pada tahun ini terlebih dahulu sebelum mengerjakan kuis.',
             ], 403);
         }
 
+        $latestAttempt = $this->yearCompletion->latestQuizAttempt($request->user(), $year);
+
         // R-QUIZ-04: tidak ada kunci jawaban yang dikirim ke user sebelum
         // menjawab (bukan alat tes) — is_correct/correct_option_id baru
         // diikutkan di feedback answerQuestion() setelah soal dijawab.
-        return $quiz->load(['questions' => function ($q) {
+        $quiz->load(['questions' => function ($q) {
             $q->select('id', 'quiz_id', 'order', 'question');
         }, 'questions.options:id,quiz_question_id,option_text,order']);
+
+        return response()->json([
+            'quiz' => $quiz,
+            'passing_grade' => Quiz::PASSING_GRADE_PERCENTAGE,
+            'question_count' => Quiz::QUESTION_COUNT,
+            'attempt_status' => $this->attemptStatus($latestAttempt),
+            'latest_score' => $latestAttempt?->scorePercentage(),
+        ]);
+    }
+
+    /**
+     * POST /api/years/{year}/quiz/retry
+     * R-QUIZ-08 (baru): dipanggil user untuk mengerjakan ulang kuis yang
+     * belum lulus (skor < passing grade). Ditolak 422 kalau attempt sudah
+     * lulus (tidak ada gunanya retry kuis yang sudah lulus) atau kalau
+     * belum pernah ada attempt sama sekali (belum perlu retry, langsung
+     * jawab soal pertama saja lewat answerQuestion()).
+     */
+    public function retry(Request $request, Year $year)
+    {
+        $quiz = $year->quiz;
+
+        if (! $quiz || ! $quiz->is_published) {
+            throw new NotFoundHttpException();
+        }
+
+        try {
+            $attempt = $this->attempts->retry($request->user(), $quiz);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'Kuis siap dikerjakan ulang.',
+            'attempt_status' => $this->attemptStatus($attempt),
+        ]);
     }
 
     /**
      * POST /api/years/{year}/quiz/questions/{question}/answer
-     * Progressive save + feedback real-time per soal.
+     * Progressive save + feedback real-time per soal (TIDAK berubah dari
+     * versi lama — feedback instan tetap dipertahankan sesuai keputusan
+     * "abis jawab langsung dinilai").
      *
-     * Dipanggil SETIAP soal dijawab, langsung menyimpan progresif ke
-     * user_quiz_attempts.answers (upsert per-key, bukan overwrite total)
-     * dan mengembalikan feedback instan untuk soal ITU SAJA — termasuk
-     * correct_option_id supaya opsi yang benar bisa di-highlight saat user
-     * salah, sesuai PRD.md QUIZ-03 / Rules.md R-QUIZ-04 ("opsi yang benar
-     * ikut di-highlight" saat jawaban salah).
+     * BEDA dari versi lama: begitu SEMUA soal terjawab (`quiz_completed:
+     * true`), response sekarang MENYERTAKAN skor akhir + status
+     * lulus/tidak lulus (`final_score`, `is_passing`) — dihitung dari
+     * `UserQuizAttempt::scorePercentage()`/`isPassing()`. Kalau lulus,
+     * `YearCompletionService::checkAndUnlockVaccines()` akan unlock vaksin
+     * terkait (isCompleted() di baliknya sekarang juga mengecek isPassing());
+     * kalau gagal, TIDAK ada unlock, dan user perlu panggil retry() untuk
+     * mengerjakan ulang.
      *
-     * completed_at di-set begitu jawaban untuk SEMUA soal quiz ini sudah
-     * terkumpul (bukan saat endpoint ini pertama kali dipanggil) — baru di
-     * titik itu status "year completed" (R-PROG-07/08) & unlock vaksin
-     * dicek ulang.
-     *
-     * R-QUIZ-08 (idempotent) tetap terjaga: kalau attempt SUDAH punya
-     * completed_at (semua soal sudah pernah dituntaskan), request baru ke
-     * endpoint ini ditolak 409 — jawaban yang sudah final tidak boleh diubah.
+     * R-QUIZ-08 (revisi): attempt yang sudah completed_at (baik lulus
+     * maupun gagal) mengunci endpoint ini — 409, sampai user memanggil
+     * retry() secara eksplisit. Beda dari versi lama yang mengunci
+     * permanen tanpa jalan keluar.
      */
     public function answerQuestion(StoreQuizAnswerRequest $request, Year $year, QuizQuestion $question)
     {
@@ -78,49 +123,33 @@ class UserQuizController extends Controller
             throw new NotFoundHttpException();
         }
 
-        // R-QUIZ-02: sama seperti show(), harus sudah selesai semua section.
-        $publishedSections = $year->sections()->published()->get();
-        $completedCount = $request->user()->progress()
-            ->whereIn('section_id', $publishedSections->pluck('id'))
-            ->count();
-
-        if ($completedCount < $publishedSections->count()) {
+        if (! $this->sectionsCompleted($request, $year)) {
             return response()->json([
                 'message' => 'Selesaikan seluruh section pada tahun ini terlebih dahulu sebelum mengerjakan kuis.',
             ], 403);
         }
 
-        $attempt = UserQuizAttempt::firstOrCreate(
-            ['user_id' => $request->user()->id, 'quiz_id' => $quiz->id],
-            ['answers' => [], 'completed_at' => null]
-        );
+        $attempt = $this->attempts->getOrCreateAttempt($request->user(), $quiz);
 
-        if ($attempt->completed_at !== null) {
+        if (! $this->attempts->canAnswer($attempt)) {
             return response()->json([
-                'message' => 'Kuis ini sudah selesai dikerjakan sebelumnya.',
+                'message' => 'Kuis ini sudah selesai dikerjakan. Kerjakan ulang lewat endpoint retry jika belum lulus.',
             ], 409);
         }
 
         $optionId = (int) $request->validated()['option_id'];
-
-        // Upsert progresif — gabung ke jawaban yang sudah ada, bukan overwrite total.
-        $answers = $attempt->answers ?? [];
-        $answers[$question->id] = $optionId;
-        $attempt->answers = $answers;
-
-        $allQuestionIds = $quiz->questions()->pluck('id');
-        $answeredQuestionIds = collect(array_keys($answers))->map(fn ($id) => (int) $id);
-        $isNowComplete = $allQuestionIds->diff($answeredQuestionIds)->isEmpty();
-
-        if ($isNowComplete) {
-            $attempt->completed_at = now();
-        }
-
-        $attempt->save();
+        ['is_complete' => $isNowComplete] = $this->attempts->recordAnswer($attempt, $quiz, $question, $optionId);
 
         $newlyUnlocked = collect();
+        $finalScore = null;
+        $isPassing = null;
+
         if ($isNowComplete) {
-            // R-PROG-08: re-check status "year completed" begitu quiz selesai.
+            $finalScore = $attempt->scorePercentage();
+            $isPassing = $attempt->isPassing();
+
+            // R-PROG-08: re-check status "year completed" begitu quiz selesai
+            // — isCompleted() di baliknya sekarang juga mensyaratkan isPassing().
             $newlyUnlocked = $this->yearCompletion->checkAndUnlockVaccines($request->user(), $year);
         }
 
@@ -136,7 +165,36 @@ class UserQuizController extends Controller
             'is_correct' => $isCorrect,
             'explanation' => $question->explanationFor($isCorrect),
             'quiz_completed' => $isNowComplete,
+            'final_score' => $finalScore,
+            'is_passing' => $isPassing,
+            'passing_grade' => Quiz::PASSING_GRADE_PERCENTAGE,
             'newly_unlocked_vaccine_ids' => $newlyUnlocked->values(),
         ]);
+    }
+
+    private function sectionsCompleted(Request $request, Year $year): bool
+    {
+        $publishedSections = $year->sections()->published()->get();
+        $completedCount = $request->user()->progress()
+            ->whereIn('section_id', $publishedSections->pluck('id'))
+            ->count();
+
+        return $completedCount >= $publishedSections->count();
+    }
+
+    /**
+     * 'not_started' | 'in_progress' | 'failed' | 'passed'
+     */
+    private function attemptStatus(?\App\Models\UserQuizAttempt $attempt): string
+    {
+        if (! $attempt) {
+            return 'not_started';
+        }
+
+        if ($attempt->completed_at === null) {
+            return 'in_progress';
+        }
+
+        return $attempt->isPassing() ? 'passed' : 'failed';
     }
 }

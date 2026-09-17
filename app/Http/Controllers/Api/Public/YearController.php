@@ -7,12 +7,14 @@ use App\Http\Resources\YearResource;
 use App\Models\Era;
 use App\Services\Progress\YearCompletionService;
 use App\Services\Section\SectionAccessService;
+use App\Services\YearSummary\YearSummaryService;
 
 class YearController extends Controller
 {
     public function __construct(
         private SectionAccessService $sectionAccessService,
         private YearCompletionService $yearCompletionService,
+        private YearSummaryService $yearSummaryService,
     ) {
     }
 
@@ -32,6 +34,10 @@ class YearController extends Controller
             ->with([
                 'sections' => fn ($q) => $q->published()->select('id', 'title', 'order', 'year_id'),
                 'quiz',
+                // (Baru) dipakai bareng YearSummaryService::hasCompleted()
+                // di bawah — sama alasan kenapa 'quiz' di-eager-load, biar
+                // YearResource::whenLoaded('summary', ...) tidak N+1 query.
+                'summary',
             ])
             ->orderBy('year') // kronologis, bukan urutan input admin
             ->get();
@@ -50,6 +56,18 @@ class YearController extends Controller
             if ($isCompleted) {
                 $completedYearsCount++;
             }
+
+            // (Baru, SUM-05/06) Status rangkuman sudah diselesaikan user —
+            // pakai relasi 'summary' yang sudah di-eager-load di atas
+            // (BUKAN YearSummaryService::getPublishedForYear(), yang akan
+            // query ulang & bikin N+1 di sini) — hanya dianggap "completed"
+            // kalau rangkumannya memang published DAN user login (guest
+            // tidak pernah punya completion tersimpan, R-SUM-13).
+            $yearSummary = $year->summary;
+            $yearSummaryCompleted = ($user && $yearSummary && $yearSummary->is_published)
+                ? $this->yearSummaryService->hasCompleted($user, $yearSummary)
+                : false;
+            $year->setAttribute('year_summary_completed', $yearSummaryCompleted);
 
             // Sisipkan status locked/completed per section (Architecture.md §4.7).
             $sectionStatuses = $this->sectionAccessService->statusForYear($user, $year)

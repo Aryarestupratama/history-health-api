@@ -52,6 +52,76 @@ class QuizSeeder extends Seeder
                         ['text' => 'Isolasi mandiri tanpa program vaksinasi', 'is_correct' => false],
                     ],
                 ],
+                [
+                    'question' => 'Virus apa yang menyebabkan penyakit cacar (smallpox)?',
+                    'explanation_correct' => 'Benar! Cacar disebabkan oleh virus variola, salah satu virus paling mematikan sepanjang sejarah manusia sebelum berhasil diberantas.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah virus variola — virus inilah penyebab penyakit cacar (smallpox).',
+                    'options' => [
+                        ['text' => 'Virus variola', 'is_correct' => true],
+                        ['text' => 'Virus vaccinia', 'is_correct' => false],
+                        ['text' => 'Virus varicella', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Metode pemberian vaksin cacar yang umum digunakan pada masa itu adalah?',
+                    'explanation_correct' => 'Tepat! Skarifikasi (goresan kulit dengan jarum bercabang) adalah metode yang umum digunakan untuk memberikan vaksin cacar pada masa itu.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah skarifikasi (goresan kulit dengan jarum bercabang) — metode inilah yang umum digunakan untuk vaksin cacar pada masa itu.',
+                    'options' => [
+                        ['text' => 'Suntikan intravena', 'is_correct' => false],
+                        ['text' => 'Skarifikasi (goresan kulit dengan jarum bercabang)', 'is_correct' => true],
+                        ['text' => 'Tetes oral', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Pada tahun berapa WHO mendeklarasikan cacar telah diberantas sepenuhnya secara global?',
+                    'explanation_correct' => 'Benar! WHO mendeklarasikan cacar berhasil diberantas sepenuhnya secara global pada 1980, beberapa tahun setelah Indonesia sendiri dinyatakan bebas cacar.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah 1980 — tahun itulah WHO mendeklarasikan cacar telah diberantas sepenuhnya secara global.',
+                    'options' => [
+                        ['text' => '1974', 'is_correct' => false],
+                        ['text' => '1980', 'is_correct' => true],
+                        ['text' => '1990', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Siapa yang berperan penting menjangkau desa-desa terpencil dalam program vaksinasi cacar di Indonesia?',
+                    'explanation_correct' => 'Tepat! Tenaga kesehatan & juru imunisasi lapangan berperan penting menjangkau desa-desa terpencil, termasuk wilayah kepulauan yang sulit diakses.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah tenaga kesehatan & juru imunisasi lapangan — merekalah yang berperan penting menjangkau desa-desa terpencil dalam program ini.',
+                    'options' => [
+                        ['text' => 'Tenaga kesehatan & juru imunisasi lapangan', 'is_correct' => true],
+                        ['text' => 'Aparat militer semata', 'is_correct' => false],
+                        ['text' => 'Relawan asing tanpa pelatihan medis', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Apa tantangan geografis utama yang dihadapi program eradikasi cacar di Indonesia?',
+                    'explanation_correct' => 'Benar! Kondisi geografis Indonesia yang berupa kepulauan luas menjadi tantangan utama menjangkau seluruh wilayah untuk vaksinasi & pengawasan kasus.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah kondisi geografis kepulauan yang luas — inilah tantangan utama menjangkau seluruh wilayah dalam program ini.',
+                    'options' => [
+                        ['text' => 'Kondisi geografis kepulauan yang luas', 'is_correct' => true],
+                        ['text' => 'Kurangnya minat masyarakat kota besar', 'is_correct' => false],
+                        ['text' => 'Cuaca yang selalu ekstrem sepanjang tahun', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Apa dampak positif utama setelah Indonesia dinyatakan bebas cacar pada 1974?',
+                    'explanation_correct' => 'Tepat! Beban penyakit menular mematikan berkurang signifikan, dan sumber daya kesehatan bisa dialihkan ke program kesehatan masyarakat lainnya.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah berkurangnya beban penyakit menular mematikan, sehingga sumber daya kesehatan bisa dialihkan ke program lain.',
+                    'options' => [
+                        ['text' => 'Berkurangnya beban penyakit menular mematikan', 'is_correct' => true],
+                        ['text' => 'Meningkatnya jumlah penyakit menular baru', 'is_correct' => false],
+                        ['text' => 'Dihentikannya seluruh program imunisasi nasional', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Apa yang dimaksud dengan istilah "ring vaccination" dalam strategi eradikasi cacar?',
+                    'explanation_correct' => 'Benar! Ring vaccination adalah strategi memvaksinasi orang-orang di sekitar kasus yang ditemukan untuk membentuk "cincin" kekebalan dan mencegah penyebaran lebih luas.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah strategi memvaksinasi orang-orang di sekitar kasus yang ditemukan untuk membentuk "cincin" kekebalan, bukan vaksinasi acak tanpa target wilayah.',
+                    'options' => [
+                        ['text' => 'Vaksinasi acak tanpa target wilayah tertentu', 'is_correct' => false],
+                        ['text' => 'Memvaksinasi orang-orang di sekitar kasus untuk membentuk "cincin" kekebalan', 'is_correct' => true],
+                        ['text' => 'Vaksinasi hanya untuk kalangan pejabat pemerintah', 'is_correct' => false],
+                    ],
+                ],
             ]);
         }
 
@@ -95,6 +165,66 @@ class QuizSeeder extends Seeder
                         ['text' => 'PSBB (Pembatasan Sosial Berskala Besar)', 'is_correct' => true],
                         ['text' => 'Larangan total pergerakan tanpa pengecualian', 'is_correct' => false],
                         ['text' => 'Penutupan seluruh fasilitas kesehatan', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Sejak kapan program vaksinasi nasional COVID-19 mulai dijalankan secara bertahap di Indonesia?',
+                    'explanation_correct' => 'Benar! Program vaksinasi nasional COVID-19 mulai dijalankan secara bertahap sejak Januari 2021, diprioritaskan bagi tenaga kesehatan.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah Januari 2021 — bulan itulah program vaksinasi nasional COVID-19 mulai dijalankan secara bertahap di Indonesia.',
+                    'options' => [
+                        ['text' => 'Maret 2020', 'is_correct' => false],
+                        ['text' => 'Januari 2021', 'is_correct' => true],
+                        ['text' => 'Desember 2021', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Kelompok mana yang menjadi prioritas pertama penerima vaksin COVID-19 di Indonesia?',
+                    'explanation_correct' => 'Benar! Tenaga kesehatan menjadi kelompok prioritas pertama karena berada di garis depan penanganan pandemi.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah tenaga kesehatan — kelompok inilah yang menjadi prioritas pertama penerima vaksin COVID-19 sebelum diperluas ke kelompok lain.',
+                    'options' => [
+                        ['text' => 'Lansia', 'is_correct' => false],
+                        ['text' => 'Tenaga kesehatan', 'is_correct' => true],
+                        ['text' => 'Pelajar', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Vaksin COVID-19 manakah yang menggunakan teknologi berbasis vektor adenovirus?',
+                    'explanation_correct' => 'Tepat! AstraZeneca menggunakan teknologi berbasis vektor adenovirus, dikembangkan bersama Universitas Oxford.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah AstraZeneca — vaksin inilah yang menggunakan teknologi berbasis vektor adenovirus, berbeda dari Pfizer-BioNTech dan Moderna yang berbasis mRNA.',
+                    'options' => [
+                        ['text' => 'Sinovac', 'is_correct' => false],
+                        ['text' => 'AstraZeneca', 'is_correct' => true],
+                        ['text' => 'Pfizer-BioNTech', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Istilah apa yang digunakan untuk kebijakan pembatasan lanjutan setelah PSBB di Indonesia?',
+                    'explanation_correct' => 'Benar! PPKM (Pemberlakuan Pembatasan Kegiatan Masyarakat) adalah istilah kebijakan pembatasan lanjutan yang menggantikan PSBB.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah PPKM (Pemberlakuan Pembatasan Kegiatan Masyarakat) — istilah inilah yang digunakan untuk kebijakan pembatasan lanjutan setelah PSBB.',
+                    'options' => [
+                        ['text' => 'PPKM (Pemberlakuan Pembatasan Kegiatan Masyarakat)', 'is_correct' => true],
+                        ['text' => 'Lockdown total permanen', 'is_correct' => false],
+                        ['text' => 'Karantina wilayah tanpa batas waktu', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Apa tujuan utama protokol kesehatan 3M/5M selama pandemi COVID-19?',
+                    'explanation_correct' => 'Tepat! Protokol 3M/5M (mencuci tangan, memakai masker, menjaga jarak, dst.) bertujuan menekan laju penularan virus di masyarakat.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah menekan laju penularan virus di masyarakat — itulah tujuan utama protokol kesehatan 3M/5M.',
+                    'options' => [
+                        ['text' => 'Menekan laju penularan virus di masyarakat', 'is_correct' => true],
+                        ['text' => 'Menggantikan kebutuhan vaksinasi sepenuhnya', 'is_correct' => false],
+                        ['text' => 'Mempercepat herd immunity tanpa vaksin', 'is_correct' => false],
+                    ],
+                ],
+                [
+                    'question' => 'Teknologi apa yang digunakan vaksin Pfizer-BioNTech dan Moderna?',
+                    'explanation_correct' => 'Benar! Pfizer-BioNTech dan Moderna sama-sama menggunakan teknologi mRNA, teknologi vaksin generasi baru yang dikembangkan dengan cepat selama pandemi.',
+                    'explanation_incorrect' => 'Jawaban yang tepat adalah mRNA — Pfizer-BioNTech dan Moderna menggunakan teknologi ini, bukan opsi tsb.',
+                    'options' => [
+                        ['text' => 'Inactivated virus', 'is_correct' => false],
+                        ['text' => 'mRNA', 'is_correct' => true],
+                        ['text' => 'Vektor adenovirus', 'is_correct' => false],
                     ],
                 ],
             ]);

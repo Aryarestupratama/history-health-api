@@ -3,19 +3,26 @@
 namespace App\Http\Controllers\Admin\EraQuiz;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\EraQuiz\StoreEraQuizQuestionRequest;
-use App\Http\Requests\Admin\EraQuiz\UpdateEraQuizQuestionRequest;
 use App\Models\Era;
 use App\Models\EraQuiz;
-use App\Models\EraQuizQuestion;
 use Illuminate\Http\Request;
 
+/**
+ * REVISI BESAR: kuis sumatif era TIDAK LAGI punya bank soal sendiri untuk
+ * dikelola admin — soal ditarik otomatis dari kuis FORMATIF (quiz_questions)
+ * milik tiap year dalam era ini. Method storeQuestion()/updateQuestion()/
+ * destroyQuestion() DIHAPUS TOTAL, admin cukup:
+ * (1) isi & publish kuis formatif tiap year (WabahWorkspace::QuizTab, 10
+ *     soal per year, sudah ada dari sebelumnya), lalu
+ * (2) toggle publish() di sini begitu SEMUA year sudah published.
+ */
 class EraQuizController extends Controller
 {
     /**
      * GET /admin/eras/{era}/quiz — ambil (atau buat draft baru) kuis
-     * sumatif milik era. 1 kuis per era (unique era_id di Schema.md),
-     * jadi selalu firstOrCreate — sama pola dengan QuizController::show().
+     * sumatif milik era, plus breakdown status tiap year (published atau
+     * belum, dan berapa kuota soal yang akan diambil darinya kalau semua
+     * sudah published) supaya admin tahu apa yang masih kurang.
      */
     public function show(Era $era)
     {
@@ -24,14 +31,36 @@ class EraQuizController extends Controller
             ['is_published' => false]
         );
 
-        return $eraQuiz->load('questions.options');
+        $years = $era->years()->with('quiz')->orderBy('id')->get();
+        $quotas = $eraQuiz->canPublish() ? $eraQuiz->questionQuotaPerYear() : [];
+
+        return response()->json([
+            'id' => $eraQuiz->id,
+            'era_id' => $eraQuiz->era_id,
+            'is_published' => $eraQuiz->is_published,
+            'attempt_question_count' => EraQuiz::ATTEMPT_QUESTION_COUNT,
+            'can_publish' => $eraQuiz->canPublish(),
+            'years' => $years->map(fn ($year) => [
+                'id' => $year->id,
+                'year' => $year->year,
+                'title' => $year->title,
+                'quiz_published' => (bool) $year->quiz?->is_published,
+                'quiz_question_count' => $year->quiz?->questions()->count() ?? 0,
+                // Kuota soal yang akan diambil dari year ini SAAT user
+                // mengerjakan kuis sumatif — cuma terisi kalau eraQuiz
+                // sudah bisa dipublish (semua year published), null kalau
+                // belum (supaya admin tidak salah kira ini angka final).
+                'quota_if_published' => $quotas[$year->id] ?? null,
+            ]),
+        ]);
     }
 
     /**
      * PATCH /admin/era-quizzes/{eraQuiz}/publish — toggle publish.
-     * R-ERAQUIZ-10: minimal 1 soal + setiap soal punya explanation_correct
-     * & explanation_incorrect terisi. TIDAK ada syarat "summary terisi"
-     * (beda dari QuizController::publish() — era tidak punya kolom summary).
+     * R-ERAQUIZ-10 (REVISI TOTAL): syarat sekarang SEMUA year dalam era
+     * ini sudah punya kuis formatif published (EraQuiz::canPublish()) —
+     * bukan lagi soal jumlah/lengkap-nya bank sumatif sendiri (sudah
+     * tidak ada bank sumatif sendiri).
      */
     public function publish(Request $request, EraQuiz $eraQuiz)
     {
@@ -39,92 +68,12 @@ class EraQuizController extends Controller
 
         if ($wantsPublish && ! $eraQuiz->canPublish()) {
             return response()->json([
-                'message' => 'Kuis sumatif belum bisa dipublish. Pastikan minimal 1 soal sudah dibuat dan setiap soal sudah punya penjelasan untuk jawaban benar maupun salah (explanation_correct & explanation_incorrect).',
+                'message' => 'Kuis sumatif belum bisa dipublish. Pastikan SEMUA tahun di era ini sudah punya kuis formatif (10 soal) yang sudah dipublish.',
             ], 422);
         }
 
         $eraQuiz->update(['is_published' => $wantsPublish]);
 
         return $eraQuiz;
-    }
-
-    /**
-     * POST /admin/era-quizzes/{eraQuiz}/questions
-     * R-ERAQUIZ-06: TIDAK ada batas maksimal jumlah soal (beda dari
-     * QuizController::storeQuestion() yang membatasi 5 soal — R-QUIZ-06).
-     * R-ERAQUIZ-07: wajib >=2 opsi dengan tepat satu is_correct.
-     */
-    public function storeQuestion(StoreEraQuizQuestionRequest $request, EraQuiz $eraQuiz)
-    {
-        $data = $request->validated();
-        $options = $data['options'] ?? [];
-        unset($data['options']);
-
-        // FIX: sama alasan dengan QuizController::storeQuestion() — admin
-        // CMS mengirim skeleton soal kosong ("") dulu untuk dapat id, diisi
-        // belakangan via updateQuestion(). Middleware
-        // ConvertEmptyStringsToNull mengubah "" jadi null sebelum validasi,
-        // sementara kolom-kolom ini NOT NULL di DB.
-        $data['question'] = $data['question'] ?? '';
-        $data['explanation_correct'] = $data['explanation_correct'] ?? '';
-        $data['explanation_incorrect'] = $data['explanation_incorrect'] ?? '';
-
-        $data['order'] = $eraQuiz->questions()->max('order') + 1;
-
-        $question = $eraQuiz->questions()->create($data);
-
-        foreach ($options as $index => $option) {
-            $question->options()->create([
-                'option_text' => $option['option_text'] ?? '',
-                'is_correct' => $option['is_correct'] ?? false,
-                'order' => $index + 1,
-            ]);
-        }
-
-        return response()->json($question->load('options'), 201);
-    }
-
-    public function updateQuestion(UpdateEraQuizQuestionRequest $request, EraQuizQuestion $question)
-    {
-        $data = $request->validated();
-        $options = $data['options'] ?? null;
-        unset($data['options']);
-
-        if (array_key_exists('question', $data)) {
-            $data['question'] = $data['question'] ?? '';
-        }
-
-        if (array_key_exists('explanation_correct', $data)) {
-            $data['explanation_correct'] = $data['explanation_correct'] ?? '';
-        }
-
-        if (array_key_exists('explanation_incorrect', $data)) {
-            $data['explanation_incorrect'] = $data['explanation_incorrect'] ?? '';
-        }
-
-        $question->update($data);
-
-        // R-ERAQUIZ-07: opsi di-replace penuh saat diedit — sama pola
-        // dengan QuizController::updateQuestion().
-        if ($options !== null) {
-            $question->options()->delete();
-
-            foreach ($options as $index => $option) {
-                $question->options()->create([
-                    'option_text' => $option['option_text'] ?? '',
-                    'is_correct' => $option['is_correct'] ?? false,
-                    'order' => $index + 1,
-                ]);
-            }
-        }
-
-        return $question->load('options');
-    }
-
-    public function destroyQuestion(EraQuizQuestion $question)
-    {
-        $question->delete();
-
-        return response()->json(null, 204);
     }
 }

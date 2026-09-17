@@ -27,8 +27,9 @@ import { PALETTE, ERA_ACCENTS } from "@/config/branding";
  * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "vaccine-detail" | "wabah-intro"
  * - data: bentuk berbeda tergantung `screen` — lihat komentar shape di atas
  *   masing-masing screen (SectionDetailScreen sekarang pakai `headerImageUrl`
- *   menggantikan judul, SummaryScreen pakai `summaryImageUrl`/`quoteText`/
- *   `references` menggantikan `summary` teks).
+ *   menggantikan judul, SummaryScreen pakai `points`/`activePointIndex`
+ *   — Rangkuman Interaktif 7 poin correct-statement — menggantikan
+ *   `summaryImageUrl`/`summary` lama).
  * - eraSlug: opsional, untuk aksen warna era (kolonial/kemerdekaan/modern)
  * - compact: opsional, perkecil frame HP (dipakai saat preview ada di dalam
  *   modal sempit, mis. dialog preview vaksin — bukan split-screen Content
@@ -289,31 +290,28 @@ function MediaPlaceholder({ icon, label, accent }) {
 }
 
 /* ------------------------------------------------------------- Summary tab */
-// data: { summaryImageUrl, quoteText, references: string[], vaccines: [{ id, name, photo }], showUnlockAnimation }
+// data: { points: [{id, order, options:[{option_text, is_correct}]}],
+//         activePointIndex, quoteText, references: string[],
+//         vaccines: [{ id, name, photo }], showUnlockAnimation }
 //
-// (Revisi) Urutan render mengikuti urutan tampil end-user (Design.md §3.3.4):
-// Rangkuman (gambar infografis) -> Quote -> Referensi -> Vaksin terkait ->
-// tombol Kuis. `summary` (teks) dihapus, diganti `summaryImageUrl` (resolved).
+// (Revisi — Rangkuman Interaktif) Urutan render mengikuti urutan tampil
+// end-user (Design.md §3.3.4 revisi): widget 1 poin correct-statement yang
+// sedang aktif diedit (dari 7 total) -> Quote -> Referensi -> Vaksin
+// terkait -> tombol Kuis. `summaryImageUrl` (infografis) dihapus total,
+// digantikan `points`/`activePointIndex` — sama pola dengan QuizScreen di
+// bawah (render 1 soal aktif + toggle simulasi feedback).
 
 function SummaryScreen({ data, accent }) {
   const vaccines = data?.vaccines ?? [];
   const references = data?.references ?? [];
+  const points = data?.points ?? [];
+  const activePointIndex = data?.activePointIndex ?? 0;
+
   return (
     <div>
       <h2 className="mb-2 text-base font-semibold text-zinc-900">Rangkuman Wabah</h2>
 
-      {data?.summaryImageUrl ? (
-        <img
-          src={data.summaryImageUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          className="mb-5 w-full rounded-xl border border-zinc-100 object-cover"
-        />
-      ) : (
-        <p className="mb-5 rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
-          Rangkuman (infografis) belum diisi
-        </p>
-      )}
+      <SummaryPointWidget points={points} activePointIndex={activePointIndex} accent={accent} />
 
       {data?.quoteText && (
         <div className="mb-5 flex gap-2 rounded-xl bg-zinc-50 p-3">
@@ -374,6 +372,156 @@ function SummaryScreen({ data, accent }) {
   );
 }
 
+/* ------------------------------------------------- Summary point widget */
+// Preview 1 poin Rangkuman Interaktif (dari 7 total) sedang aktif diedit,
+// LENGKAP dengan toggle simulasi "Belum dijawab"/"Simulasi: Benar"/
+// "Simulasi: Salah" — pola SAMA persis dengan toggle simulasi feedback di
+// QuizScreen di bawah, tapi perilaku "sudah dijawab"-nya BEDA (SUM-02):
+// - Simulasi Benar -> HANYA kalimat benar yang ditampilkan (2 pengecoh
+//   disembunyikan total, bukan cuma di-nonaktifkan).
+// - Simulasi Salah -> kalimat yang dipilih user (salah) + kalimat benar
+//   ditampilkan berdampingan, pengecoh KETIGA yang tidak dipilih ikut
+//   disembunyikan. Ini beda dari kuis (QuizScreen) yang tetap menampilkan
+//   SEMUA opsi walau sudah dijawab — di sini opsi yang tidak relevan lagi
+//   memang dihilangkan dari tampilan, sesuai kriteria SUM-02.
+
+function SummaryPointWidget({ points, activePointIndex, accent }) {
+  const point = points[activePointIndex];
+
+  // null = "belum dijawab" (3 opsi tampil semua, teracak — di preview ini
+  // urutan input admin dipakai apa adanya, pengacakan sungguhan terjadi di
+  // response API end-user, bukan di sini).
+  const [feedbackMode, setFeedbackMode] = useState(null);
+
+  useEffect(() => {
+    setFeedbackMode(null);
+  }, [activePointIndex]);
+
+  if (points.length === 0) {
+    return (
+      <p className="mb-5 rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+        Rangkuman Interaktif belum ada poinnya
+      </p>
+    );
+  }
+
+  if (!point) return null;
+
+  const options = point.options ?? [];
+  const correctOption = options.find((o) => o.is_correct);
+  const simulatedSelected =
+    feedbackMode === "correct"
+      ? correctOption
+      : feedbackMode === "incorrect"
+      ? options.find((o) => !o.is_correct) ?? null
+      : null;
+
+  // R-SUM-02: opsi apa saja yang MASIH ditampilkan tergantung feedbackMode
+  // — beda dari kuis yang selalu tampilkan semua opsi.
+  const visibleOptions = options.filter((o) => {
+    if (feedbackMode === null) return true; // belum dijawab -> semua 3 tampil
+    if (feedbackMode === "correct") return o.is_correct; // cuma kalimat benar
+    return o.is_correct || o === simulatedSelected; // salah -> benar + pilihan user
+  });
+
+  return (
+    <div className="mb-5 rounded-xl border border-zinc-100 p-3">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs font-medium text-zinc-400">
+          Poin {activePointIndex + 1} dari {points.length}
+        </p>
+        <div className="flex gap-1">
+          {points.map((_, i) => (
+            <span
+              key={i}
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: i === activePointIndex ? accent : "#E4E4E7" }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {visibleOptions.length === 0 && <p className="text-xs text-zinc-300">Belum ada opsi kalimat</p>}
+        {visibleOptions.map((opt, oi) => {
+          const isCorrectOpt = !!opt.is_correct;
+          const isSimulatedSelected = simulatedSelected === opt;
+          const showAsCorrect = feedbackMode !== null && isCorrectOpt;
+          const showAsWrongSelected = feedbackMode === "incorrect" && isSimulatedSelected && !isCorrectOpt;
+
+          return (
+            <div
+              key={oi}
+              className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm ${
+                showAsCorrect
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : showAsWrongSelected
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-zinc-100 text-zinc-700"
+              }`}
+            >
+              <span
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
+                style={{
+                  borderColor: showAsCorrect ? "#4BA95F" : showAsWrongSelected ? "#DC5B5B" : accent,
+                }}
+              />
+              <span className="flex-1">
+                {opt.option_text || <span className="text-zinc-300">Kalimat kosong</span>}
+              </span>
+              {showAsCorrect && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-500">Benar</span>
+              )}
+              {showAsWrongSelected && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500">
+                  Dipilih user
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Toggle simulasi preview — BUKAN kontrol yang muncul di tampilan
+          end-user asli, murni alat bantu admin lihat 3 kondisi tanpa perlu
+          login sebagai user beneran. Sama pola dengan toggle di QuizScreen. */}
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => setFeedbackMode(null)}
+          className={`flex-1 rounded-lg py-1.5 text-[11px] font-medium transition ${
+            feedbackMode === null ? "text-white" : "bg-zinc-100 text-zinc-500"
+          }`}
+          style={feedbackMode === null ? { backgroundColor: accent } : undefined}
+        >
+          Belum dijawab
+        </button>
+        <button
+          onClick={() => setFeedbackMode("correct")}
+          className={`flex-1 rounded-lg py-1.5 text-[11px] font-medium transition ${
+            feedbackMode === "correct" ? "text-white" : "bg-zinc-100 text-zinc-500"
+          }`}
+          style={feedbackMode === "correct" ? { backgroundColor: "#4BA95F" } : undefined}
+        >
+          Simulasi: Benar
+        </button>
+        <button
+          onClick={() => setFeedbackMode("incorrect")}
+          className={`flex-1 rounded-lg py-1.5 text-[11px] font-medium transition ${
+            feedbackMode === "incorrect" ? "text-white" : "bg-zinc-100 text-zinc-500"
+          }`}
+          style={feedbackMode === "incorrect" ? { backgroundColor: "#DC5B5B" } : undefined}
+        >
+          Simulasi: Salah
+        </button>
+      </div>
+
+      <p className="mt-2 text-center text-[10px] text-zinc-300">
+        Ganti poin dari editor di sebelah kiri · tanpa tampilan skor
+      </p>
+    </div>
+  );
+}
+
 /* --------------------------------------------------------------- Quiz tab */
 // data: { questions: [{ id, question, explanation_correct, explanation_incorrect,
 //         options: [{ option_text, is_correct }] }], activeIndex, footerNote? }
@@ -388,12 +536,16 @@ function SummaryScreen({ data, accent }) {
 // tanpa perlu login sebagai user beneran — toggle ini murni alat bantu
 // preview, bukan bagian dari tampilan end-user asli.
 //
+// R-QUIZ-09/11 (REVISI BESAR): kuis formatif sekarang BERSKOR + passing
+// grade 75% + boleh retake — feedback instan per-soal tetap dipertahankan
+// (ini masih preview yang sama), tapi footerNote default di bawah tidak
+// lagi bilang "tanpa tampilan skor" (itu sudah tidak akurat sejak revisi).
+//
 // DIREUSE untuk preview kuis sumatif era (EraQuizManager) — bentuk data
 // per-soal identik (question/options/explanation_correct/explanation_incorrect),
-// cuma beda perilaku end-user asli (submit di akhir + halaman skor, bukan
-// feedback instan tanpa skor). `footerNote` dipakai EraQuizManager untuk
-// menimpa teks catatan bawah supaya tidak menyesatkan ("tanpa tampilan skor"
-// tidak berlaku untuk kuis sumatif era).
+// cuma beda perilaku end-user asli (submit di akhir + halaman skor dari 20
+// soal hasil randomize, bukan feedback instan per-soal). `footerNote`
+// dipakai EraQuizManager untuk menimpa teks catatan bawah.
 
 function QuizScreen({ data, accent }) {
   const questions = data?.questions ?? [];
@@ -559,7 +711,7 @@ function QuizScreen({ data, accent }) {
       </div>
 
       <p className="mt-2 text-center text-[10px] text-zinc-300">
-        {data?.footerNote ?? "Ganti soal dari editor di sebelah kiri · tanpa tampilan skor"}
+        {data?.footerNote ?? "Ganti soal dari editor di sebelah kiri · berskor, passing grade 75%, boleh diulang"}
       </p>
     </div>
   );
