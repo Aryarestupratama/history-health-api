@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import api from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,6 @@ export default function WabahIntroManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     fetchIntro();
@@ -60,7 +60,6 @@ export default function WabahIntroManager() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
-    setSuccess(false);
     setSaving(true);
     try {
       const res = await api.put('/admin/wabah-intro', {
@@ -71,7 +70,7 @@ export default function WabahIntroManager() {
         image_link: res.data.image_link || '',
         is_published: !!res.data.is_published,
       });
-      setSuccess(true);
+      toast.success('Konten berhasil disimpan');
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal menyimpan konten pengenalan wabah.');
     } finally {
@@ -98,17 +97,11 @@ export default function WabahIntroManager() {
         </Alert>
       )}
 
-      {success && (
-        <Alert className="border-success/40 bg-success/10 text-success">
-          <AlertDescription>Konten berhasil disimpan.</AlertDescription>
-        </Alert>
-      )}
-
       {loading ? (
         <p className="text-sm text-muted-foreground">Memuat...</p>
       ) : (
-        <div className="grid gap-6 md:grid-cols-[1fr_300px]">
-          <form id="wabah-intro-form" onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-5">
+        <div className="flex flex-wrap items-start gap-6">
+          <form id="wabah-intro-form" onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-5 w-full max-w-xl">
             <div className="space-y-1.5">
               <Label>Infografis (link Google Drive)</Label>
               <Input
@@ -145,7 +138,9 @@ export default function WabahIntroManager() {
               sekarang selesai). Sesuaikan path import di atas kalau lokasi
               PhonePreview.jsx di project Anda beda dari asumsi (satu folder
               yang sama, ./PhonePreview). */}
-          <PhonePreview screen="wabah-intro" data={{ resolvedImageUrl: previewUrl }} compact />
+          <div className="flex flex-1 justify-center">
+            <PhonePreview screen="wabah-intro" data={{ resolvedImageUrl: previewUrl }} compact />
+          </div>
         </div>
       )}
     </div>

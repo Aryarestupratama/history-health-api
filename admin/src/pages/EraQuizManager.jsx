@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, ListChecks, Shuffle, Target } from "lucide-react";
+import { toast } from "sonner";
 import apiClient from "@/api";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { ERA_ACCENTS } from "@/config/branding";
 
 /**
@@ -20,13 +24,19 @@ import { ERA_ACCENTS } from "@/config/branding";
  * 3. Tombol toggle publish kuis sumatif — TIDAK ADA lagi editor soal,
  *    tambah/hapus soal, atau preview HP di sini. Admin isi soal lewat tab
  *    Kuis di WabahWorkspace (per year), bukan di komponen ini.
+ *
+ * Styling disamakan dengan pola halaman admin lain (mis. AdminManager.jsx):
+ * header judul+deskripsi+aksi di kanan, tabel dibungkus card
+ * `rounded-lg border border-l-4`, hanya warna aksen kiri yang mengikuti
+ * warna era (bukan warna fix seperti `gamify`) supaya tetap terasa "punya
+ * identitas era" sesuai Design.md §5.4.
  */
 export default function EraQuizManager({ era }) {
-  const [data, setData] = useState(null); // { is_published, can_publish, attempt_question_count, years: [...] }
+  const [data, setData] = useState(null); // { id, is_published, can_publish, attempt_question_count, years: [...] }
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState(null);
 
-  const accent = ERA_ACCENTS?.[era?.slug]?.hex;
+  const accent = ERA_ACCENTS?.[era?.slug]?.hex ?? "#0C0C0C";
 
   useEffect(() => {
     if (!era) return;
@@ -46,12 +56,14 @@ export default function EraQuizManager({ era }) {
         is_published: !data.is_published,
       });
       setData((prev) => ({ ...prev, ...updated }));
+      toast.success(updated.is_published ? "Kuis sumatif era dipublish" : "Kuis sumatif era di-unpublish");
       load(); // refresh breakdown per year (quota berubah begitu status publish berubah)
     } catch (e) {
-      setError(
+      const message =
         e?.response?.data?.message ??
-          "Gagal publish (butuh SEMUA tahun di era ini sudah punya kuis formatif 10 soal yang dipublish)."
-      );
+        "Gagal publish (butuh SEMUA tahun di era ini sudah punya kuis formatif 10 soal yang dipublish).";
+      setError(message);
+      toast.error(message);
     } finally {
       setPublishing(false);
     }
@@ -64,59 +76,92 @@ export default function EraQuizManager({ era }) {
   const readyYearsCount = data.years.filter((y) => y.quiz_published).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header: judul + deskripsi + aksi publish, pola sama dengan
+          AdminManager.jsx (judul kiri, tombol aksi kanan). */}
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Kuis Sumatif — {era?.name}
-          </p>
-          <p className="text-[11px] text-zinc-400">
-            Soal ditarik otomatis dari kuis formatif tiap tahun · {data.attempt_question_count} soal
-            per attempt · passing grade 75%
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            "Final boss" akhir era — soal tidak dikelola manual di sini, cukup pastikan kuis formatif
+            tiap tahun sudah lengkap & published.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={togglePublish} disabled={publishing}>
+        <Button
+          onClick={togglePublish}
+          disabled={publishing || (!data.is_published && !data.can_publish)}
+          style={{ backgroundColor: accent }}
+          className="text-white hover:opacity-90 disabled:opacity-40"
+        >
           {publishing ? "Menyimpan…" : data.is_published ? "Unpublish" : "Publish"}
         </Button>
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <div className="rounded-lg border border-zinc-100">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-100 text-left text-[11px] uppercase tracking-wide text-zinc-400">
-              <th className="px-3 py-2">Tahun</th>
-              <th className="px-3 py-2">Kuis Formatif</th>
-              <th className="px-3 py-2">Soal</th>
-              <th className="px-3 py-2">Kuota sumatif</th>
-            </tr>
-          </thead>
-          <tbody>
+      {/* Info aturan kuis sumatif — dibuat lebih informatif/terlihat (dulu
+          1 baris teks kecil abu-abu), sekarang 3 poin kunci dengan ikon
+          supaya langsung kebaca tanpa perlu mengecil-kecilkan mata. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <InfoStat
+          icon={Shuffle}
+          accent={accent}
+          label="Sumber soal"
+          value="Ditarik otomatis dari kuis formatif tiap tahun"
+        />
+        <InfoStat
+          icon={ListChecks}
+          accent={accent}
+          label="Jumlah soal"
+          value={`${data.attempt_question_count} soal per attempt`}
+        />
+        <InfoStat icon={Target} accent={accent} label="Passing grade" value="75% (fixed, tidak bisa diubah)" />
+      </div>
+
+      {/* Tabel status kuis formatif tiap tahun — dibungkus card senada
+          AdminManager.jsx (`rounded-lg border border-l-4`), warna aksen
+          kiri mengikuti warna era, bukan warna fix. */}
+      <div className="rounded-lg border border-l-4" style={{ borderLeftColor: accent }}>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tahun</TableHead>
+              <TableHead>Kuis Formatif</TableHead>
+              <TableHead>Soal</TableHead>
+              <TableHead className="text-right">Kuota Sumatif</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data.years.map((y) => (
-              <tr key={y.id} className="border-b border-zinc-50 last:border-0">
-                <td className="px-3 py-2 font-medium text-zinc-900">
+              <TableRow key={y.id}>
+                <TableCell className="font-medium">
                   {y.year} — {y.title}
-                </td>
-                <td className="px-3 py-2">
+                </TableCell>
+                <TableCell>
                   {y.quiz_published ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-600">
-                      <CheckCircle2 size={14} /> Published
-                    </span>
+                    <Badge variant="success" className="gap-1">
+                      <CheckCircle2 size={13} /> Published
+                    </Badge>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-amber-600">
-                      <XCircle size={14} /> Belum
-                    </span>
+                    <Badge variant="secondary" className="gap-1 text-amber-600">
+                      <XCircle size={13} /> Belum
+                    </Badge>
                   )}
-                </td>
-                <td className="px-3 py-2 text-zinc-500">{y.quiz_question_count}/10</td>
-                <td className="px-3 py-2 text-zinc-500">
+                </TableCell>
+                <TableCell className="text-muted-foreground">{y.quiz_question_count}/10</TableCell>
+                <TableCell className="text-right text-muted-foreground">
                   {y.quota_if_published !== null ? `${y.quota_if_published} soal` : "—"}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {!data.can_publish && (
@@ -132,6 +177,25 @@ export default function EraQuizManager({ era }) {
           Semua tahun sudah siap — kuis sumatif bisa dipublish sekarang.
         </p>
       )}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- Stats */
+
+function InfoStat({ icon: Icon, accent, label, value }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-zinc-100 bg-zinc-50/60 p-3.5">
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${accent}1A`, color: accent }}
+      >
+        <Icon size={16} />
+      </span>
+      <div>
+        <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">{label}</p>
+        <p className="text-sm font-semibold text-zinc-800">{value}</p>
+      </div>
     </div>
   );
 }

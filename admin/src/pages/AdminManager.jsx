@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,7 @@ export default function AdminManager() {
           password: form.password,
         });
       }
+      toast.success(editingId ? 'Admin berhasil diupdate' : 'Admin baru berhasil ditambahkan');
       resetForm();
       fetchAdmins();
     } catch (err) {
@@ -107,9 +109,10 @@ export default function AdminManager() {
     if (!ok) return;
     try {
       await api.delete(`/admin/admins/${admin.id}`);
+      toast.success(`Admin "${admin.name}" berhasil dihapus`);
       fetchAdmins();
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menghapus akun admin.');
+      toast.error(err.response?.data?.message || 'Gagal menghapus akun admin.');
     }
   }
 

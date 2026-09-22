@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { APP_NAME, APP_SHORT_INITIALS, APP_FULL_NAME } from '@/config/branding';
+import { Card, CardContent } from '@/components/ui/card';
+import { APP_NAME, APP_FULL_NAME } from '@/config/branding';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login(email, password);
+      toast.success('Login berhasil');
       navigate('/dashboard');
     } catch (err) {
       setError(
@@ -36,15 +38,26 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/40 px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-warning via-gamify to-info text-sm font-bold text-white shadow-sm">
-            {APP_SHORT_INITIALS}
+      <Card className="w-full max-w-sm overflow-hidden py-0">
+        {/* Gambar utuh, tanpa crop — tinggi menyesuaikan rasio aslinya */}
+        <img
+          src={`${import.meta.env.BASE_URL}images/login-illustration.png`}
+          alt=""
+          aria-hidden="true"
+          className="w-full"
+        />
+
+        <CardContent className="px-6 pb-6 pt-2">
+          <div className="mb-6 flex flex-col items-center text-center">
+            <img
+              src={`${import.meta.env.BASE_URL}icons/app-icon.png`}
+              alt={APP_NAME}
+              className="mb-3 h-14 w-14 rounded-2xl object-cover shadow-sm"
+            />
+            <h1 className="text-xl font-semibold text-foreground">{APP_NAME} Admin</h1>
+            <p className="text-sm text-muted-foreground">{APP_FULL_NAME}</p>
           </div>
-          <CardTitle>{APP_NAME} Admin</CardTitle>
-          <CardDescription>{APP_FULL_NAME}</CardDescription>
-        </CardHeader>
-        <CardContent>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>

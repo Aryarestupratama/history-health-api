@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Plus, Trash2, GripVertical, Save } from "lucide-react";
+import { toast } from "sonner";
 import apiClient from "@/api"; // axios instance dgn interceptor token Sanctum
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,17 @@ const TABS = [
   { key: "summary", label: "Rangkuman & Vaksin" },
   { key: "quiz", label: "Kuis" },
 ];
+
+// Skema warna tombol dipakai konsisten di seluruh workspace ini:
+// - Publish/Simpan -> hitam, teks putih
+// - Hapus (section/soal/opsi/referensi/blok) -> merah, teks putih
+// - "+" tambah section -> hitam, ikon putih
+// Ditulis sebagai konstanta supaya gampang dipakai ulang & konsisten,
+// bukan class ad-hoc yang beda-beda tiap tombol.
+const BTN_DARK =
+  "bg-zinc-900 text-white hover:bg-zinc-800 focus-visible:ring-zinc-900 disabled:opacity-50";
+const BTN_RED =
+  "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600 disabled:opacity-50";
 
 export default function WabahWorkspace() {
   const { yearId } = useParams();
@@ -263,29 +275,24 @@ export default function WabahWorkspace() {
       {dialog}
       <Breadcrumb year={year} confirmDiscardIfUnsaved={confirmDiscardIfUnsaved} />
 
-      <div className="flex border-b border-zinc-100 px-6">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`relative flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition ${
-              activeTab === t.key ? "" : "text-zinc-400 hover:text-zinc-600"
-            }`}
-            style={activeTab === t.key ? { color: eraAccent } : undefined}
-          >
-            {t.label}
-            {activeTab === t.key && (
-              <span
-                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full"
-                style={{ backgroundColor: eraAccent }}
-              />
-            )}
-          </button>
-        ))}
+      <div className="border-b border-zinc-100 px-6 pb-4 pt-1">
+        <div className="inline-flex items-center gap-1 rounded-full bg-zinc-100 p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                activeTab === t.key ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid flex-1 grid-cols-[65%_35%] overflow-hidden">
-        <div className="overflow-y-auto p-6">
+      <div className="grid flex-1 grid-cols-[65%_35%] gap-4 overflow-hidden bg-zinc-50 p-4">
+        <div className="overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           {tabError[activeTab] && (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription>{tabError[activeTab]}</AlertDescription>
@@ -342,7 +349,7 @@ export default function WabahWorkspace() {
           )}
         </div>
 
-        <div className="flex items-start justify-center border-l border-zinc-100 bg-zinc-50/50 p-6">
+        <div className="flex items-start justify-center overflow-y-auto rounded-2xl border border-zinc-200 bg-zinc-50/60 p-6 shadow-sm">
           <PhonePreview screen={previewProps.screen} data={previewProps.data} eraSlug={year.era?.slug} />
         </div>
       </div>
@@ -393,10 +400,12 @@ function Breadcrumb({ year, confirmDiscardIfUnsaved }) {
     <div className="relative px-6 pb-3 pt-5">
       <button
         onClick={toggle}
-        className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
+        className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800"
       >
-        <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: eraAccent }} />
-        <span>{year.era?.name}</span>
+        <span className="mr-0.5 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: eraAccent }} />
+        <span className="font-semibold" style={{ color: eraAccent }}>
+          {year.era?.name}
+        </span>
         <span className="text-zinc-300">/</span>
         <span className="font-medium text-zinc-900">
           {year.year} — {year.title}
@@ -437,16 +446,16 @@ function Breadcrumb({ year, confirmDiscardIfUnsaved }) {
 function SaveButton({ status, onClick }) {
   const config =
     {
-      idle: { label: "Simpan", variant: "outline" },
-      dirty: { label: "Simpan", variant: "default" },
-      saving: { label: "Menyimpan…", variant: "default" },
-      saved: { label: "Tersimpan", variant: "outline" },
-      error: { label: "Gagal, coba lagi", variant: "destructive" },
-    }[status] ?? { label: "Simpan", variant: "outline" };
+      idle: { label: "Simpan", className: BTN_DARK },
+      dirty: { label: "Simpan", className: BTN_DARK },
+      saving: { label: "Menyimpan…", className: BTN_DARK },
+      saved: { label: "Tersimpan", className: BTN_DARK },
+      error: { label: "Gagal, coba lagi", className: BTN_RED },
+    }[status] ?? { label: "Simpan", className: BTN_DARK };
 
   return (
-    <Button size="sm" variant={config.variant} onClick={onClick} disabled={status === "saving"}>
-      <Save size={12} /> {config.label}
+    <Button onClick={onClick} disabled={status === "saving"} className={config.className}>
+      <Save size={14} /> {config.label}
     </Button>
   );
 }
@@ -575,8 +584,9 @@ function SectionBlokTab({
         ...year,
         sections: year.sections.map((s) => (s.id === section.id ? { ...s, ...data } : s)),
       });
+      toast.success(data.is_published ? "Section dipublish" : "Section di-unpublish");
     } catch (e) {
-      alert(e?.response?.data?.message ?? "Gagal ubah status publish");
+      toast.error(e?.response?.data?.message ?? "Gagal ubah status publish");
     }
   }
 
@@ -660,20 +670,22 @@ function SectionBlokTab({
         return next;
       });
       setStatus("saved");
+      toast.success("Section berhasil disimpan");
     } catch (e) {
       setStatus("error");
-      alert(e?.response?.data?.message ?? "Gagal menyimpan section.");
+      toast.error(e?.response?.data?.message ?? "Gagal menyimpan section.");
     }
   }
 
   return (
-    <div className="grid grid-cols-[220px_1fr] gap-6">
-      {/* Sidebar list section */}
-      <div>
+    <div className="mx-auto grid w-full max-w-4xl grid-cols-[220px_1fr] gap-4">
+      {/* Sidebar list section -- kartu tersendiri supaya tidak menyatu
+          dengan panel editor di sebelahnya (poin 3) */}
+      <div className="h-fit rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Section</p>
-          <Button size="icon" variant="ghost" onClick={addSection}>
-            <Plus size={16} />
+          <Button size="icon" onClick={addSection} className={`h-9 w-9 rounded-lg ${BTN_DARK}`}>
+            <Plus size={18} />
           </Button>
         </div>
         <ul className="space-y-1">
@@ -723,12 +735,13 @@ function SectionBlokTab({
         </ul>
       </div>
 
-      {/* Editor section aktif */}
-      <div className="space-y-4">
+      {/* Editor section aktif -- kartu tersendiri, dibatasi max-width &
+          jadi scrollable kalau kontennya (blok) makin panjang (poin 5) */}
+      <div className="max-h-[75vh] space-y-4 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4">
         {!activeSection ? (
           <EmptyPanel text="Belum ada section. Tambahkan section baru di sidebar kiri." />
         ) : (
-          <>
+          <div className="mx-auto w-full max-w-2xl space-y-4">
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -766,11 +779,11 @@ function SectionBlokTab({
                 Blok Konten
               </p>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => togglePublish(activeSection)}>
+                <Button size="sm" onClick={() => togglePublish(activeSection)} className={BTN_DARK}>
                   {activeSection.is_published ? "Unpublish" : "Publish"}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => deleteSection(activeSection.id)}>
-                  <Trash2 size={14} className="text-red-500" /> Hapus section
+                <Button size="sm" onClick={() => deleteSection(activeSection.id)} className={BTN_RED}>
+                  <Trash2 size={14} /> Hapus section
                 </Button>
               </div>
             </div>
@@ -798,7 +811,7 @@ function SectionBlokTab({
               )}
               <SaveButton status={status} onClick={handleSaveSection} />
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -901,8 +914,8 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
                 <Badge variant="secondary">{b.type}</Badge>
                 {isDirty && <UnsavedFieldBadge />}
               </span>
-              <Button variant="ghost" size="icon" onClick={() => removeBlock(b.id)}>
-                <Trash2 size={14} className="text-red-500" />
+              <Button size="icon" onClick={() => removeBlock(b.id)} className={`h-8 w-8 ${BTN_RED}`}>
+                <Trash2 size={14} />
               </Button>
             </div>
             {b.type === "text" ? (
@@ -944,12 +957,11 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
             <Button
               key={t}
               variant="outline"
-              size="sm"
               disabled={disabled}
               title={disabled ? "Maksimal 2 video per section" : undefined}
               onClick={() => addBlock(t)}
             >
-              <Plus size={12} /> {t}
+              <Plus size={14} /> {t}
             </Button>
           );
         })}
@@ -1059,8 +1071,9 @@ function SummaryVaccineTab({
         is_published: !summary.is_published,
       });
       setYear({ ...year, summary: { ...summary, ...data } });
+      toast.success(data.is_published ? "Rangkuman Interaktif dipublish" : "Rangkuman Interaktif di-unpublish");
     } catch (e) {
-      alert(
+      toast.error(
         e?.response?.data?.message ??
           "Gagal publish (butuh seluruh 7 poin terisi, tiap poin 3 opsi dengan tepat 1 ditandai benar)"
       );
@@ -1101,9 +1114,10 @@ function SummaryVaccineTab({
       setSummaryDirty(false);
       setVaccinesDirty(false);
       setStatus("saved");
+      toast.success("Rangkuman & vaksin berhasil disimpan");
     } catch (e) {
       setStatus("error");
-      alert(e?.response?.data?.message ?? "Gagal menyimpan rangkuman/vaksin.");
+      toast.error(e?.response?.data?.message ?? "Gagal menyimpan rangkuman/vaksin.");
     }
   }
 
@@ -1114,19 +1128,20 @@ function SummaryVaccineTab({
   const incompletePointCount = points.filter((p) => (p.options ?? []).some((o) => !o.option_text?.trim())).length;
 
   return (
-    <div className="space-y-8">
-      {/* Urutan section di bawah SENGAJA mengikuti urutan tampil di layar
+    <div className="mx-auto max-h-[75vh] w-full max-w-2xl space-y-4 overflow-y-auto pr-1">
+      {/* Urutan card di bawah SENGAJA mengikuti urutan tampil di layar
           end-user (Design.md §3.3.4, revisi Rangkuman Interaktif): 7 Poin
-          Rangkuman > Quote > Referensi > tombol Kuis (tombol Kuis-nya
-          sendiri ada di tab Kuis terpisah). */}
+          Rangkuman > Quote+Referensi > Vaksin (tombol Kuis-nya sendiri ada
+          di tab Kuis terpisah). Tiap bagian dibatasi kartu sendiri (poin 7)
+          supaya tidak terlihat menyatu. */}
 
-      <div>
+      <Panel>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
             Rangkuman Interaktif ({points.length}/7 poin)
           </p>
           {summary && (
-            <Button size="sm" variant="outline" onClick={togglePublishSummary}>
+            <Button size="sm" onClick={togglePublishSummary} className={BTN_DARK}>
               {summary.is_published ? "Unpublish" : "Publish"}
             </Button>
           )}
@@ -1136,23 +1151,16 @@ function SummaryVaccineTab({
           <EmptyPanel text="Memuat rangkuman…" />
         ) : (
           <>
-            <div className="mb-3 flex gap-2">
+            <div className="mb-3 flex flex-wrap gap-2">
               {points.map((p, i) => (
-                <button
+                <NumberBadge
                   key={p.id}
+                  active={activePointIndex === i}
+                  dirty={summaryPointsDirty.has(p.id)}
                   onClick={() => setActivePointIndex(i)}
-                  className={`relative h-8 w-8 rounded-full text-xs font-medium ${
-                    activePointIndex === i ? "bg-gamify text-white" : "bg-zinc-100 text-zinc-500"
-                  }`}
                 >
                   {i + 1}
-                  {summaryPointsDirty.has(p.id) && (
-                    <span
-                      className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-orange-400"
-                      title="Ada opsi belum disimpan di poin ini"
-                    />
-                  )}
-                </button>
+                </NumberBadge>
               ))}
             </div>
 
@@ -1193,34 +1201,36 @@ function SummaryVaccineTab({
             dipublish.
           </p>
         )}
-      </div>
+      </Panel>
 
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Quote <span className="normal-case font-normal text-zinc-400">(opsional)</span>
-          </p>
-          {summaryDirty && <UnsavedFieldBadge />}
+      <Panel className="space-y-5">
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Quote <span className="normal-case font-normal text-zinc-400">(opsional)</span>
+            </p>
+            {summaryDirty && <UnsavedFieldBadge />}
+          </div>
+          <Textarea
+            rows={3}
+            value={year.quote_text ?? ""}
+            onChange={(e) => editQuoteText(e.target.value)}
+            placeholder="Kutipan singkat terkait wabah ini…"
+          />
         </div>
-        <Textarea
-          rows={3}
-          value={year.quote_text ?? ""}
-          onChange={(e) => editQuoteText(e.target.value)}
-          placeholder="Kutipan singkat terkait wabah ini…"
-        />
-      </div>
 
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Referensi <span className="normal-case font-normal text-zinc-400">(opsional)</span>
-          </p>
-          {summaryDirty && <UnsavedFieldBadge />}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Referensi <span className="normal-case font-normal text-zinc-400">(opsional)</span>
+            </p>
+            {summaryDirty && <UnsavedFieldBadge />}
+          </div>
+          <ReferencesEditor references={year.references ?? []} onChange={editReferences} />
         </div>
-        <ReferencesEditor references={year.references ?? []} onChange={editReferences} />
-      </div>
+      </Panel>
 
-      <div>
+      <Panel>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Vaksin Terkait</p>
           {vaccinesDirty && <UnsavedFieldBadge />}
@@ -1246,9 +1256,9 @@ function SummaryVaccineTab({
             </p>
           )}
         </div>
-      </div>
+      </Panel>
 
-      <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+      <div className="flex items-center justify-end gap-2 pt-1">
         <SaveButton status={status} onClick={handleSave} />
       </div>
     </div>
@@ -1290,7 +1300,7 @@ function QuizTab({
     // R-QUIZ-06 (revisi): batas sekarang 10 (dulu 5) — TAPI publish tetap
     // butuh TEPAT 10, bukan "sampai 10 boleh kurang" (lihat Quiz::canPublish()
     // backend & label "Soal (n/10)" di bawah).
-    if (questions.length >= 10) return alert("Maksimal 10 soal per kuis (R-QUIZ-06).");
+    if (questions.length >= 10) return toast.error("Maksimal 10 soal per kuis (R-QUIZ-06).");
     const { data } = await apiClient.post(`/admin/quizzes/${quiz.id}/questions`, {
       question: "",
       // R-QUIZ-04/R-QUIZ-10 (revisi terbaru — feedback kuis 2 kolom): sama
@@ -1343,8 +1353,9 @@ function QuizTab({
         is_published: !quiz.is_published,
       });
       setYear({ ...year, quiz: { ...quiz, ...data } });
+      toast.success(data.is_published ? "Kuis dipublish" : "Kuis di-unpublish");
     } catch (e) {
-      alert(
+      toast.error(
         e?.response?.data?.message ??
           "Gagal publish (butuh TEPAT 10 soal + rangkuman terisi). Kuis kini berskor, passing grade 75% (tetap, tidak bisa diubah admin)."
       );
@@ -1372,9 +1383,10 @@ function QuizTab({
       );
       setDirtyFields(new Map());
       setStatus("saved");
+      toast.success("Soal kuis berhasil disimpan");
     } catch (e) {
       setStatus("error");
-      alert(e?.response?.data?.message ?? "Gagal menyimpan soal.");
+      toast.error(e?.response?.data?.message ?? "Gagal menyimpan soal.");
     }
   }
 
@@ -1394,7 +1406,8 @@ function QuizTab({
   ).length;
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-h-[75vh] w-full max-w-2xl space-y-4 overflow-y-auto pr-1">
+      <Panel>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
@@ -1409,37 +1422,31 @@ function QuizTab({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={addQuestion} disabled={questions.length >= 10}>
-            <Plus size={12} /> Soal
+          <Button variant="outline" onClick={addQuestion} disabled={questions.length >= 10}>
+            <Plus size={14} /> Soal
           </Button>
-          <Button size="sm" variant="outline" onClick={togglePublish}>
+          <Button onClick={togglePublish} className={BTN_DARK}>
             {quiz.is_published ? "Unpublish" : "Publish"}
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="mb-1 mt-3 flex flex-wrap gap-2">
         {questions.map((q, i) => (
-          <button
+          <NumberBadge
             key={q.id}
+            active={activeQuestionIndex === i}
+            dirty={dirtyQuestionIds.has(q.id)}
             onClick={() => selectQuestion(i)}
-            className={`relative h-8 w-8 rounded-full text-xs font-medium ${
-              activeQuestionIndex === i ? "bg-gamify text-white" : "bg-zinc-100 text-zinc-500"
-            }`}
           >
             {i + 1}
-            {dirtyQuestionIds.has(q.id) && (
-              <span
-                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-orange-400"
-                title="Ada field belum disimpan di soal ini"
-              />
-            )}
-          </button>
+          </NumberBadge>
         ))}
       </div>
+      </Panel>
 
       {activeQuestion && (
-        <div className="space-y-3 rounded-lg border border-zinc-100 p-4">
+        <Panel className="space-y-3">
           <div>
             <div className="mb-1 flex items-center justify-between">
               <p className="text-[11px] font-medium text-zinc-400">Teks soal</p>
@@ -1495,10 +1502,10 @@ function QuizTab({
             />
           </div>
 
-          <Button variant="ghost" size="sm" onClick={() => deleteQuestion(activeQuestion.id)}>
-            <Trash2 size={14} className="text-red-500" /> Hapus soal
+          <Button onClick={() => deleteQuestion(activeQuestion.id)} className={BTN_RED}>
+            <Trash2 size={14} /> Hapus soal
           </Button>
-        </div>
+        </Panel>
       )}
 
       {/* R-QUIZ-10: hint client-side, bukan pengganti validasi backend —
@@ -1511,7 +1518,7 @@ function QuizTab({
         </p>
       )}
 
-      <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+      <div className="flex items-center justify-end gap-2 pt-1">
         <SaveButton status={status} onClick={handleSaveQuiz} />
       </div>
     </div>
@@ -1547,13 +1554,13 @@ function OptionsEditor({ question, onChange }) {
             placeholder={`Opsi ${i + 1}`}
             onChange={(e) => setOption(i, { option_text: e.target.value })}
           />
-          <Button variant="ghost" size="icon" onClick={() => removeOption(i)}>
-            <Trash2 size={14} className="text-red-500" />
+          <Button size="icon" onClick={() => removeOption(i)} className={`h-8 w-8 ${BTN_RED}`}>
+            <Trash2 size={14} />
           </Button>
         </div>
       ))}
-      <Button variant="outline" size="sm" onClick={addOption}>
-        <Plus size={12} /> Opsi
+      <Button variant="outline" onClick={addOption}>
+        <Plus size={14} /> Opsi
       </Button>
     </div>
   );
@@ -1587,13 +1594,13 @@ function ReferencesEditor({ references, onChange }) {
             placeholder="Mis. Kementerian Kesehatan RI, judul dokumen, tahun…"
             onChange={(e) => setItem(i, e.target.value)}
           />
-          <Button variant="ghost" size="icon" onClick={() => removeItem(i)}>
-            <Trash2 size={14} className="text-red-500" />
+          <Button size="icon" onClick={() => removeItem(i)} className={`h-8 w-8 ${BTN_RED}`}>
+            <Trash2 size={14} />
           </Button>
         </div>
       ))}
-      <Button variant="outline" size="sm" onClick={addItem}>
-        <Plus size={12} /> Referensi
+      <Button variant="outline" onClick={addItem}>
+        <Plus size={14} /> Referensi
       </Button>
       {references.length === 0 && (
         <p className="text-xs text-zinc-400">Belum ada referensi. Opsional, boleh dikosongkan.</p>
@@ -1603,6 +1610,38 @@ function ReferencesEditor({ references, onChange }) {
 }
 
 /* --------------------------------------------------------------- Helpers */
+
+// Kartu pembatas generik -- dipakai untuk memisahkan setiap bagian
+// (mis. Rangkuman / Quote & Referensi / Vaksin, atau tiap soal Kuis)
+// supaya tidak terlihat menyatu satu sama lain (poin 3 & 7).
+function Panel({ children, className = "" }) {
+  return (
+    <div className={`rounded-xl border border-zinc-200 bg-white p-4 shadow-sm ${className}`}>{children}</div>
+  );
+}
+
+// Numbering kotak (bukan bulat), hitam dengan teks putih -- dipakai
+// konsisten di poin Rangkuman Interaktif maupun soal Kuis (poin 6 & 8).
+// Status aktif dibedakan lewat ring, bukan lewat warna lain, karena warna
+// numbering-nya sengaja dipatok hitam/putih.
+function NumberBadge({ active, dirty, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex h-9 w-9 items-center justify-center rounded-md bg-zinc-900 text-xs font-semibold text-white transition ${
+        active ? "ring-2 ring-offset-2 ring-zinc-900" : "opacity-60 hover:opacity-100"
+      }`}
+    >
+      {children}
+      {dirty && (
+        <span
+          className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-orange-400 ring-2 ring-white"
+          title="Ada perubahan belum disimpan"
+        />
+      )}
+    </button>
+  );
+}
 
 function EmptyPanel({ text, children }) {
   return (

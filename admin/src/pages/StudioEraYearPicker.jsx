@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, ChevronRight, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import apiClient from "@/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,11 +25,11 @@ import EraQuizManager from "@/pages/EraQuizManager";
  * class-nya ke-detect Tailwind JIT scanner.
  */
 const ERA_CARD_STYLES = {
-  kolonial: "bg-warning text-warning-foreground",
-  kemerdekaan: "bg-success text-success-foreground",
-  modern: "bg-info text-info-foreground",
+  kolonial: "border-l-warning",
+  kemerdekaan: "border-l-success",
+  modern: "border-l-info",
 };
-const DEFAULT_ERA_CARD_STYLE = "bg-primary text-primary-foreground";
+const DEFAULT_ERA_CARD_STYLE = "border-l-primary";
 
 /**
  * Entry point Content Studio (Design.md §4.1):
@@ -74,6 +75,7 @@ export default function StudioEraYearPicker() {
       year,
       title,
     });
+    toast.success(`Tahun "${newYear.year} — ${newYear.title}" berhasil dibuat`);
     // submit langsung masuk ke Workspace Wabah tahun baru tsb (Design.md §4.1)
     navigate(`/studio/${newYear.id}`);
   }
@@ -95,16 +97,22 @@ export default function StudioEraYearPicker() {
         <div>
           <button
             onClick={backToEraGrid}
-            className="mb-4 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
+            className="mb-4 flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
           >
-            <ArrowLeft size={14} /> Kembali ke pilih masa
+            <ArrowLeft size={15} /> Kembali ke pilih masa
           </button>
 
           {/* Tab switcher level Era (Design.md, revisi Content Studio):
               "Tahun" = grid tahun seperti sebelumnya, "Kuis Sumatif Era" =
               EraQuizManager, dikelola sebagai tab di sini (bukan halaman
-              terpisah) supaya admin tidak perlu keluar dari Content Studio. */}
-          <div className="mb-4 flex gap-1 border-b border-zinc-100">
+              terpisah) supaya admin tidak perlu keluar dari Content Studio.
+              Halaman kontennya sendiri tidak lagi geser — animasi geser
+              dipindah ke pill aktif di tab switcher ini. */}
+          <div className="relative mb-4 grid w-fit grid-cols-2 gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-1">
+            <div
+              className="absolute inset-y-1 left-1 w-[calc(50%-0.125rem)] rounded-lg bg-zinc-900 shadow-sm transition-transform duration-300 ease-out"
+              style={{ transform: eraTab === "years" ? "translateX(0%)" : "translateX(calc(100% + 0.25rem))" }}
+            />
             <EraTabButton active={eraTab === "years"} onClick={() => setEraTab("years")}>
               Tahun
             </EraTabButton>
@@ -134,10 +142,8 @@ function EraTabButton({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
-        active
-          ? "border-zinc-900 text-zinc-900"
-          : "border-transparent text-zinc-400 hover:text-zinc-600"
+      className={`relative z-10 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-300 ${
+        active ? "text-white" : "text-zinc-500 hover:text-zinc-900"
       }`}
     >
       {children}
@@ -156,17 +162,17 @@ function EraGrid({ eras, onSelect }) {
           <button
             key={era.id}
             onClick={() => onSelect(era)}
-            className={`group flex flex-col justify-between rounded-2xl p-5 text-left shadow-sm transition hover:shadow-md hover:-translate-y-0.5 ${cardStyle}`}
+            className={`group flex flex-col justify-between rounded-2xl border-l-4 bg-white p-6 text-left shadow-md transition hover:shadow-lg hover:-translate-y-0.5 ${cardStyle}`}
           >
             <div>
-              <h3 className="text-base font-semibold">{era.name}</h3>
+              <h3 className="text-xl font-semibold text-zinc-900">{era.name}</h3>
               {era.description && (
-                <p className="mt-1 line-clamp-2 text-xs opacity-80">{era.description}</p>
+                <p className="mt-1.5 line-clamp-2 text-sm text-zinc-500">{era.description}</p>
               )}
             </div>
-            <div className="mt-4 flex items-center justify-between text-xs opacity-80">
+            <div className="mt-5 flex items-center justify-between text-sm text-zinc-400">
               <span>{era.years_count ?? "—"} tahun</span>
-              <ChevronRight size={16} className="transition group-hover:translate-x-0.5" />
+              <ChevronRight size={20} className="transition group-hover:translate-x-0.5" />
             </div>
           </button>
         );
@@ -220,8 +226,13 @@ function YearGrid({ era, years, loading, onSelect, onCreate }) {
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent }} />
           <h2 className="text-base font-semibold text-zinc-900">{era.name}</h2>
         </div>
-        <Button size="sm" onClick={openForm} style={{ backgroundColor: accent }} className="text-white hover:opacity-90">
-          <Plus size={16} /> Tambah Tahun Baru
+        <Button
+          size="lg"
+          onClick={openForm}
+          style={{ backgroundColor: accent }}
+          className="px-5 py-5 text-base font-semibold text-white shadow-md hover:opacity-90"
+        >
+          <Plus size={20} /> Tambah Tahun Baru
         </Button>
       </div>
 
@@ -241,11 +252,11 @@ function YearGrid({ era, years, loading, onSelect, onCreate }) {
             <button
               key={y.id}
               onClick={() => onSelect(y)}
-              className="flex flex-col items-start gap-1 rounded-xl border border-l-4 border-zinc-100 p-4 text-left transition hover:shadow-md"
+              className="group flex flex-col items-start gap-1.5 rounded-2xl border-l-4 bg-white p-5 text-left shadow-md transition hover:shadow-lg hover:-translate-y-0.5"
               style={{ borderLeftColor: accent }}
             >
-              <span className="text-xs font-medium text-zinc-400">{y.year}</span>
-              <span className="line-clamp-2 text-sm font-medium text-zinc-900">{y.title}</span>
+              <span className="text-sm font-medium text-zinc-400">{y.year}</span>
+              <span className="line-clamp-2 text-lg font-semibold text-zinc-900">{y.title}</span>
               <div className="mt-2 flex gap-1">
                 {y.quiz?.is_published && <Badge variant="success">Kuis siap</Badge>}
                 {!y.summary && <Badge variant="secondary">Rangkuman kosong</Badge>}
