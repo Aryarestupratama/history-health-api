@@ -75,6 +75,12 @@ class YearResource extends JsonResource
                 ->map(fn ($section) => [
                     'id' => $section->id,
                     'title' => $section->title,
+                    // (Baru — Fase 1 Studi Kasus) 'reading' atau 'case_study'
+                    // — Flutter pakai ini untuk render ikon/rute roadmap
+                    // section yang berbeda untuk section ke-8 (selalu
+                    // case_study). Perlu ditambahkan ke select() eager-load
+                    // di YearController::index(), lihat catatan di sana.
+                    'type' => $section->type,
                     'order' => $section->order,
                     'locked' => $section->locked ?? true,
                     'completed' => $section->completed ?? false,

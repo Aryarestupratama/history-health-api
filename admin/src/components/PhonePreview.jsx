@@ -24,7 +24,7 @@ import { PALETTE, ERA_ACCENTS } from "@/config/branding";
  * lewat prop `data` oleh parent.
  *
  * Props:
- * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "vaccine-detail" | "wabah-intro"
+ * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "case-study" | "vaccine-detail" | "wabah-intro"
  * - data: bentuk berbeda tergantung `screen` — lihat komentar shape di atas
  *   masing-masing screen (SectionDetailScreen sekarang pakai `headerImageUrl`
  *   menggantikan judul, SummaryScreen pakai `points`/`activePointIndex`
@@ -52,6 +52,7 @@ export default function PhonePreview({ screen, data, eraSlug, compact = false })
           {screen === "summary" && <SummaryScreen data={data} accent={accent} />}
           {screen === "quiz" && <QuizScreen data={data} accent={accent} />}
           {screen === "era-quiz-recap" && <EraQuizRecapScreen data={data} accent={accent} />}
+          {screen === "case-study" && <CaseStudyScreen data={data} accent={accent} />}
           {screen === "vaccine-detail" && <VaccineDetailScreen data={data} accent={accent} />}
           {screen === "wabah-intro" && <WabahIntroScreen data={data} accent={accent} />}
           {!screen && <EmptyState />}
@@ -797,6 +798,102 @@ function EraQuizRecapScreen({ data, accent }) {
         style={{ backgroundColor: accent }}
       >
         Kembali ke Hasil
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ Case study */
+// data: { title, description, challengeText, reasonDescription,
+//         options: [{ id, title, description, correct_rank }] }
+//
+// Preview disederhanakan jadi 1 layar (gabungan Briefing + Ruang Keputusan)
+// -- BUKAN simulasi 4 layar penuh (Opening & Badge murni teks template
+// hardcode Flutter, tidak ada yang bisa diedit admin di situ). correct_rank
+// SENGAJA ikut ditampilkan di preview admin ini (beda dari response endpoint
+// user yang menyembunyikannya) supaya admin bisa cek highlight Prioritas
+// 1/2/3 vs pengecoh saat mengedit opsi.
+
+function CaseStudyScreen({ data, accent }) {
+  const { title, description, challengeText, reasonDescription, options = [] } = data ?? {};
+  const rankLabel = { 1: "Prioritas 1", 2: "Prioritas 2", 3: "Prioritas 3" };
+
+  return (
+    <div>
+      <span
+        className="mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+        style={{ backgroundColor: `${accent}26`, color: accent }}
+      >
+        Studi Kasus
+      </span>
+      <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+        Briefing kasus utama
+      </p>
+      <h2 className="mb-2 text-base font-semibold text-zinc-900">
+        {title || <span className="text-zinc-300">(judul belum diisi)</span>}
+      </h2>
+      <p className="mb-3 whitespace-pre-line text-xs leading-relaxed text-zinc-600">
+        {description || <span className="text-zinc-300">Deskripsi belum diisi</span>}
+      </p>
+      {challengeText && (
+        <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs leading-relaxed text-amber-700">
+          {challengeText}
+        </div>
+      )}
+
+      <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+        Ruang Keputusan — susun 3 prioritas
+      </p>
+      {options.length === 0 && (
+        <p className="rounded-xl border border-dashed border-zinc-200 p-4 text-center text-xs text-zinc-400">
+          Belum ada opsi
+        </p>
+      )}
+      <div className="space-y-2">
+        {options.map((opt, i) => {
+          const isPriority = opt.correct_rank != null;
+          return (
+            <div
+              key={opt.id ?? i}
+              className={`rounded-lg border p-2.5 text-xs ${
+                isPriority ? "border-emerald-200 bg-emerald-50" : "border-zinc-100"
+              }`}
+            >
+              <div className="mb-0.5 flex items-center justify-between gap-2">
+                <span className="font-medium text-zinc-900">
+                  {opt.title || <span className="text-zinc-300">(judul opsi kosong)</span>}
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                    isPriority ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-400"
+                  }`}
+                >
+                  {isPriority ? rankLabel[opt.correct_rank] : "Pengecoh"}
+                </span>
+              </div>
+              <p className="text-zinc-500">{opt.description}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {reasonDescription && (
+        <div className="mt-4">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+            Analisis singkat Anda wajib diisi
+          </p>
+          <p className="mb-2 text-xs text-zinc-500">{reasonDescription}</p>
+          <div className="rounded-lg border border-dashed border-zinc-200 p-3 text-xs italic text-zinc-300">
+            Kolom alasan user…
+          </div>
+        </div>
+      )}
+
+      <button
+        className="mt-6 w-full rounded-lg py-2.5 text-sm font-medium text-white"
+        style={{ backgroundColor: accent }}
+      >
+        Submit analisis
       </button>
     </div>
   );

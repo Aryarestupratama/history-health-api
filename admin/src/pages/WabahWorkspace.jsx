@@ -16,6 +16,11 @@ const TABS = [
   { key: "section", label: "Section & Blok" },
   { key: "summary", label: "Rangkuman & Vaksin" },
   { key: "quiz", label: "Kuis" },
+  // (Baru — Fase 1 Studi Kasus) Section-nya sendiri (type=case_study, selalu
+  // order=8) tetap kelihatan di daftar Section & Blok sebagai penanda posisi,
+  // tapi kontennya (Briefing/Ruang Keputusan/Badge) dikelola di sini —
+  // mirror pola "Rangkuman & Vaksin" yang terpisah dari "Section & Blok".
+  { key: "case_study", label: "Studi Kasus" },
 ];
 
 // Skema warna tombol dipakai konsisten di seluruh workspace ini:
@@ -48,11 +53,21 @@ export default function WabahWorkspace() {
   // Status simpan per tab ("idle" | "dirty" | "saving" | "saved" | "error").
   // Dipakai HANYA untuk tombol Simpan (enable/disable + label) di masing-masing
   // tab -- bukan indikator "belum disimpan" per field (lihat state di bawah).
-  const [tabStatus, setTabStatus] = useState({ section: "idle", summary: "idle", quiz: "idle" });
+  const [tabStatus, setTabStatus] = useState({
+    section: "idle",
+    summary: "idle",
+    quiz: "idle",
+    case_study: "idle",
+  });
   // Pesan error per tab -- pengganti alert() browser, ditampilkan sebagai
   // <Alert> di atas konten tab aktif, konsisten dengan AdminManager/
   // VaccineManager/EraYearManager.
-  const [tabError, setTabError] = useState({ section: null, summary: null, quiz: null });
+  const [tabError, setTabError] = useState({
+    section: null,
+    summary: null,
+    quiz: null,
+    case_study: null,
+  });
 
   function setStatusFor(tabKey, status) {
     setTabStatus((prev) => ({ ...prev, [tabKey]: status }));
@@ -90,6 +105,15 @@ export default function WabahWorkspace() {
   const [summaryPointsDirty, setSummaryPointsDirty] = useState(new Set());
   const [vaccinesDirty, setVaccinesDirty] = useState(false);
   const [quizFieldDirty, setQuizFieldDirty] = useState(new Map());
+  // (Baru — Studi Kasus) caseStudyContentDirty: Set<fieldName> — field teks
+  // (title/description/challenge_text/reason_description/kedua
+  // feedback/badge_*) mana yang berubah, semuanya disimpan lewat 1 endpoint
+  // yang sama (PATCH .../case-studies/{id}) jadi cukup 1 Set field-level,
+  // BEDA dari quizFieldDirty yang per-soal karena studi kasus cuma 1 entity.
+  // caseStudyOptionsDirty: Set<optionId> — opsi mana yang title/description/
+  // correct_rank-nya berubah, disimpan lewat endpoint options terpisah.
+  const [caseStudyContentDirty, setCaseStudyContentDirty] = useState(new Set());
+  const [caseStudyOptionsDirty, setCaseStudyOptionsDirty] = useState(new Set());
 
   const hasAnyUnsaved =
     sectionTitleDirty.size > 0 ||
@@ -98,7 +122,9 @@ export default function WabahWorkspace() {
     summaryDirty ||
     summaryPointsDirty.size > 0 ||
     vaccinesDirty ||
-    quizFieldDirty.size > 0;
+    quizFieldDirty.size > 0 ||
+    caseStudyContentDirty.size > 0 ||
+    caseStudyOptionsDirty.size > 0;
 
   function resetAllDirty() {
     setSectionTitleDirty(new Set());
@@ -108,6 +134,8 @@ export default function WabahWorkspace() {
     setSummaryPointsDirty(new Set());
     setVaccinesDirty(false);
     setQuizFieldDirty(new Map());
+    setCaseStudyContentDirty(new Set());
+    setCaseStudyOptionsDirty(new Set());
   }
 
   // Dipanggil dari mana pun yang mau berpindah keluar workspace ini
@@ -154,12 +182,31 @@ export default function WabahWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, activeSectionId]);
 
+  // (Baru — Studi Kasus) Lazy-load CaseStudy (+ 5 options) begitu tab
+  // "case_study" aktif dan belum pernah dimuat — mirror pola lazy-load
+  // content_blocks di atas. Section case_study-nya sendiri dicari dari
+  // year.sections (type === 'case_study', selalu order=8); kalau section
+  // itu sendiri belum ada, tidak ada yang di-fetch (lihat CaseStudyTab,
+  // yang menampilkan tombol "Buat Section Studi Kasus" untuk kasus ini).
+  useEffect(() => {
+    if (!year || activeTab !== "case_study") return;
+    const caseStudySection = year.sections?.find((s) => s.type === "case_study");
+    if (!caseStudySection || year.caseStudy !== undefined) return;
+
+    apiClient.get(`/admin/sections/${caseStudySection.id}/case-study`).then(({ data }) => {
+      setYear((prev) => ({ ...prev, caseStudy: data }));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, activeTab]);
+
   async function loadYear() {
     setLoading(true);
     const { data } = await apiClient.get(`/admin/years/${yearId}`);
     setYear(data);
-    setActiveSectionId(data.sections?.[0]?.id ?? null);
-    setTabStatus({ section: "idle", summary: "idle", quiz: "idle" });
+    setActiveSectionId(
+      data.sections?.find((s) => s.type !== "case_study")?.id ?? null
+    );
+    setTabStatus({ section: "idle", summary: "idle", quiz: "idle", case_study: "idle" });
     resetAllDirty();
     setLoading(false);
   }
@@ -263,6 +310,26 @@ export default function WabahWorkspace() {
       };
     }
 
+    if (activeTab === "case_study") {
+      const caseStudy = year.caseStudy;
+      return {
+        screen: "case-study",
+        data: {
+          // Preview disederhanakan jadi 1 layar (Briefing + 5 opsi Ruang
+          // Keputusan) — bukan simulasi 4 layar penuh (Opening/Badge masih
+          // teks template hardcode Flutter, tidak relevan diedit admin di
+          // sini). correct_rank IKUT dikirim ke preview (beda dari response
+          // endpoint user yang menyembunyikannya) supaya admin bisa lihat
+          // highlight prioritas 1/2/3 vs pengecoh saat mengedit.
+          title: caseStudy?.title ?? null,
+          description: caseStudy?.description ?? null,
+          challengeText: caseStudy?.challenge_text ?? null,
+          reasonDescription: caseStudy?.reason_description ?? null,
+          options: caseStudy?.options ?? [],
+        },
+      };
+    }
+
     return { screen: null, data: null };
   }, [year, activeTab, activeSectionId, activeQuestionIndex, activeSummaryPointIndex]);
 
@@ -304,6 +371,7 @@ export default function WabahWorkspace() {
               setYear={setYear}
               activeSectionId={activeSectionId}
               setActiveSectionId={selectSection}
+              setActiveTab={setActiveTab}
               eraAccent={eraAccent}
               status={tabStatus.section}
               setStatus={(s) => setStatusFor("section", s)}
@@ -345,6 +413,19 @@ export default function WabahWorkspace() {
               setError={(m) => setErrorFor("quiz", m)}
               dirtyFields={quizFieldDirty}
               setDirtyFields={setQuizFieldDirty}
+            />
+          )}
+          {activeTab === "case_study" && (
+            <CaseStudyTab
+              year={year}
+              setYear={setYear}
+              status={tabStatus.case_study}
+              setStatus={(s) => setStatusFor("case_study", s)}
+              setError={(m) => setErrorFor("case_study", m)}
+              contentDirty={caseStudyContentDirty}
+              setContentDirty={setCaseStudyContentDirty}
+              optionsDirty={caseStudyOptionsDirty}
+              setOptionsDirty={setCaseStudyOptionsDirty}
             />
           )}
         </div>
@@ -481,6 +562,7 @@ function SectionBlokTab({
   setYear,
   activeSectionId,
   setActiveSectionId,
+  setActiveTab,
   eraAccent,
   status,
   setStatus,
@@ -495,7 +577,21 @@ function SectionBlokTab({
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
 
-  const orderedSections = (year.sections ?? []).slice().sort((a, b) => a.order - b.order);
+  // (Baru — Studi Kasus) Section bertipe `case_study` (selalu order=8)
+  // TIDAK ditampilkan/di-drag di sini — kontennya bukan content_blocks,
+  // dikelola di tab "Studi Kasus" terpisah. Filter ini juga yang membuat
+  // reindex drag-drop di bawah aman melewati order 8 (lihat orderForPosition()).
+  const orderedSections = (year.sections ?? [])
+    .filter((s) => s.type !== "case_study")
+    .slice()
+    .sort((a, b) => a.order - b.order);
+  const caseStudySection = (year.sections ?? []).find((s) => s.type === "case_study");
+
+  // Posisi (0-based) di antara section BACAAN -> `order` sesungguhnya di DB,
+  // melompati order=8 yang dipesan untuk case_study (R-CASE, Section::CASE_STUDY_ORDER).
+  function orderForPosition(position) {
+    return position < 7 ? position + 1 : position + 2;
+  }
 
   function isSectionDirty(sectionId) {
     if (titleDirty.has(sectionId)) return true;
@@ -520,7 +616,7 @@ function SectionBlokTab({
     // re-assign `order` sesuai posisi baru, lalu persist ke backend (R-SECT-01)
     // -- ini aksi diskrit (drag-drop), bukan field ketikan, jadi tetap
     // langsung tersimpan seperti semula (tidak ikut tombol Simpan).
-    const reindexed = list.map((s, i) => ({ ...s, order: i + 1 }));
+    const reindexed = list.map((s, i) => ({ ...s, order: orderForPosition(i) }));
     reorderSections(reindexed);
     setDragId(null);
     setDragOverId(null);
@@ -536,19 +632,29 @@ function SectionBlokTab({
     setActiveSectionId(newSection.id);
   }
 
-  async function reorderSections(orderedSections) {
+  async function reorderSections(newlyOrderedReadingSections) {
+    // (Fix — Studi Kasus) Section case_study (& section non-reading lain,
+    // kalau ada) TIDAK ikut dikirim ke endpoint reorder ini (endpoint itu
+    // cuma tahu soal urutan section bacaan) — tapi tetap harus dipertahankan
+    // di state lokal, jangan sampai hilang dari year.sections cuma karena
+    // tidak ada di payload/response reorder.
+    const untouchedSections = (year.sections ?? []).filter((s) => s.type === "case_study");
+
     // optimistic: update urutan lokal dulu (dipakai juga oleh drag-drop)
-    setYear({ ...year, sections: orderedSections });
+    setYear({ ...year, sections: [...newlyOrderedReadingSections, ...untouchedSections] });
     const { data: freshSections } = await apiClient.put(`/admin/years/${year.id}/sections/reorder`, {
-      section_ids: orderedSections.map((s) => s.id),
+      section_ids: newlyOrderedReadingSections.map((s) => s.id),
     });
     // response reorder() tidak include content_blocks — merge, jangan overwrite mentah
     setYear((prev) => ({
       ...prev,
-      sections: freshSections.map((fresh) => {
-        const existing = prev.sections.find((s) => s.id === fresh.id);
-        return { ...fresh, content_blocks: existing?.content_blocks };
-      }),
+      sections: [
+        ...freshSections.map((fresh) => {
+          const existing = prev.sections.find((s) => s.id === fresh.id);
+          return { ...fresh, content_blocks: existing?.content_blocks };
+        }),
+        ...untouchedSections,
+      ],
     }));
   }
 
@@ -733,6 +839,40 @@ function SectionBlokTab({
             </li>
           ))}
         </ul>
+
+        {/* (Baru — Studi Kasus) Penanda posisi section case_study (selalu
+            order=8) -- BUKAN item draggable/editable di sini, cuma pointer
+            ke tab "Studi Kasus". Kalau belum ada section-nya sama sekali,
+            tampilkan tombol untuk membuatnya (lihat CaseStudyTab utk isi
+            kontennya setelah section ini ada). */}
+        <div className="mt-3 border-t border-dashed border-zinc-200 pt-3">
+          {caseStudySection ? (
+            <button
+              onClick={() => setActiveTab?.("case_study")}
+              className="flex w-full items-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 text-left text-sm text-zinc-500 hover:bg-zinc-50"
+              title="Kelola konten Studi Kasus di tab terpisah"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-amber-100 text-[10px] font-semibold text-amber-700">
+                8
+              </span>
+              <span className="flex-1 truncate">{caseStudySection.title}</span>
+              <Badge variant={caseStudySection.is_published ? "default" : "secondary"} className="shrink-0 text-[10px]">
+                {caseStudySection.is_published ? "Published" : "Draft"}
+              </Badge>
+            </button>
+          ) : (
+            <p className="px-2 text-[11px] text-zinc-400">
+              Section Studi Kasus (order 8) belum dibuat — buat lewat tab{" "}
+              <button
+                onClick={() => setActiveTab?.("case_study")}
+                className="font-medium text-zinc-600 underline underline-offset-2"
+              >
+                Studi Kasus
+              </button>
+              .
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Editor section aktif -- kartu tersendiri, dibatasi max-width &
@@ -1521,6 +1661,389 @@ function QuizTab({
       <div className="flex items-center justify-end gap-2 pt-1">
         <SaveButton status={status} onClick={handleSaveQuiz} />
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ Tab: Studi Kasus */
+// Fase 1 (progress.md) -- Studi Kasus (Problem-Based Learning), section
+// ke-8 tiap year (type=case_study, Section::CASE_STUDY_ORDER). Beda dari
+// tab Kuis/Rangkuman: cuma 1 entity per year (bukan banyak soal/poin),
+// jadi field-level dirty tracking-nya 1 Set datar (bukan per-item Map),
+// mirror layout Panel/SaveButton yang sama supaya konsisten dengan tab lain.
+//
+// Konten (title, description, challenge_text, reason_description, kedua
+// feedback, badge_*) disimpan lewat PATCH /admin/case-studies/{id}.
+// 5 opsi (A-E) di-update IN-PLACE lewat PATCH .../options -- payload
+// SELALU berisi seluruh 5 opsi (bukan cuma yang dirty), karena
+// CaseStudyService::updateOptions() mensyaratkan id persis cocok dengan
+// 5 opsi yang sudah ada (lihat catatan class-level CaseStudyService kenapa
+// tidak boleh delete+recreate).
+
+function CaseStudyTab({ year, setYear, status, setStatus, setError, contentDirty, setContentDirty, optionsDirty, setOptionsDirty }) {
+  const caseStudySection = year.sections?.find((s) => s.type === "case_study");
+  const caseStudy = year.caseStudy;
+  const [creatingSection, setCreatingSection] = useState(false);
+
+  async function createCaseStudySection() {
+    setCreatingSection(true);
+    try {
+      // apiResource('sections') -> store langsung di /admin/sections, sama
+      // endpoint yang dipakai addSection() di tab Section & Blok, tapi
+      // eksplisit isi order=8 & type=case_study (guard R-CASE ditegakkan
+      // di backend, bukan di sini -- ini cuma niat admin).
+      const { data: newSection } = await apiClient.post(`/admin/sections`, {
+        year_id: year.id,
+        title: "Studi Kasus",
+        order: Section_CASE_STUDY_ORDER,
+        type: "case_study",
+      });
+      setYear((prev) => ({ ...prev, sections: [...(prev.sections ?? []), newSection] }));
+      toast.success("Section Studi Kasus dibuat — lengkapi kontennya di bawah.");
+    } catch (e) {
+      toast.error(e?.response?.data?.message ?? "Gagal membuat section Studi Kasus.");
+    } finally {
+      setCreatingSection(false);
+    }
+  }
+
+  function editField(field, value) {
+    setYear((prev) => ({ ...prev, caseStudy: { ...prev.caseStudy, [field]: value } }));
+    setContentDirty((prev) => new Set(prev).add(field));
+    setStatus("dirty");
+  }
+
+  function editOptions(nextOptions) {
+    setYear((prev) => ({ ...prev, caseStudy: { ...prev.caseStudy, options: nextOptions } }));
+    setOptionsDirty(new Set(nextOptions.map((o) => o.id)));
+    setStatus("dirty");
+  }
+
+  async function togglePublish() {
+    try {
+      const { data } = await apiClient.patch(`/admin/case-studies/${caseStudy.id}/publish`, {
+        is_published: !caseStudy.is_published,
+      });
+      setYear((prev) => ({ ...prev, caseStudy: { ...prev.caseStudy, ...data } }));
+      toast.success(data.is_published ? "Studi Kasus dipublish" : "Studi Kasus di-unpublish");
+    } catch (e) {
+      toast.error(
+        e?.response?.data?.message ??
+          "Gagal publish (butuh seluruh teks + badge terisi, dan 5 opsi dengan prioritas 1/2/3 masing-masing satu)."
+      );
+    }
+  }
+
+  async function handleSave() {
+    setStatus("saving");
+    try {
+      if (contentDirty.size > 0) {
+        const payload = {};
+        contentDirty.forEach((field) => {
+          payload[field] = caseStudy[field] ?? (field === "badge_description" ? null : "");
+        });
+        const { data } = await apiClient.patch(`/admin/case-studies/${caseStudy.id}`, payload);
+        setYear((prev) => ({ ...prev, caseStudy: { ...prev.caseStudy, ...data } }));
+      }
+      if (optionsDirty.size > 0) {
+        const { data } = await apiClient.patch(`/admin/case-studies/${caseStudy.id}/options`, {
+          options: (caseStudy.options ?? []).map((o) => ({
+            id: o.id,
+            title: o.title,
+            description: o.description,
+            correct_rank: o.correct_rank,
+          })),
+        });
+        setYear((prev) => ({ ...prev, caseStudy: { ...prev.caseStudy, ...data } }));
+      }
+      setContentDirty(new Set());
+      setOptionsDirty(new Set());
+      setStatus("saved");
+      toast.success("Studi Kasus berhasil disimpan");
+    } catch (e) {
+      setStatus("error");
+      setError(e?.response?.data?.message ?? "Gagal menyimpan Studi Kasus.");
+      toast.error(e?.response?.data?.message ?? "Gagal menyimpan Studi Kasus.");
+    }
+  }
+
+  // Hint client-side (bukan pengganti CaseStudy::canPublish() di backend) --
+  // sama filosofi missingExplanationCount (Kuis) / incompletePointCount
+  // (Rangkuman): bantu admin tahu lebih awal kenapa publish nanti ditolak.
+  const requiredTextFields = [
+    "title",
+    "description",
+    "challenge_text",
+    "reason_description",
+    "feedback_correct",
+    "feedback_incorrect",
+    "badge_name",
+    "badge_image_link",
+  ];
+  const missingTextCount = caseStudy
+    ? requiredTextFields.filter((f) => !caseStudy[f]?.trim?.()).length
+    : 0;
+  const ranks = (caseStudy?.options ?? [])
+    .map((o) => o.correct_rank)
+    .filter((r) => r !== null && r !== undefined);
+  const ranksValid = ranks.length === 3 && ranks.slice().sort().join(",") === "1,2,3";
+
+  return (
+    <div className="mx-auto max-h-[75vh] w-full max-w-2xl space-y-4 overflow-y-auto pr-1">
+      {!caseStudySection ? (
+        <EmptyPanel text="Section Studi Kasus (order 8) belum ada untuk tahun ini.">
+          <Button onClick={createCaseStudySection} disabled={creatingSection} className={BTN_DARK}>
+            <Plus size={14} /> {creatingSection ? "Membuat…" : "Buat Section Studi Kasus"}
+          </Button>
+        </EmptyPanel>
+      ) : !caseStudy ? (
+        <EmptyPanel text="Memuat Studi Kasus…" />
+      ) : (
+        <>
+          <Panel>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Briefing Kasus
+              </p>
+              <Button size="sm" onClick={togglePublish} className={BTN_DARK}>
+                {caseStudy.is_published ? "Unpublish" : "Publish"}
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">Judul studi kasus</p>
+                  {contentDirty.has("title") && <UnsavedFieldBadge />}
+                </div>
+                <Input
+                  value={caseStudy.title ?? ""}
+                  placeholder="Mis. Menentukan Prioritas Upaya Pengendalian…"
+                  onChange={(e) => editField("title", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">
+                    Deskripsi (1 blok teks, bukan 3 card)
+                  </p>
+                  {contentDirty.has("description") && <UnsavedFieldBadge />}
+                </div>
+                <Textarea
+                  value={caseStudy.description ?? ""}
+                  placeholder="Deskripsi briefing kasus…"
+                  onChange={(e) => editField("description", e.target.value)}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">Teks tantangan</p>
+                  {contentDirty.has("challenge_text") && <UnsavedFieldBadge />}
+                </div>
+                <Textarea
+                  value={caseStudy.challenge_text ?? ""}
+                  placeholder="Tantangan yang dihadapi user di kasus ini…"
+                  onChange={(e) => editField("challenge_text", e.target.value)}
+                />
+              </div>
+            </div>
+          </Panel>
+
+          <Panel>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Ruang Keputusan — 5 Opsi (A-E)
+            </p>
+            <p className="mb-3 text-[11px] text-zinc-400">
+              Tandai tepat 3 opsi sebagai Prioritas 1/2/3 (urutan harus persis ditebak user,
+              penilaian mode HARD) — 2 sisanya otomatis jadi pengecoh.
+            </p>
+            <CaseStudyOptionsEditor
+              options={caseStudy.options ?? []}
+              onChange={editOptions}
+              dirty={optionsDirty}
+            />
+            {!ranksValid && (
+              <p className="mt-2 text-xs text-amber-600">
+                Wajib tepat 3 opsi dengan Prioritas 1, 2, dan 3 (masing-masing satu) sebelum bisa dipublish.
+              </p>
+            )}
+
+            <div className="mt-4">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="text-[11px] font-medium text-zinc-400">
+                  Deskripsi kolom alasan <span className="normal-case font-normal">(tampil di atas textarea alasan user)</span>
+                </p>
+                {contentDirty.has("reason_description") && <UnsavedFieldBadge />}
+              </div>
+              <Textarea
+                value={caseStudy.reason_description ?? ""}
+                placeholder="Mis. Jelaskan alasan urutan prioritas yang kamu pilih…"
+                onChange={(e) => editField("reason_description", e.target.value)}
+              />
+            </div>
+          </Panel>
+
+          <Panel>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Feedback (tingkat kasus, bukan per opsi)
+            </p>
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">
+                    Feedback jika <span className="text-emerald-500">BENAR</span> (urutan persis tepat)
+                  </p>
+                  {contentDirty.has("feedback_correct") && <UnsavedFieldBadge />}
+                </div>
+                <Textarea
+                  value={caseStudy.feedback_correct ?? ""}
+                  placeholder="Tampil setelah user submit dengan urutan yang benar…"
+                  onChange={(e) => editField("feedback_correct", e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">
+                    Feedback jika <span className="text-red-500">SALAH</span>
+                  </p>
+                  {contentDirty.has("feedback_incorrect") && <UnsavedFieldBadge />}
+                </div>
+                <Textarea
+                  value={caseStudy.feedback_incorrect ?? ""}
+                  placeholder="Tampil kalau ada opsi salah posisi/pengecoh terpilih — arahan umum, jangan sebut slot mana yang salah…"
+                  onChange={(e) => editField("feedback_incorrect", e.target.value)}
+                />
+              </div>
+            </div>
+          </Panel>
+
+          <Panel>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Badge (layar ke-4, "Misi terselesaikan!")
+            </p>
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">Nama badge</p>
+                  {contentDirty.has("badge_name") && <UnsavedFieldBadge />}
+                </div>
+                <Input
+                  value={caseStudy.badge_name ?? ""}
+                  placeholder="Mis. Badge Cacar"
+                  onChange={(e) => editField("badge_name", e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">
+                    Deskripsi badge <span className="normal-case font-normal">(opsional)</span>
+                  </p>
+                  {contentDirty.has("badge_description") && <UnsavedFieldBadge />}
+                </div>
+                <Textarea
+                  value={caseStudy.badge_description ?? ""}
+                  placeholder="Boleh dikosongkan…"
+                  onChange={(e) => editField("badge_description", e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] font-medium text-zinc-400">Link ikon badge (Google Drive)</p>
+                  {contentDirty.has("badge_image_link") && <UnsavedFieldBadge />}
+                </div>
+                <Input
+                  value={caseStudy.badge_image_link ?? ""}
+                  placeholder="Link Google Drive…"
+                  onChange={(e) => editField("badge_image_link", e.target.value)}
+                />
+              </div>
+            </div>
+          </Panel>
+
+          {missingTextCount > 0 && (
+            <p className="text-xs text-amber-600">
+              {missingTextCount} kolom teks wajib masih kosong — wajib lengkap dulu sebelum Studi
+              Kasus bisa dipublish.
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <SaveButton status={status} onClick={handleSave} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Section::CASE_STUDY_ORDER (backend) -- didup di sini sebagai konstanta
+// FE supaya "Buat Section Studi Kasus" selalu eksplisit isi order=8, bukan
+// mengandalkan default/urutan input.
+const Section_CASE_STUDY_ORDER = 8;
+
+// Editor 5 opsi (A-E) Studi Kasus -- BEDA dari OptionsEditor kuis (radio
+// benar/salah tunggal): tiap opsi punya title+description terpisah, dan
+// "kebenarannya" berupa correct_rank (1/2/3/null), dipilih lewat dropdown
+// "Prioritas 1/2/3/Pengecoh" -- BUKAN tambah/hapus bebas (selalu tepat 5,
+// mengikuti CaseStudy::OPTION_COUNT, tombol tambah/hapus SENGAJA tidak ada).
+function CaseStudyOptionsEditor({ options, onChange, dirty }) {
+  const rankLabel = { 1: "Prioritas 1", 2: "Prioritas 2", 3: "Prioritas 3", "": "Pengecoh" };
+  const letters = ["A", "B", "C", "D", "E"];
+
+  function setOption(i, patch) {
+    onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
+  }
+
+  function setRank(i, rawValue) {
+    const nextRank = rawValue === "" ? null : Number(rawValue);
+    // Kalau rank ini sudah dipakai opsi lain, lepas dari opsi lama itu
+    // (jadi pengecoh) supaya tetap tepat 1 opsi per nilai 1/2/3 -- bukan
+    // menolak aksi, cuma "pindahkan" tanda prioritasnya.
+    onChange(
+      options.map((o, idx) => {
+        if (idx === i) return { ...o, correct_rank: nextRank };
+        if (nextRank !== null && o.correct_rank === nextRank) return { ...o, correct_rank: null };
+        return o;
+      })
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {options.map((o, i) => (
+        <div key={o.id ?? i} className="rounded-lg border border-zinc-100 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-zinc-900 text-[11px] font-semibold text-white">
+              {letters[i] ?? i + 1}
+            </span>
+            <select
+              value={o.correct_rank ?? ""}
+              onChange={(e) => setRank(i, e.target.value)}
+              className="rounded-md border border-zinc-200 px-2 py-1 text-xs"
+            >
+              {[1, 2, 3, ""].map((r) => (
+                <option key={r} value={r}>
+                  {rankLabel[r]}
+                </option>
+              ))}
+            </select>
+            {dirty?.has(o.id) && <UnsavedFieldBadge />}
+          </div>
+          <Input
+            className="mb-2"
+            value={o.title ?? ""}
+            placeholder={`Judul opsi ${letters[i] ?? i + 1}`}
+            onChange={(e) => setOption(i, { title: e.target.value })}
+          />
+          <Textarea
+            value={o.description ?? ""}
+            placeholder={`Deskripsi opsi ${letters[i] ?? i + 1}`}
+            onChange={(e) => setOption(i, { description: e.target.value })}
+          />
+        </div>
+      ))}
     </div>
   );
 }

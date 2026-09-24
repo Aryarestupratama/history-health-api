@@ -18,6 +18,7 @@ class StoreSectionRequest extends FormRequest
             'year_id' => 'required|exists:years,id',
             'title' => 'required|string|max:255', // tetap wajib — label admin di sidebar Content Studio, walau tidak lagi dirender ke end-user
             'order' => 'nullable|integer|min:1', // jika kosong, auto-assign urutan berikutnya di controller
+            'type' => 'nullable|in:reading,case_study', // default 'reading' (skema); pasangan type=case_study <-> order=8 ditegakkan di Controller/Service, bukan di rules ini
 
             // (Baru) Header gambar section — OPSIONAL murni (boleh diisi boleh
             // tidak per section, bukan wajib). Link gdrive, divalidasi format

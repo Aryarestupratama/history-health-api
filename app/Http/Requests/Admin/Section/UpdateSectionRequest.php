@@ -19,6 +19,7 @@ class UpdateSectionRequest extends FormRequest
             'title' => 'sometimes|required|string|max:255',
             'order' => 'sometimes|required|integer|min:1',
             'is_published' => 'sometimes|boolean',
+            'type' => 'sometimes|required|in:reading,case_study', // ganti type via update sebaiknya diblokir di Controller/Service (section case_study tidak boleh diubah jadi reading atau sebaliknya setelah dibuat) — rules ini cuma jaga format
 
             // (Baru) Header gambar section — OPSIONAL, boleh dikosongkan lagi
             // lewat update (mis. admin menghapus header yang sudah diisi).

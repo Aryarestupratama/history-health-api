@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\Quiz\QuizController as AdminQuizController;
 use App\Http\Controllers\Admin\Section\SectionController as AdminSectionController;
 use App\Http\Controllers\Admin\Year\YearController as AdminYearController;
 use App\Http\Controllers\Admin\YearSummary\YearSummaryController as AdminYearSummaryController;
+use App\Http\Controllers\Admin\CaseStudy\CaseStudyController as AdminCaseStudyController;
 use App\Http\Controllers\Admin\WabahIntro\WabahIntroController as AdminWabahIntroController;
 
 use App\Http\Controllers\Api\Public\EraController as PublicEraController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Api\Card\CardController;
 use App\Http\Controllers\Api\Quiz\UserQuizController;
 use App\Http\Controllers\Api\EraQuiz\UserEraQuizController;
 use App\Http\Controllers\Api\YearSummary\UserYearSummaryController;
+use App\Http\Controllers\Api\CaseStudy\CaseStudyController as UserCaseStudyController;
 use App\Http\Controllers\Api\WabahIntro\WabahIntroController;
 
 use Illuminate\Support\Facades\Route;
@@ -72,6 +74,13 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // lihat AssignVaccinesRequest.php yang sudah dibuat terpisah.
     Route::post('years/{year}/assign-vaccines', [AdminYearController::class, 'assignVaccines']);
 
+    // Kebalikan dari assign-vaccines di atas: assign year(s) dari sisi vaksin
+    // (VaccineManager.jsx) supaya admin bisa mengatur relasi year_vaccine
+    // tanpa harus lewat WabahWorkspace per-tahun satu-satu. sync() dipakai
+    // (bukan attach) supaya payload year_ids selalu jadi "source of truth"
+    // relasi vaksin ini — kirim array kosong untuk melepas semua relasi.
+    Route::post('vaccines/{vaccine}/assign-years', [AdminVaccineController::class, 'assignYears']);
+
     Route::apiResource('sections', AdminSectionController::class);
 
     Route::put('years/{year}/sections/reorder', [AdminSectionController::class, 'reorder']);
@@ -96,6 +105,17 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('years/{year}/summary', [AdminYearSummaryController::class, 'show']);
     Route::patch('year-summary-points/{point}', [AdminYearSummaryController::class, 'updatePoint']);
     Route::patch('year-summaries/{yearSummary}/publish', [AdminYearSummaryController::class, 'publish']);
+
+    // R-CASE (baru, Fase 1): kelola Studi Kasus per section ber-type
+    // case_study (selalu order=8). BEDA dari kuis maupun rangkuman: opsi
+    // (5, tepat) di-update IN-PLACE lewat updateOptions() (bukan
+    // storeQuestion/destroyQuestion ala kuis, bukan pula delete+recreate
+    // ala updatePointOptions rangkuman) — lihat catatan class-level
+    // CaseStudyService kenapa tidak boleh delete+recreate.
+    Route::get('sections/{section}/case-study', [AdminCaseStudyController::class, 'show']);
+    Route::patch('case-studies/{caseStudy}', [AdminCaseStudyController::class, 'updateContent']);
+    Route::patch('case-studies/{caseStudy}/options', [AdminCaseStudyController::class, 'updateOptions']);
+    Route::patch('case-studies/{caseStudy}/publish', [AdminCaseStudyController::class, 'publish']);
 
     // R-ERAQUIZ (REVISI TOTAL): kuis sumatif era ("final boss") TIDAK LAGI
     // punya bank soal sendiri — soal ditarik otomatis dari kuis formatif
@@ -157,6 +177,16 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::get('years/{year}/summary', [UserYearSummaryController::class, 'show']);
     Route::post('years/{year}/summary/points/{point}/answer', [UserYearSummaryController::class, 'checkAnswer']);
     Route::post('years/{year}/summary/complete', [UserYearSummaryController::class, 'submit']);
+
+    // R-CASE (baru, Fase 1): Studi Kasus — gate akses SAMA dengan section
+    // manapun (SectionAccessService::isUnlocked(), dicek eksplisit di
+    // controller, sama pola dengan UserYearSummaryController). Section
+    // case_study TIDAK BISA diselesaikan lewat
+    // `POST sections/{section}/complete` biasa di atas (lihat guard di
+    // ProgressController::complete()) — satu-satunya jalan sah adalah
+    // submit yang BENAR lewat endpoint kedua di bawah.
+    Route::get('sections/{section}/case-study', [UserCaseStudyController::class, 'show']);
+    Route::post('sections/{section}/case-study/submit', [UserCaseStudyController::class, 'submit']);
 
     // R-ERAQUIZ-02/03: kuis sumatif era ("final boss") — hanya login+verified,
     // gate "semua year completed" dicek di controller (EraQuizAccessService).

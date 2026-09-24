@@ -27,10 +27,15 @@ class SectionDetailResource extends JsonResource
     {
         // Section terkunci: kembalikan response terbatas, tanpa content_blocks
         // maupun daftar figures/vaccine terkait (R-SECT-04).
+        // (Baru — Fase 1 Studi Kasus) `type` TETAP disertakan meski locked —
+        // Flutter butuh tahu section ini `case_study` (selalu order=8) untuk
+        // render ikon roadmap yang berbeda dari section bacaan biasa, walau
+        // isinya belum bisa diakses.
         if ($this->isLocked === true) {
             return [
                 'id' => $this->id,
                 'title' => $this->title,
+                'type' => $this->type,
                 'order' => $this->order,
                 'locked' => true,
                 'year' => $this->yearSummaryArray(),
@@ -44,6 +49,13 @@ class SectionDetailResource extends JsonResource
             // Detail Section — posisi paling atas digantikan `header_image_url`
             // (opsional, null kalau section ini tidak diisi header gambar).
             'title' => $this->title,
+            // (Baru — Fase 1 Studi Kasus) 'reading' atau 'case_study'. Kalau
+            // 'case_study', Flutter TIDAK render `content_blocks` di bawah
+            // sebagai section bacaan biasa — arahkan ke alur 4 layar Studi
+            // Kasus (GET/POST /sections/{section}/case-study...) alih-alih
+            // memakai isi `content_blocks` (yang untuk section case_study
+            // selalu kosong, konten sepenuhnya lewat tabel case_studies).
+            'type' => $this->type,
             // (Baru) Header gambar section — opsional per section (bisa ada,
             // bisa tidak). Sudah di-resolve ke direct-view URL lewat accessor
             // model (Section::getResolvedHeaderImageUrlAttribute()).

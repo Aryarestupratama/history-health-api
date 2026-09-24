@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\CaseStudy;
+use App\Models\CaseStudyOption;
 use App\Models\Era;
 use App\Models\EraQuiz;
 use App\Models\Section;
@@ -68,6 +70,21 @@ use Illuminate\Database\Seeder;
  * bawah — cukup representatif, tapi tetap disarankan direview tim konten.
  * 7 poin COVID (2020) masih ditandai "[Placeholder]" karena datanya sendiri
  * (quote/referensi) juga masih placeholder — pola penandaan sama.
+ *
+ * (Revisi terbaru — Fase 1 Studi Kasus, dummy/lokal) Tiap year (Cacar &
+ * COVID) kini genap 9 section: section bacaan asli yang sudah ada
+ * dipertahankan apa adanya di `order` awal, ditambah beberapa section
+ * DUMMY (bukan "[Placeholder]" — sesuai arahan, ini masih pengembangan
+ * lokal) untuk mengisi order 1-7 & 9, dan 1 section bertipe `case_study`
+ * baru di `order = 8` (Section::CASE_STUDY_ORDER) via method baru
+ * `createCaseStudySection()`. Isi CaseStudy (title, description,
+ * challenge_text, reason_description, kedua feedback, badge) & 5
+ * CaseStudyOption (3 rank benar + 2 pengecoh) SEMUANYA dummy, termasuk
+ * `badge_image_link` yang masih placeholder link Drive — wajib diganti
+ * konten & aset asli tim konten sebelum dianggap final/publish beneran.
+ * `createSections()` direvisi supaya `order` section diambil eksplisit
+ * dari tiap item array (bukan lagi index+1), karena sekarang ada gap di
+ * order 8 yang dipesan untuk case_study.
  */
 class ModernSeeder extends Seeder
 {
@@ -199,6 +216,7 @@ class ModernSeeder extends Seeder
         $sections = [
             [
                 'title' => 'Wabah Cacar di Indonesia',
+                'order' => 1,
                 'header_image' => $headerWabah,
                 'blocks' => [
                     [
@@ -229,6 +247,7 @@ class ModernSeeder extends Seeder
                 // tetap true di seeder supaya kelihatan di preview, tapi
                 // TODO teksnya jangan lolos ke produksi apa adanya).
                 'title' => 'Pendahuluan Program Eradikasi Cacar',
+                'order' => 2,
                 'header_image' => $headerPendahuluan,
                 'blocks' => [
                     [
@@ -265,6 +284,7 @@ class ModernSeeder extends Seeder
             ],
             [
                 'title' => 'Program Eradikasi Cacar Global',
+                'order' => 3,
                 'header_image' => null,
                 'blocks' => [
                     [
@@ -287,6 +307,7 @@ class ModernSeeder extends Seeder
                 // 1 block teks placeholder supaya section tidak kosong
                 // total (section tanpa block bisa aneh dirender Flutter).
                 'title' => 'Sub Materi Program Eradikasi Cacar',
+                'order' => 4,
                 'header_image' => $headerSubMateri,
                 'blocks' => [
                     [
@@ -297,9 +318,91 @@ class ModernSeeder extends Seeder
                     ],
                 ],
             ],
+            // (Baru — dummy, Fase 1 Studi Kasus) Section 5-7 belum ada
+            // konten asli dari tim konten, diisi dummy sementara supaya
+            // tiap year genap 9 section (order 1-7 bacaan + 8 studi kasus
+            // + 9 bacaan), sesuai keputusan Fase 1 (progress.md). WAJIB
+            // diganti konten asli sebelum publish beneran.
+            [
+                'title' => 'Dummy Section 5 — Cacar',
+                'order' => 5,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section 5 belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
+            [
+                'title' => 'Dummy Section 6 — Cacar',
+                'order' => 6,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section 6 belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
+            [
+                'title' => 'Dummy Section 7 — Cacar',
+                'order' => 7,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section 7 belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
+            // order 8 SENGAJA dilewati di sini — dipesan untuk section
+            // case_study, dibuat lewat createCaseStudySection() di bawah,
+            // bukan lewat createSections() (bukan content_blocks).
+            [
+                'title' => 'Dummy Section 9 (Penutup) — Cacar',
+                'order' => 9,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section penutup (order 9) belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
         ];
 
         $this->createSections($year, $sections);
+
+        // (Baru — dummy, Fase 1 Studi Kasus) Section order 8, konten dummy
+        // (bukan pola "[Placeholder]" ala section bacaan) sesuai arahan —
+        // masih pengembangan lokal, wajib diganti konten asli sebelum publish.
+        $this->createCaseStudySection($year, [
+            'title' => 'Simulasi Respons Wabah Cacar (Dummy)',
+            'description' => 'Dummy: deskripsi studi kasus Cacar untuk keperluan pengembangan lokal, belum konten final.',
+            'challenge_text' => 'Dummy: tentukan prioritas upaya pengendalian wabah cacar berdasarkan situasi krisis yang disajikan.',
+            'reason_description' => 'Dummy: jelaskan singkat alasan urutan prioritas yang kamu pilih.',
+            'feedback_correct' => 'Dummy: urutan prioritas yang kamu susun sudah tepat, misi terselesaikan.',
+            'feedback_incorrect' => 'Dummy: masih ada urutan prioritas yang belum tepat, coba susun ulang.',
+            'badge_name' => 'Badge Dummy Cacar',
+            'badge_description' => 'Dummy: deskripsi badge Cacar, belum final.',
+            'badge_image_link' => 'https://drive.google.com/file/d/PLACEHOLDER_BADGE_CACAR/view?usp=drive_link',
+            'options' => [
+                ['title' => 'Dummy Opsi A', 'description' => 'Dummy deskripsi opsi A (prioritas 1).', 'correct_rank' => 1],
+                ['title' => 'Dummy Opsi B', 'description' => 'Dummy deskripsi opsi B (prioritas 2).', 'correct_rank' => 2],
+                ['title' => 'Dummy Opsi C', 'description' => 'Dummy deskripsi opsi C (prioritas 3).', 'correct_rank' => 3],
+                ['title' => 'Dummy Opsi D', 'description' => 'Dummy deskripsi opsi D (pengecoh).', 'correct_rank' => null],
+                ['title' => 'Dummy Opsi E', 'description' => 'Dummy deskripsi opsi E (pengecoh).', 'correct_rank' => null],
+            ],
+        ]);
 
         $vaccine = Vaccine::updateOrCreate(
             ['name' => 'Vaksin Cacar (Smallpox Vaccine)'],
@@ -412,6 +515,7 @@ class ModernSeeder extends Seeder
         $sections = [
             [
                 'title' => 'Pandemi COVID-19 di Indonesia',
+                'order' => 1,
                 'header_image' => null,
                 'blocks' => [
                     [
@@ -436,6 +540,7 @@ class ModernSeeder extends Seeder
             ],
             [
                 'title' => 'Liputan dan Edukasi COVID-19',
+                'order' => 2,
                 'header_image' => null,
                 'blocks' => [
                     [
@@ -452,6 +557,7 @@ class ModernSeeder extends Seeder
             ],
             [
                 'title' => 'Vaksinasi COVID-19 di Indonesia',
+                'order' => 3,
                 'header_image' => null,
                 'blocks' => [
                     [
@@ -474,9 +580,103 @@ class ModernSeeder extends Seeder
                     ],
                 ],
             ],
+            // (Baru — dummy, Fase 1 Studi Kasus) Section 4-7 belum ada
+            // konten asli dari tim konten, diisi dummy sementara supaya
+            // tiap year genap 9 section (order 1-7 bacaan + 8 studi kasus
+            // + 9 bacaan), sesuai keputusan Fase 1 (progress.md). WAJIB
+            // diganti konten asli sebelum publish beneran.
+            [
+                'title' => 'Dummy Section 4 — COVID-19',
+                'order' => 4,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section 4 belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
+            [
+                'title' => 'Dummy Section 5 — COVID-19',
+                'order' => 5,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section 5 belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
+            [
+                'title' => 'Dummy Section 6 — COVID-19',
+                'order' => 6,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section 6 belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
+            [
+                'title' => 'Dummy Section 7 — COVID-19',
+                'order' => 7,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section 7 belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
+            // order 8 SENGAJA dilewati di sini — dipesan untuk section
+            // case_study, dibuat lewat createCaseStudySection() di bawah.
+            [
+                'title' => 'Dummy Section 9 (Penutup) — COVID-19',
+                'order' => 9,
+                'header_image' => null,
+                'blocks' => [
+                    [
+                        'type' => 'text',
+                        'content' => '[Dummy] Konten section penutup (order 9) belum ada, ini teks isian sementara untuk keperluan pengembangan lokal.',
+                        'caption' => null,
+                        'order' => 1,
+                    ],
+                ],
+            ],
         ];
 
         $this->createSections($year, $sections);
+
+        // (Baru — dummy, Fase 1 Studi Kasus) Section order 8, konten dummy
+        // sesuai arahan — masih pengembangan lokal, wajib diganti konten
+        // asli sebelum publish beneran.
+        $this->createCaseStudySection($year, [
+            'title' => 'Simulasi Respons Pandemi COVID-19 (Dummy)',
+            'description' => 'Dummy: deskripsi studi kasus COVID-19 untuk keperluan pengembangan lokal, belum konten final.',
+            'challenge_text' => 'Dummy: tentukan prioritas upaya pengendalian pandemi COVID-19 berdasarkan situasi krisis yang disajikan.',
+            'reason_description' => 'Dummy: jelaskan singkat alasan urutan prioritas yang kamu pilih.',
+            'feedback_correct' => 'Dummy: urutan prioritas yang kamu susun sudah tepat, misi terselesaikan.',
+            'feedback_incorrect' => 'Dummy: masih ada urutan prioritas yang belum tepat, coba susun ulang.',
+            'badge_name' => 'Badge Dummy COVID-19',
+            'badge_description' => 'Dummy: deskripsi badge COVID-19, belum final.',
+            'badge_image_link' => 'https://drive.google.com/file/d/PLACEHOLDER_BADGE_COVID/view?usp=drive_link',
+            'options' => [
+                ['title' => 'Dummy Opsi A', 'description' => 'Dummy deskripsi opsi A (prioritas 1).', 'correct_rank' => 1],
+                ['title' => 'Dummy Opsi B', 'description' => 'Dummy deskripsi opsi B (prioritas 2).', 'correct_rank' => 2],
+                ['title' => 'Dummy Opsi C', 'description' => 'Dummy deskripsi opsi C (prioritas 3).', 'correct_rank' => 3],
+                ['title' => 'Dummy Opsi D', 'description' => 'Dummy deskripsi opsi D (pengecoh).', 'correct_rank' => null],
+                ['title' => 'Dummy Opsi E', 'description' => 'Dummy deskripsi opsi E (pengecoh).', 'correct_rank' => null],
+            ],
+        ]);
 
         $vaccines = [
             [
@@ -625,15 +825,21 @@ class ModernSeeder extends Seeder
     }
 
     /**
-     * @param array<int, array{title: string, header_image: ?string, blocks: array<int, array{type: string, content: string, caption: ?string, order: int}>}> $sections
+     * (Revisi — Fase 1 Studi Kasus) Section bacaan sekarang bisa punya gap
+     * `order` (order 8 dipesan untuk case_study, lihat createCaseStudySection()
+     * di bawah), jadi `order` TIDAK LAGI diturunkan dari index array — tiap
+     * item WAJIB eksplisit isi 'order' sendiri.
+     *
+     * @param array<int, array{title: string, order: int, header_image: ?string, blocks: array<int, array{type: string, content: string, caption: ?string, order: int}>}> $sections
      */
     private function createSections(Year $year, array $sections): void
     {
-        foreach ($sections as $index => $sectionData) {
+        foreach ($sections as $sectionData) {
             $section = Section::updateOrCreate(
-                ['year_id' => $year->id, 'title' => $sectionData['title']],
+                ['year_id' => $year->id, 'order' => $sectionData['order']],
                 [
-                    'order' => $index + 1,
+                    'title' => $sectionData['title'],
+                    'type' => 'reading',
                     'is_published' => true,
                     'header_image' => $sectionData['header_image'] ?? null,
                 ]
@@ -641,6 +847,84 @@ class ModernSeeder extends Seeder
 
             $section->contentBlocks()->delete();
             $section->contentBlocks()->createMany($sectionData['blocks']);
+        }
+    }
+
+    /**
+     * (Baru — Fase 1 Studi Kasus, dummy/lokal) Buat section bertipe
+     * `case_study` di `order = 8` (Section::CASE_STUDY_ORDER) untuk satu
+     * year, lalu isi CaseStudy + 5 CaseStudyOption (3 rank benar + 2
+     * pengecoh). Konten di sini SENGAJA dummy (bukan pola "[Placeholder]"
+     * ala section bacaan) karena masih pengembangan lokal, sesuai arahan —
+     * wajib diganti konten asli tim konten sebelum publish beneran.
+     *
+     * @param array{
+     *   title: string,
+     *   description: string,
+     *   challenge_text: string,
+     *   reason_description: string,
+     *   feedback_correct: string,
+     *   feedback_incorrect: string,
+     *   badge_name: string,
+     *   badge_description: ?string,
+     *   badge_image_link: string,
+     *   options: array<int, array{title: string, description: string, correct_rank: ?int}>
+     * } $data
+     */
+    private function createCaseStudySection(Year $year, array $data): void
+    {
+        if (count($data['options']) !== CaseStudy::OPTION_COUNT) {
+            throw new \InvalidArgumentException(
+                "Studi kasus year #{$year->id} harus tepat " . CaseStudy::OPTION_COUNT . ' opsi, diberikan ' . count($data['options']) . '.'
+            );
+        }
+
+        $section = Section::updateOrCreate(
+            ['year_id' => $year->id, 'order' => Section::CASE_STUDY_ORDER],
+            [
+                'title' => $data['title'] . ' (Studi Kasus)',
+                'type' => 'case_study',
+                'is_published' => true,
+                'header_image' => null,
+            ]
+        );
+
+        $caseStudy = CaseStudy::updateOrCreate(
+            ['section_id' => $section->id],
+            [
+                'title' => $data['title'],
+                'description' => $data['description'],
+                'challenge_text' => $data['challenge_text'],
+                'reason_description' => $data['reason_description'],
+                'feedback_correct' => $data['feedback_correct'],
+                'feedback_incorrect' => $data['feedback_incorrect'],
+                'badge_name' => $data['badge_name'],
+                'badge_description' => $data['badge_description'] ?? null,
+                'badge_image_link' => $data['badge_image_link'],
+            ]
+        );
+
+        // Hapus opsi lama dulu supaya seeder idempotent kalau dijalankan
+        // ulang dengan isi opsi yang berbeda (pola sama dengan
+        // createYearSummary()/points()->delete()).
+        $caseStudy->options()->delete();
+
+        $optionsToCreate = [];
+        foreach ($data['options'] as $index => $option) {
+            $optionsToCreate[] = [
+                'case_study_id' => $caseStudy->id,
+                'title' => $option['title'],
+                'description' => $option['description'],
+                'order' => $index + 1,
+                'correct_rank' => $option['correct_rank'] ?? null,
+            ];
+        }
+        CaseStudyOption::insert($optionsToCreate);
+
+        // Dummy sudah lengkap (5 opsi, 3 rank benar, semua teks terisi) —
+        // canPublish() otomatis true, sama pola dengan createYearSummary().
+        if ($caseStudy->fresh()->canPublish()) {
+            $caseStudy->update(['is_published' => true]);
         }
     }
 }

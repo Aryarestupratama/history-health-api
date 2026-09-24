@@ -22,6 +22,18 @@ class ProgressController extends Controller
             throw new NotFoundHttpException();
         }
 
+        // (Baru — Fase 1 Studi Kasus, progress.md) Section bertipe
+        // `case_study` (selalu order=8) TIDAK BOLEH diselesaikan lewat
+        // endpoint umum ini — supaya tidak ada cara melewati evaluasi hard-
+        // order studi kasus lewat API. Satu-satunya jalan sah adalah submit
+        // yang BENAR lewat CaseStudyController (lihat
+        // CaseStudyService::completeSectionIfNeeded()).
+        if ($section->isCaseStudy()) {
+            return response()->json([
+                'message' => 'Section studi kasus hanya bisa diselesaikan dengan mengerjakan Ruang Keputusan dengan benar, bukan lewat endpoint ini.',
+            ], 403);
+        }
+
         $result = $this->progressService->completeSection($request->user(), $section);
 
         return response()->json([

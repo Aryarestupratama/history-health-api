@@ -25,6 +25,20 @@ return new class extends Migration
             // tanpa header gambar di paling atas (fallback ke konten langsung).
             $table->string('header_image')->nullable();
 
+            // (Baru — Fase 1 Studi Kasus, progress.md) Section bertipe `reading`
+            // (default, section bacaan biasa dengan content_blocks) atau
+            // `case_study` (section ke-8 setiap year, konten dikelola lewat
+            // tabel case_studies, BUKAN content_blocks). Ditambahkan lewat edit
+            // langsung migration ini (bukan migration `alter` terpisah) karena
+            // belum ada data produksi saat perubahan ini dibuat.
+            //
+            // R-CASE (rencana): `order = 8` HANYA boleh dipakai oleh section
+            // bertipe `case_study`, dan sebaliknya section `case_study` HARUS
+            // `order = 8` — tidak ditegakkan sebagai constraint DB di sini
+            // (sama filosofi dengan "tepat 7 poin" year_summaries yang juga
+            // divalidasi di layer aplikasi), lihat Service/FormRequest terkait.
+            $table->enum('type', ['reading', 'case_study'])->default('reading');
+
             $table->integer('order')->default(0); // urutan section dalam 1 year; menentukan section mana yang terbuka/terkunci (section N+1 baru terbuka jika section N sudah completed di user_progress)
             $table->boolean('is_published')->default(false);
             $table->timestamps();

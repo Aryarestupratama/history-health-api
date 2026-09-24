@@ -32,7 +32,11 @@ class YearController extends Controller
         $years = $era->years()
             ->whereHas('sections', fn ($q) => $q->published())
             ->with([
-                'sections' => fn ($q) => $q->published()->select('id', 'title', 'order', 'year_id'),
+                // (Baru — Fase 1 Studi Kasus) tambah `type` ke select() —
+                // wajib, kalau tidak field ini null di response walau sudah
+                // di-expose YearResource (kolom yang tidak ada di select()
+                // Eloquent tidak ikut ter-load).
+                'sections' => fn ($q) => $q->published()->select('id', 'title', 'type', 'order', 'year_id'),
                 'quiz',
                 // (Baru) dipakai bareng YearSummaryService::hasCompleted()
                 // di bawah — sama alasan kenapa 'quiz' di-eager-load, biar
