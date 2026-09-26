@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Layers, Syringe, ShieldCheck, Settings, LogOut, BookOpenText } from 'lucide-react';
+import { LayoutDashboard, Layers, Syringe, ShieldCheck, Settings, LogOut, BookOpenText, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -15,6 +15,7 @@ import AdminManager from './pages/AdminManager';
 import StudioEraYearPicker from './pages/StudioEraYearPicker';
 import WabahWorkspace from './pages/WabahWorkspace';
 import WabahIntroManager from './pages/WabahIntroManager';
+import AdminProfile from './pages/AdminProfile';
 
 // Revisi Design.md §4: sidebar utama jadi Dashboard / Content Studio / Kelola
 // Vaksin. "Era & Tahun" turun jadi housekeeping sekunder (jarang dipakai),
@@ -32,6 +33,9 @@ const NAV_ITEMS = [
 const SECONDARY_NAV_ITEMS = [
   { to: '/eras', label: 'Era & Tahun', icon: Settings },
   { to: '/wabah-intro', label: 'Pengenalan Wabah', icon: BookOpenText },
+  // Profil (baru) -- satu-satunya tempat admin ganti password akun sendiri,
+  // sejak fitur Edit di Kelola Admin dicabut total.
+  { to: '/profile', label: 'Profil Saya', icon: UserCog },
 ];
 
 function initials(name) {
@@ -110,13 +114,15 @@ function Layout({ children }) {
 
         <div className="border-t p-3">
           <div className="flex items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-accent">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/15 text-xs font-semibold text-warning">
-              {initials(user?.name)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium leading-tight">{user?.name}</p>
-              <p className="truncate text-xs text-muted-foreground leading-tight">Admin</p>
-            </div>
+            <Link to="/profile" className="flex min-w-0 flex-1 items-center gap-2" title="Buka Profil">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/15 text-xs font-semibold text-warning">
+                {initials(user?.name)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium leading-tight">{user?.name}</p>
+                <p className="truncate text-xs text-muted-foreground leading-tight">Admin</p>
+              </div>
+            </Link>
             <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
               <LogOut className="h-4 w-4" />
             </Button>
@@ -205,6 +211,17 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Layout><WabahIntroManager /></Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Profil (baru) -- ganti password akun sendiri, pengganti fitur
+              Edit yang sudah dicabut dari Kelola Admin. */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Layout><AdminProfile /></Layout>
               </ProtectedRoute>
             }
           />

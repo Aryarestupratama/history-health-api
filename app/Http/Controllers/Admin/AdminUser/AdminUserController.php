@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin\AdminUser;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminUser\StoreAdminUserRequest;
-use App\Http\Requests\Admin\AdminUser\UpdateAdminUserRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -37,26 +36,12 @@ class AdminUserController extends Controller
         return response()->json($admin->only(self::VISIBLE_FIELDS), 201);
     }
 
-    public function update(UpdateAdminUserRequest $request, User $admin)
-    {
-        $this->ensureIsAdmin($admin);
-
-        $data = $request->validated();
-
-        $payload = [
-            'name' => $data['name'],
-            'email' => $data['email'],
-        ];
-
-        // Password opsional saat update -- kosongkan di form berarti tidak diubah.
-        if (! empty($data['password'])) {
-            $payload['password'] = Hash::make($data['password']);
-        }
-
-        $admin->update($payload);
-
-        return $admin->only(self::VISIBLE_FIELDS);
-    }
+    // NOTE (revisi): update() dicabut total -- Kelola Admin sekarang cuma
+    // Tambah/Hapus. Ganti nama/email/password akun sendiri pindah ke menu
+    // Profil (lihat ProfileController/AuthController::changePassword),
+    // admin lain tidak lagi bisa mengedit data admin manapun lewat sini.
+    // UpdateAdminUserRequest juga sudah tidak dipakai -- boleh dihapus dari
+    // app/Http/Requests/Admin/AdminUser/ kalau tidak dipakai di tempat lain.
 
     public function destroy(Request $request, User $admin)
     {

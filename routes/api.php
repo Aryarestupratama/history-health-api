@@ -80,10 +80,14 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::apiResource('years', AdminYearController::class);
     Route::apiResource('vaccines', AdminVaccineController::class);
 
-    // Kelola Akun Admin (baru) -- CRUD terbatas ke user dengan role=admin,
-    // reuse tabel `users` yang sudah ada (tidak perlu tabel baru). Guard
+    // Kelola Akun Admin -- CRUD terbatas ke user dengan role=admin, reuse
+    // tabel `users` yang sudah ada (tidak perlu tabel baru). Guard
     // self-delete & last-admin-delete ada di AdminUserController.
-    Route::apiResource('admins', AdminUserController::class)->only(['index', 'store', 'update', 'destroy']);
+    // REVISI: 'update' dicabut -- Kelola Admin sekarang cuma Tambah/Hapus,
+    // admin tidak bisa lagi mengedit akun admin manapun (termasuk akun
+    // sendiri) lewat sini. Ganti password akun sendiri pindah ke menu
+    // Profil (lihat POST /auth/password di atas).
+    Route::apiResource('admins', AdminUserController::class)->only(['index', 'store', 'destroy']);
 
     // CMS-05: assign vaccine ke year (naik level dari section -> figure lama).
     // NB: method assignVaccines() perlu ditambahkan ke YearController Anda —
