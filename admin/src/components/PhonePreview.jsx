@@ -1164,7 +1164,7 @@ function VaccineDetailScreen({ data, accent }) {
 // bottom sheet), cukup untuk mengecek infografis tampil benar.
 
 function WabahIntroScreen({ data, accent }) {
-  const { resolvedImageUrl } = data ?? {};
+  const { content } = data ?? {};
 
   return (
     <div>
@@ -1175,17 +1175,12 @@ function WabahIntroScreen({ data, accent }) {
         Apa itu Wabah?
       </span>
 
-      {resolvedImageUrl ? (
-        <img
-          src={resolvedImageUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          className="w-full rounded-xl border border-zinc-100 object-cover"
-        />
+      {content ? (
+        <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-600">{content}</p>
       ) : (
         <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-200 text-zinc-300">
-          <ImageIcon size={28} />
-          <span className="text-[10px]">Link infografis belum valid</span>
+          <FileText size={28} />
+          <span className="text-[10px]">Teks belum diisi</span>
         </div>
       )}
 

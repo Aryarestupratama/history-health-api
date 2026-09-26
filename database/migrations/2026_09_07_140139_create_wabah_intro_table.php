@@ -11,11 +11,8 @@ use Illuminate\Support\Facades\Schema;
  * entry point: ikon info di header roadmap era pada tab Informasi
  * Sejarah. Tidak ada auto-show maupun banner per-era.
  *
- * Format konten: murni infografis (link Google Drive, pola sama dengan
- * years.summary_image & content_blocks) — tanpa teks pendukung.
- * Konversi ke direct-view URL dilakukan di layer API response
- * (accessor image_url), bukan disimpan di DB — konsisten dengan
- * Schema.md §5 (Catatan Khusus Media).
+ * Format konten: teks biasa (paragraf penjelasan "Apa itu Wabah"),
+ * bukan lagi infografis/link Google Drive.
  */
 return new class extends Migration
 {
@@ -23,8 +20,8 @@ return new class extends Migration
     {
         Schema::create('wabah_intro', function (Blueprint $table) {
             $table->id();
-            // Raw link Google Drive, apa adanya dari input admin
-            $table->text('image_link')->nullable();
+            // Teks penjelasan "Apa itu Wabah", diisi admin apa adanya
+            $table->text('content')->nullable();
             // Admin bisa draft dulu sebelum konten ini tayang ke user
             $table->boolean('is_published')->default(false);
             $table->timestamps();

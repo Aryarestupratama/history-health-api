@@ -2,29 +2,13 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import api from '../api';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import PhonePreview from '../components/PhonePreview';
 
-// Sama helper dengan VaccineManager.jsx — versi ringan
-// LinkParserService::toDriveImageUrl (backend) untuk preview live di sisi
-// klien tanpa round-trip API. Format 'thumbnail' harus tetap disamakan
-// dengan backend (Design.md §4.3).
-function resolveDrivePhotoUrl(rawUrl) {
-  if (!rawUrl) return null;
-  const patterns = [/\/d\/([a-zA-Z0-9_-]{10,})/, /[?&]id=([a-zA-Z0-9_-]{10,})/];
-  for (const pattern of patterns) {
-    const match = rawUrl.match(pattern);
-    if (match) {
-      return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
-    }
-  }
-  return null;
-}
-
 const EMPTY_FORM = {
-  image_link: '',
+  content: '',
   is_published: false,
 };
 
@@ -47,7 +31,7 @@ export default function WabahIntroManager() {
     try {
       const res = await api.get('/admin/wabah-intro');
       setForm({
-        image_link: res.data.image_link || '',
+        content: res.data.content || '',
         is_published: !!res.data.is_published,
       });
     } catch (err) {
@@ -63,11 +47,11 @@ export default function WabahIntroManager() {
     setSaving(true);
     try {
       const res = await api.put('/admin/wabah-intro', {
-        image_link: form.image_link || null,
+        content: form.content || null,
         is_published: form.is_published,
       });
       setForm({
-        image_link: res.data.image_link || '',
+        content: res.data.content || '',
         is_published: !!res.data.is_published,
       });
       toast.success('Konten berhasil disimpan');
@@ -78,8 +62,6 @@ export default function WabahIntroManager() {
     }
   }
 
-  const previewUrl = resolveDrivePhotoUrl(form.image_link);
-
   return (
     <div className="space-y-6">
       <div>
@@ -87,7 +69,7 @@ export default function WabahIntroManager() {
         <p className="mt-1 text-sm text-muted-foreground">
           Konten "Apa itu Wabah" — hanya bisa diakses lewat ikon info di header roadmap era
           pada tab Informasi Sejarah (tidak ada tampilan otomatis). Hanya ada satu konten
-          untuk seluruh aplikasi, berupa infografis saja tanpa teks pendukung.
+          untuk seluruh aplikasi, berupa teks penjelasan biasa.
         </p>
       </div>
 
@@ -103,11 +85,12 @@ export default function WabahIntroManager() {
         <div className="flex flex-wrap items-start gap-6">
           <form id="wabah-intro-form" onSubmit={handleSubmit} className="space-y-4 rounded-lg border p-5 w-full max-w-xl">
             <div className="space-y-1.5">
-              <Label>Infografis (link Google Drive)</Label>
-              <Input
-                value={form.image_link}
-                onChange={(e) => setForm({ ...form, image_link: e.target.value })}
-                placeholder="https://drive.google.com/file/d/FILE_ID/view..."
+              <Label>Teks penjelasan "Apa itu Wabah"</Label>
+              <Textarea
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                placeholder="Tuliskan penjelasan tentang apa itu wabah..."
+                rows={8}
               />
             </div>
 
@@ -132,14 +115,13 @@ export default function WabahIntroManager() {
             </div>
           </form>
 
-          {/* PhonePreview screen="wabah-intro" -- sebelumnya <img> sederhana,
-              sekarang konsisten dengan preview HP di Content Studio/Kelola
-              Vaksin (backlog lama "integrasikan preview ke PhonePreview.jsx",
-              sekarang selesai). Sesuaikan path import di atas kalau lokasi
-              PhonePreview.jsx di project Anda beda dari asumsi (satu folder
-              yang sama, ./PhonePreview). */}
+          {/* PhonePreview screen="wabah-intro" -- sekarang render teks
+              (content), bukan lagi resolvedImageUrl. Kalau PhonePreview.jsx
+              di project Anda masih membaca resolvedImageUrl untuk screen
+              ini, sesuaikan case-nya di sana untuk menampilkan `content`
+              sebagai paragraf teks, bukan <img>. */}
           <div className="flex flex-1 justify-center">
-            <PhonePreview screen="wabah-intro" data={{ resolvedImageUrl: previewUrl }} compact />
+            <PhonePreview screen="wabah-intro" data={{ content: form.content }} compact />
           </div>
         </div>
       )}

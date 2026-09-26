@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Admin\WabahIntro;
 
-use App\Rules\Content\ValidGoogleDriveLink;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateWabahIntroRequest extends FormRequest
@@ -15,13 +14,12 @@ class UpdateWabahIntroRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Nullable — admin boleh simpan draft dulu tanpa link Drive
-            // (sama pola dengan StoreContentBlockRequest: content skeleton
-            // kosong dulu, diisi belakangan). Validasi link Drive baru
-            // jalan kalau value-nya memang diisi (bukan null/kosong).
-            'image_link' => ['nullable', 'string', new ValidGoogleDriveLink],
+            // Nullable — admin boleh simpan draft dulu tanpa mengisi
+            // teksnya (sama pola dengan StoreContentBlockRequest: content
+            // skeleton kosong dulu, diisi belakangan).
+            'content' => ['nullable', 'string'],
 
-            // 'sometimes' — request update image_link saja (tanpa
+            // 'sometimes' — request update content saja (tanpa
             // menyertakan is_published) tidak boleh diam-diam mereset
             // status publish jadi false.
             'is_published' => ['sometimes', 'boolean'],
