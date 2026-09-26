@@ -42,6 +42,12 @@ class BadgeResource extends JsonResource
         // pernah hilang lagi walau user retake dan salah).
         $isUnlocked = (bool) $this->attempt?->isCompleted();
 
+        // Dot merah / tag "Baru" (fitur baru) — mirror VaccineCard.unseen:
+        // hanya relevan untuk badge yang SUDAH unlocked; badge locked tidak
+        // pernah dianggap "unseen" (tidak ada yang perlu dilihat).
+        // seen_at nullable independen dari completed_at (lihat migration).
+        $isUnseen = $isUnlocked && $this->attempt?->seen_at === null;
+
         $year = $this->section->year;
         $era = $year->era;
 
@@ -56,6 +62,7 @@ class BadgeResource extends JsonResource
             'icon_url' => $this->badge_image_url,
             'unlocked' => $isUnlocked,
             'unlocked_at' => $isUnlocked ? $this->attempt->completed_at : null,
+            'unseen' => $isUnseen,
             'year' => [
                 'id' => $year->id,
                 'year' => $year->year,

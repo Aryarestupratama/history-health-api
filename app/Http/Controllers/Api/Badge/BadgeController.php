@@ -58,7 +58,44 @@ class BadgeController extends Controller
                 'unlocked' => $attemptsByCaseStudyId
                     ->filter(fn ($attempt) => $attempt->isCompleted())
                     ->count(),
+                // Dipakai dot merah bottom nav Profil (main_shell.dart) &
+                // menu "Koleksi Badge" di ProfileScreen — mirror
+                // `meta.unseen` milik /cards. Badge locked tidak pernah ikut
+                // hitungan ini (lihat BadgeResource::$isUnseen).
+                'unseen' => $attemptsByCaseStudyId
+                    ->filter(fn ($attempt) => $attempt->isCompleted() && $attempt->seen_at === null)
+                    ->count(),
             ],
         ]);
+    }
+
+    /**
+     * PATCH /badges/{caseStudy}/seen — mirror endpoint mark-seen milik
+     * vaksin (CardController). Dipanggil Flutter persis di titik yang sama
+     * dengan pola vaksin: saat user BENERAN membuka detail badge, bukan
+     * begitu badge masuk antrean reveal/grid — supaya dot & tag "Baru"
+     * sempat kelihatan dulu sebelum hilang.
+     *
+     * Idempotent & permisif secara sengaja (tidak pernah 404/422): kalau
+     * user belum pernah punya attempt, attempt belum completed, atau
+     * seen_at sudah terisi sebelumnya, endpoint ini tetap sukses tanpa
+     * efek — supaya Flutter tidak perlu menjaga urutan panggilan dengan
+     * hati-hati (unawaited() seperti markVaccineSeen di
+     * vaccine_list_screen.dart).
+     */
+    public function markSeen(Request $request, CaseStudy $caseStudy)
+    {
+        $user = $request->user();
+
+        $attempt = UserCaseStudyAttempt::query()
+            ->where('user_id', $user->id)
+            ->where('case_study_id', $caseStudy->id)
+            ->first();
+
+        if ($attempt && $attempt->isCompleted() && $attempt->seen_at === null) {
+            $attempt->update(['seen_at' => now()]);
+        }
+
+        return response()->noContent();
     }
 }

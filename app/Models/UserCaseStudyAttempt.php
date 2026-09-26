@@ -17,12 +17,17 @@ class UserCaseStudyAttempt extends Model
         'slot_3_option_id',
         'reason',
         'completed_at',
+        // Dot merah / tag "Baru" — diisi lewat BadgeController::markSeen()
+        // via update(), BUKAN lewat recordAttempt() di bawah (retake tidak
+        // boleh menyentuh kolom ini sama sekali, lihat catatan di sana).
+        'seen_at',
     ];
 
     protected function casts(): array
     {
         return [
             'completed_at' => 'datetime',
+            'seen_at' => 'datetime',
         ];
     }
 
@@ -69,6 +74,11 @@ class UserCaseStudyAttempt extends Model
      *   PERNAH ditimpa lagi (baik oleh submit salah berikutnya, MAUPUN
      *   oleh submit benar berikutnya) — badge yang sudah didapat permanen,
      *   termasuk timestamp kapan pertama kali didapat.
+     * - `seen_at` SENGAJA tidak disebut sama sekali di sini (baik di
+     *   payload updateOrCreate maupun dihitung ulang) — kolom ini murni
+     *   dikelola BadgeController::markSeen(), supaya retake (benar maupun
+     *   salah) tidak pernah diam-diam menghidupkan lagi dot "Baru" pada
+     *   badge yang sudah pernah dilihat user.
      *
      * Dipanggil dari CaseStudyService::submit() setelah evaluasi hard-order
      * selesai di server (bukan dipercaya dari payload client).

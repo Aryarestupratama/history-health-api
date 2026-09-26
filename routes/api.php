@@ -232,4 +232,8 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // badge locked TETAP mengirim nama/ikon asli (lihat BadgeResource) —
     // Flutter yang meredupkan tampilannya, bukan disamarkan di backend.
     Route::get('badges', [BadgeController::class, 'index']);
+    // Dot merah / tag "Baru" — ditandai "sudah dilihat" begitu user beneran
+    // membuka detail badge di Koleksi Badge, sama pola & titik panggil
+    // dengan `POST cards/{vaccine}/seen` di atas.
+    Route::patch('badges/{caseStudy}/seen', [BadgeController::class, 'markSeen']);
 });

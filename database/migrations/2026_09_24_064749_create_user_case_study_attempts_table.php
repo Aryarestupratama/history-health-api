@@ -36,6 +36,15 @@ return new class extends Migration
             // permanen (lihat UserCaseStudyAttempt::recordAttempt()).
             $table->timestamp('completed_at')->nullable();
 
+            // Dot merah / tag "Baru" (badge belum dilihat) — mirror
+            // `user_vaccine_unlocks.seen_at`. Independen dari completed_at:
+            // begitu completed_at terisi, seen_at TETAP null sampai user
+            // beneran membuka Koleksi Badge (endpoint mark-seen), supaya ada
+            // jeda "dot menyala" antara badge didapat dan dilihat. Sekali
+            // terisi, permanen sama seperti completed_at — recordAttempt()
+            // di bawah TIDAK menyentuh kolom ini sama sekali.
+            $table->timestamp('seen_at')->nullable();
+
             $table->timestamps();
 
             // Retake (benar maupun salah) MENIMPA row yang sama, bukan bikin
