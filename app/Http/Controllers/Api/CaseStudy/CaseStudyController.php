@@ -149,6 +149,14 @@ class CaseStudyController extends Controller
             // terbuka!" tepat sekali, bukan tiap kali studi kasus lain yang
             // sudah pernah unlock border diselesaikan ulang.
             $response['border_unlocked'] = $completion['border_unlocked'];
+            // Beda dari border_unlocked (sticky lintas-wabah): ini true
+            // HANYA pada attempt yang PERTAMA KALI membuat progress section
+            // studi kasus ini (lihat UserProgress::wasRecentlyCreated di
+            // CaseStudyService::completeSectionIfNeeded()) — dipakai
+            // Flutter untuk munculkan notifikasi "Badge X berhasil
+            // didapat!" sekali saja, bukan tiap kali user retake studi
+            // kasus yang sama dan tetap benar.
+            $response['badge_newly_unlocked'] = $completion['badge_newly_unlocked'];
         }
 
         return response()->json($response);

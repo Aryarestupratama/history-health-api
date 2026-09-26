@@ -261,7 +261,7 @@ class CaseStudyService
      * — BorderUnlockService::checkAndUnlock() sendiri no-op kalau border
      * sudah terbuka (sticky).
      *
-     * @return array{progress: \App\Models\UserProgress, year_completed: bool, newly_unlocked_vaccines: \Illuminate\Support\Collection, border_unlocked: bool}
+     * @return array{progress: \App\Models\UserProgress, year_completed: bool, newly_unlocked_vaccines: \Illuminate\Support\Collection, border_unlocked: bool, badge_newly_unlocked: bool}
      */
     public function completeSectionIfNeeded(User $user, CaseStudy $caseStudy): array
     {
@@ -271,11 +271,16 @@ class CaseStudyService
 
             // Sama pola dengan ProgressService::completeSection() —
             // firstOrCreate untuk idempotency, unique(user_id, section_id)
-            // di DB jadi safety net-nya.
+            // di DB jadi safety net-nya. `wasRecentlyCreated` dipakai
+            // sebagai penanda "badge baru saja didapat" (bukan retake yang
+            // kebetulan benar lagi) — satu-satunya jalur sah baris progress
+            // section ini pertama kali dibuat, karena completeSectionIfNeeded()
+            // cuma dipanggil setelah submit() benar (lihat docblock class).
             $progress = \App\Models\UserProgress::firstOrCreate(
                 ['user_id' => $user->id, 'section_id' => $section->id],
                 ['completed_at' => now()]
             );
+            $badgeNewlyUnlocked = $progress->wasRecentlyCreated;
 
             $newlyUnlockedVaccines = $this->yearCompletionService->checkAndUnlockVaccines($user, $year);
 
@@ -289,6 +294,7 @@ class CaseStudyService
                 'year_completed' => $newlyUnlockedVaccines->isNotEmpty() || $this->yearCompletionService->isCompleted($user, $year),
                 'newly_unlocked_vaccines' => $newlyUnlockedVaccines,
                 'border_unlocked' => $borderUnlocked,
+                'badge_newly_unlocked' => $badgeNewlyUnlocked,
             ];
         });
     }
