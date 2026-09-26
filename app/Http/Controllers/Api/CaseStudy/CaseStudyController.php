@@ -56,8 +56,9 @@ class CaseStudyController extends Controller
         }
 
         $attempt = $this->service->getAttempt($request->user(), $caseStudy);
+        $isCompleted = $attempt?->isCompleted() ?? false;
 
-        return response()->json([
+        $response = [
             'case_study' => [
                 'id' => $caseStudy->id,
                 'title' => $caseStudy->title,
@@ -66,9 +67,26 @@ class CaseStudyController extends Controller
                 'reason_description' => $caseStudy->reason_description,
             ],
             'options' => $this->service->getOptionsForAttempt($caseStudy),
-            'completed' => $attempt?->isCompleted() ?? false,
+            'completed' => $isCompleted,
             'completed_at' => $attempt?->completed_at,
-        ]);
+        ];
+
+        // Mengaktifkan "opsi B" (langsung ke layar Badge, bukan Opening,
+        // saat studi kasus yang sudah completed dibuka ulang) —
+        // CaseStudyShellScreen._initStageFrom() di Flutter sudah siap
+        // menerima field ini sejak Fase 1, hanya menunggu backend mengisinya
+        // (lihat progress.md, "Dependensi backend yang masih menyusul").
+        // Dikirim HANYA saat completed, sama seperti pola field `badge` di
+        // submit().
+        if ($isCompleted) {
+            $response['badge'] = [
+                'name' => $caseStudy->badge_name,
+                'description' => $caseStudy->badge_description,
+                'image_url' => $caseStudy->badge_image_url,
+            ];
+        }
+
+        return response()->json($response);
     }
 
     /**
@@ -121,10 +139,16 @@ class CaseStudyController extends Controller
             $response['badge'] = [
                 'name' => $caseStudy->badge_name,
                 'description' => $caseStudy->badge_description,
-                'image_link' => $caseStudy->badge_image_link,
+                'image_url' => $caseStudy->badge_image_url,
             ];
             $response['year_completed'] = $completion['year_completed'];
             $response['newly_unlocked_vaccine_ids'] = $completion['newly_unlocked_vaccines']->values();
+            // (Fase 3) true HANYA di attempt yang benar-benar men-trigger
+            // unlock (BorderUnlockService::checkAndUnlock() sticky) —
+            // dipakai Flutter untuk munculkan notifikasi "Border SEKALA
+            // terbuka!" tepat sekali, bukan tiap kali studi kasus lain yang
+            // sudah pernah unlock border diselesaikan ulang.
+            $response['border_unlocked'] = $completion['border_unlocked'];
         }
 
         return response()->json($response);

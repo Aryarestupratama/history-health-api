@@ -6,6 +6,7 @@ use App\Models\CaseStudy;
 use App\Models\Section;
 use App\Models\User;
 use App\Models\UserCaseStudyAttempt;
+use App\Services\Profile\BorderUnlockService;
 use App\Services\Progress\YearCompletionService;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -45,6 +46,12 @@ class CaseStudyService
 
     public function __construct(
         private YearCompletionService $yearCompletionService,
+        // (Fase 3) Dependensi baru — trigger cek unlock Border SEKALA tiap
+        // studi kasus baru selesai. Bukan tabel/entitas baru di service
+        // ini, cuma dipanggil di completeSectionIfNeeded() (lihat komentar
+        // di sana), sama pola sengaja "tidak re-implement logic" seperti
+        // dilakukan pada yearCompletionService.
+        private BorderUnlockService $borderUnlockService,
     ) {
     }
 
@@ -244,7 +251,17 @@ class CaseStudyService
      * biasa untuk section case_study ditegakkan di
      * ProgressController::complete() (lihat Section::isCaseStudy()).
      *
-     * @return array{progress: \App\Models\UserProgress, year_completed: bool, newly_unlocked_vaccines: \Illuminate\Support\Collection}
+     * (Fase 3) Ditambahkan langkah ke-3: cek unlock Border SEKALA lewat
+     * BorderUnlockService SETELAH progress section tercatat — sengaja
+     * ditaruh di titik yang sama dengan checkAndUnlockVaccines() (bukan di
+     * ProgressController atau job terpisah), karena "badge didapat" HANYA
+     * bisa berubah tepat di sini (satu-satunya jalur sah completed_at
+     * studi kasus terisi, lihat UserCaseStudyAttempt::recordAttempt() di
+     * submit() atas). Aman idempotent sama seperti checkAndUnlockVaccines
+     * — BorderUnlockService::checkAndUnlock() sendiri no-op kalau border
+     * sudah terbuka (sticky).
+     *
+     * @return array{progress: \App\Models\UserProgress, year_completed: bool, newly_unlocked_vaccines: \Illuminate\Support\Collection, border_unlocked: bool}
      */
     public function completeSectionIfNeeded(User $user, CaseStudy $caseStudy): array
     {
@@ -262,10 +279,16 @@ class CaseStudyService
 
             $newlyUnlockedVaccines = $this->yearCompletionService->checkAndUnlockVaccines($user, $year);
 
+            // Border dicek TERLEPAS dari year completed/tidak — border
+            // bergantung ke KOLEKSI BADGE lintas year/era, bukan ke
+            // completion 1 year tertentu (beda syarat dari unlock vaksin).
+            $borderUnlocked = $this->borderUnlockService->checkAndUnlock($user);
+
             return [
                 'progress' => $progress,
                 'year_completed' => $newlyUnlockedVaccines->isNotEmpty() || $this->yearCompletionService->isCompleted($user, $year),
                 'newly_unlocked_vaccines' => $newlyUnlockedVaccines,
+                'border_unlocked' => $borderUnlocked,
             ];
         });
     }

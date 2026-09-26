@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Content\LinkParserService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -36,6 +37,15 @@ class CaseStudy extends Model
         'is_published',
     ];
 
+    /**
+     * (Fase 2 — Badge) `badge_image_url` diikutkan otomatis tiap model ini
+     * di-serialize ke array/JSON — pola identik Vaccine::$appends
+     * ('photo_url'/'photo_locked_url'), supaya BadgeResource & response
+     * admin cukup akses $caseStudy->badge_image_url tanpa panggil resolver
+     * manual di tiap tempat.
+     */
+    protected $appends = ['badge_image_url'];
+
     protected function casts(): array
     {
         return [
@@ -56,6 +66,22 @@ class CaseStudy extends Model
     public function attempts()
     {
         return $this->hasMany(UserCaseStudyAttempt::class);
+    }
+
+    /**
+     * (Fase 2 — Badge) Resolve raw link Google Drive (`badge_image_link`)
+     * jadi direct-view URL — pola & service SAMA dengan
+     * Vaccine::getPhotoUrlAttribute() / ContentBlock::resolved_url, supaya
+     * kalau format link Drive berubah di masa depan, cukup ubah
+     * LinkParserService satu tempat tanpa menyentuh model manapun.
+     *
+     * Ini yang menutup dependensi backend di progress.md: "badge_image_link
+     * yang dikirim submit()/show() masih link Drive mentah — perlu
+     * image_url yang sudah di-resolve".
+     */
+    public function getBadgeImageUrlAttribute(): ?string
+    {
+        return app(LinkParserService::class)->toDriveImageUrl($this->badge_image_link);
     }
 
     /**

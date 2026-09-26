@@ -805,18 +805,47 @@ function EraQuizRecapScreen({ data, accent }) {
 
 /* ------------------------------------------------------------ Case study */
 // data: { title, description, challengeText, reasonDescription,
-//         options: [{ id, title, description, correct_rank }] }
+//         options: [{ id, title, description, correct_rank }],
+//         feedbackCorrect, feedbackIncorrect,
+//         badgeName, badgeDescription, resolvedBadgeImageUrl }
 //
-// Preview disederhanakan jadi 1 layar (gabungan Briefing + Ruang Keputusan)
-// -- BUKAN simulasi 4 layar penuh (Opening & Badge murni teks template
-// hardcode Flutter, tidak ada yang bisa diedit admin di situ). correct_rank
-// SENGAJA ikut ditampilkan di preview admin ini (beda dari response endpoint
-// user yang menyembunyikannya) supaya admin bisa cek highlight Prioritas
-// 1/2/3 vs pengecoh saat mengedit opsi.
+// Preview disederhanakan jadi 1 komponen dengan TOGGLE internal (bukan 4
+// route Flutter terpisah) — "Ruang Keputusan" (form yang sedang diedit),
+// "Hasil: Benar" (feedback_correct + Layar 4 Badge), "Hasil: Salah"
+// (feedback_incorrect saja, TIDAK ada Badge — selaras R-CASE-06: gagal
+// tidak pernah membuka badge). Opening TIDAK disimulasikan di sini karena
+// isinya murni teks template hardcode Flutter (Peran Pemain/Aturan Main),
+// tidak ada satu pun yang diedit admin — tidak ada gunanya dipreview.
+//
+// correct_rank SENGAJA ikut ditampilkan di preview admin ini (beda dari
+// response endpoint user yang menyembunyikannya) supaya admin bisa cek
+// highlight Prioritas 1/2/3 vs pengecoh saat mengedit opsi.
 
 function CaseStudyScreen({ data, accent }) {
-  const { title, description, challengeText, reasonDescription, options = [] } = data ?? {};
+  const {
+    title,
+    description,
+    challengeText,
+    reasonDescription,
+    options = [],
+    feedbackCorrect,
+    feedbackIncorrect,
+    badgeName,
+    badgeDescription,
+    resolvedBadgeImageUrl,
+  } = data ?? {};
   const rankLabel = { 1: "Prioritas 1", 2: "Prioritas 2", 3: "Prioritas 3" };
+
+  // "decision" = form Briefing + Ruang Keputusan (default, sama seperti
+  // sebelumnya). "correct"/"incorrect" mensimulasikan hasil submit — murni
+  // state lokal komponen preview, tidak memanggil API apa pun.
+  const [view, setView] = useState("decision");
+
+  const tabs = [
+    { key: "decision", label: "Ruang Keputusan" },
+    { key: "correct", label: "Hasil: Benar" },
+    { key: "incorrect", label: "Hasil: Salah" },
+  ];
 
   return (
     <div>
@@ -826,6 +855,67 @@ function CaseStudyScreen({ data, accent }) {
       >
         Studi Kasus
       </span>
+
+      <div className="mb-3 flex gap-1 rounded-lg bg-zinc-100 p-0.5">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setView(t.key)}
+            className={`flex-1 rounded-md py-1 text-[10px] font-medium transition ${
+              view === t.key ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-400"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "decision" && (
+        <CaseStudyDecisionPreview
+          title={title}
+          description={description}
+          challengeText={challengeText}
+          reasonDescription={reasonDescription}
+          options={options}
+          rankLabel={rankLabel}
+          accent={accent}
+        />
+      )}
+
+      {view === "correct" && (
+        <CaseStudyResultPreview
+          isCorrect
+          feedback={feedbackCorrect}
+          badgeName={badgeName}
+          badgeDescription={badgeDescription}
+          resolvedBadgeImageUrl={resolvedBadgeImageUrl}
+          accent={accent}
+        />
+      )}
+
+      {view === "incorrect" && (
+        <CaseStudyResultPreview
+          isCorrect={false}
+          feedback={feedbackIncorrect}
+          accent={accent}
+        />
+      )}
+    </div>
+  );
+}
+
+function CaseStudyDecisionPreview({
+  title,
+  description,
+  challengeText,
+  reasonDescription,
+  options,
+  rankLabel,
+  accent,
+}) {
+  return (
+    <div>
       <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
         Briefing kasus utama
       </p>
@@ -894,6 +984,74 @@ function CaseStudyScreen({ data, accent }) {
         style={{ backgroundColor: accent }}
       >
         Submit analisis
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Simulasi Layar 4 (Badge) untuk hasil BENAR, dan feedback tanpa badge
+ * untuk hasil SALAH — feedback SENGAJA tidak menunjukkan slot mana yang
+ * salah (R-CASE-06, teks murni dari admin apa adanya).
+ */
+function CaseStudyResultPreview({ isCorrect, feedback, badgeName, badgeDescription, resolvedBadgeImageUrl, accent }) {
+  if (!isCorrect) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-400">
+          <FileWarning size={26} />
+        </div>
+        <p className="text-sm font-semibold text-zinc-900">Belum tepat</p>
+        <p className="whitespace-pre-line text-xs leading-relaxed text-zinc-500">
+          {feedback || <span className="text-zinc-300">Feedback jawaban salah belum diisi</span>}
+        </p>
+        <button
+          className="mt-2 w-full rounded-lg border py-2.5 text-sm font-medium"
+          style={{ borderColor: accent, color: accent }}
+        >
+          Coba lagi
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3 py-4 text-center">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Misi terselesaikan!</p>
+
+      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-4 bg-zinc-50" style={{ borderColor: accent }}>
+        {resolvedBadgeImageUrl ? (
+          <img
+            src={resolvedBadgeImageUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <Sparkles size={28} style={{ color: accent }} />
+        )}
+      </div>
+
+      <h2 className="text-base font-semibold text-zinc-900">
+        {badgeName || <span className="text-zinc-300">(nama badge belum diisi)</span>}
+      </h2>
+
+      {badgeDescription && (
+        <p className="whitespace-pre-line text-xs leading-relaxed text-zinc-500">{badgeDescription}</p>
+      )}
+
+      <div className="mt-1 w-full rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-left">
+        <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Feedback benar</p>
+        <p className="whitespace-pre-line text-xs leading-relaxed text-zinc-600">
+          {feedback || <span className="text-zinc-300">Feedback jawaban benar belum diisi</span>}
+        </p>
+      </div>
+
+      <button
+        className="mt-4 w-full rounded-lg py-2.5 text-sm font-medium text-white"
+        style={{ backgroundColor: accent }}
+      >
+        Selesai
       </button>
     </div>
   );

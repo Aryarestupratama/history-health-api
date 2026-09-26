@@ -315,17 +315,27 @@ export default function WabahWorkspace() {
       return {
         screen: "case-study",
         data: {
-          // Preview disederhanakan jadi 1 layar (Briefing + 5 opsi Ruang
-          // Keputusan) — bukan simulasi 4 layar penuh (Opening/Badge masih
-          // teks template hardcode Flutter, tidak relevan diedit admin di
-          // sini). correct_rank IKUT dikirim ke preview (beda dari response
-          // endpoint user yang menyembunyikannya) supaya admin bisa lihat
-          // highlight prioritas 1/2/3 vs pengecoh saat mengedit.
+          // Preview 1 komponen dengan toggle internal (Ruang Keputusan /
+          // Hasil Benar / Hasil Salah) — Opening tetap tidak disimulasikan
+          // (teks template hardcode Flutter, tidak ada yang diedit admin
+          // di sana). correct_rank IKUT dikirim ke preview (beda dari
+          // response endpoint user yang menyembunyikannya) supaya admin
+          // bisa lihat highlight prioritas 1/2/3 vs pengecoh saat mengedit.
           title: caseStudy?.title ?? null,
           description: caseStudy?.description ?? null,
           challengeText: caseStudy?.challenge_text ?? null,
           reasonDescription: caseStudy?.reason_description ?? null,
           options: caseStudy?.options ?? [],
+          // (Baru — preview Hasil Benar/Salah & layar Badge) feedback_*
+          // ditampilkan di kartu hasil; badge_image_url sudah ter-resolve
+          // dari backend (accessor CaseStudy::getBadgeImageUrlAttribute(),
+          // sama pola dengan photo_url Vaccine) — tidak perlu resolve ulang
+          // di sisi admin.
+          feedbackCorrect: caseStudy?.feedback_correct ?? null,
+          feedbackIncorrect: caseStudy?.feedback_incorrect ?? null,
+          badgeName: caseStudy?.badge_name ?? null,
+          badgeDescription: caseStudy?.badge_description ?? null,
+          resolvedBadgeImageUrl: caseStudy?.badge_image_url ?? null,
         },
       };
     }

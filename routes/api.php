@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
+use App\Http\Controllers\Api\Profile\AvatarController;
+use App\Http\Controllers\Api\Profile\FrameController;
 
 use App\Http\Controllers\Admin\AdminUser\AdminUserController;
 use App\Http\Controllers\Admin\ContentBlock\ContentBlockController;
@@ -19,6 +21,7 @@ use App\Http\Controllers\Api\Public\EraController as PublicEraController;
 use App\Http\Controllers\Api\Public\YearController as PublicYearController;
 use App\Http\Controllers\Api\Public\SectionController as PublicSectionController;
 
+use App\Http\Controllers\Api\Badge\BadgeController;
 use App\Http\Controllers\Api\HomeController;
 use App\Http\Controllers\Api\Progress\ProgressController;
 use App\Http\Controllers\Api\Card\CardController;
@@ -55,6 +58,19 @@ Route::prefix('auth')->group(function () {
         // progress, kuis, collectible card), jadi tidak butuh middleware
         // 'verified'. Cukup login (auth:sanctum) seperti route auth lainnya.
         Route::post('password', [AuthController::class, 'changePassword']);
+
+        // Fase 3 — Foto Profil unggahan. Sama alasan dengan
+        // changePassword() di atas: BUKAN bagian dari daftar fitur
+        // wajib-verified R-AUTH-03 (progress, kuis, collectible card),
+        // jadi cukup auth:sanctum, tidak perlu middleware 'verified'.
+        // store() dipakai juga untuk ganti foto (bukan cuma upload pertama).
+        Route::post('profile/avatar', [AvatarController::class, 'store']);
+        Route::delete('profile/avatar', [AvatarController::class, 'destroy']);
+
+        // Fase 3 — pasang/lepas Border SEKALA. Sama alasan dgn avatar di
+        // atas: bukan fitur wajib-verified R-AUTH-03, cukup auth:sanctum.
+        // Guard "belum unlocked" ada di UpdateFrameRequest, bukan di sini.
+        Route::patch('profile/frame', [FrameController::class, 'update']);
     });
 });
 
@@ -205,4 +221,11 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // Ditandai "sudah dilihat" begitu animasi reveal locked->unlocked
     // selesai diputar di halaman Koleksi (badge dot & auto-scroll reveal).
     Route::post('cards/{vaccine}/seen', [CardController::class, 'markSeen']);
+
+    // R-CASE (Fase 2): Koleksi Badge — derived dari CaseStudy published +
+    // UserCaseStudyAttempt.completed_at (sticky), TIDAK ada tabel badges
+    // terpisah. Pola sama dengan Koleksi Vaksin (cards) di atas, bedanya
+    // badge locked TETAP mengirim nama/ikon asli (lihat BadgeResource) —
+    // Flutter yang meredupkan tampilannya, bukan disamarkan di backend.
+    Route::get('badges', [BadgeController::class, 'index']);
 });

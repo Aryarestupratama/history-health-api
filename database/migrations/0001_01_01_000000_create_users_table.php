@@ -19,6 +19,21 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password')->nullable();
             $table->enum('role', ['user', 'admin'])->default('user');
+            // Fase 3 — Foto Profil unggahan & Border SEKALA.
+            // avatar_path: path file di disk hosting (BUKAN link Drive
+            // seperti gambar CMS lain — ini upload asli, disimpan &
+            // di-resize di server). Null = belum pernah upload, Flutter
+            // fallback ke inisial/placeholder.
+            $table->string('avatar_path')->nullable();
+            // frame_unlocked_at: PERMANEN sekali terisi (diset saat user
+            // sudah mengumpulkan semua badge dari year yang punya studi
+            // kasus published) — tidak pernah dikosongkan lagi walau admin
+            // menambah year baru dengan studi kasus baru, sama filosofi
+            // sticky-nya dengan UserCaseStudyAttempt.completed_at.
+            $table->timestamp('frame_unlocked_at')->nullable();
+            // frame_equipped: toggle pasang/lepas border di foto profil,
+            // hanya relevan kalau frame_unlocked_at sudah terisi.
+            $table->boolean('frame_equipped')->default(false);
             $table->rememberToken();
             $table->timestamps();
         });
