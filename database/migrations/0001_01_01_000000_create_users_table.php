@@ -34,6 +34,20 @@ return new class extends Migration
             // frame_equipped: toggle pasang/lepas border di foto profil,
             // hanya relevan kalau frame_unlocked_at sudah terisi.
             $table->boolean('frame_equipped')->default(false);
+            // Status "sudah lihat tutorial onboarding" level AKUN (bukan
+            // device) — pengganti flag SharedPreferences murni-lokal di
+            // Flutter yang terbukti salah asumsi: SharedPreferences itu
+            // per-device/per-install, bukan per-user, jadi logout lalu
+            // daftar/login akun LAIN di device yang sama membuat tur
+            // tidak pernah muncul untuk akun baru itu (ketuker sama akun
+            // sebelumnya yang sudah pernah lihat). BEDA dari
+            // `has_seen_wabah_intro` yang PERNAH dibuat lalu dihapus total
+            // (lihat Schema.md) karena tidak pernah diekspos ke
+            // UserResource/Flutter — kolom ini sengaja langsung
+            // disambungkan ke UserResource & endpoint PATCH di PR yang
+            // sama. Guest tetap pakai flag lokal SharedPreferences (guest
+            // tidak punya row users).
+            $table->boolean('has_seen_onboarding_tutorial')->default(false);
             $table->rememberToken();
             $table->timestamps();
         });

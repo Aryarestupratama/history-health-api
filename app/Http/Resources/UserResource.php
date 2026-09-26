@@ -26,6 +26,12 @@ class UserResource extends JsonResource
             // Flutter tetap terima apa adanya (false secara default),
             // toggle pasang/lepas cuma boleh diaktifkan kalau unlocked.
             'frame_equipped' => (bool) $this->frame_equipped,
+            // Status "sudah lihat tutorial onboarding" level akun — dibaca
+            // TutorialTourController (Flutter) untuk user login, MENGGANTIKAN
+            // flag SharedPreferences murni-lokal (yang salah asumsi: per
+            // device, bukan per akun). Guest tetap pakai flag lokal karena
+            // guest tidak punya row users.
+            'has_seen_onboarding_tutorial' => (bool) $this->has_seen_onboarding_tutorial,
         ];
     }
 }

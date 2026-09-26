@@ -26,6 +26,10 @@ class User extends Authenticatable implements MustVerifyEmail
     // frame_unlocked_at SENGAJA tidak fillable — hanya diisi service unlock
     // border (permanen, satu arah), bukan lewat update biasa/mass-assign.
 
+    // has_seen_onboarding_tutorial SENGAJA tidak fillable juga — hanya
+    // diisi lewat markOnboardingTutorialSeen() (satu arah: false -> true),
+    // bukan mass-assign biasa. Sama alasan dengan frame_unlocked_at di atas.
+
     protected $hidden = [
         'password',
         'remember_token',
@@ -45,6 +49,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'frame_unlocked_at' => 'datetime',
             'frame_equipped' => 'boolean',
+            'has_seen_onboarding_tutorial' => 'boolean',
         ];
     }
 
@@ -74,6 +79,21 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hasFrameUnlocked(): bool
     {
         return ! is_null($this->frame_unlocked_at);
+    }
+
+    /**
+     * Tandai user ini sudah pernah melihat tur tutorial onboarding sampai
+     * selesai — dipanggil dari endpoint PATCH profile/tutorial-seen
+     * (TutorialTourController Flutter memanggilnya di titik yang SAMA
+     * dengan `_markSeen()` lokal sebelumnya, cukup setelah step terakhir
+     * kelar). Satu arah (tidak ada "un-mark"), idempotent kalau dipanggil
+     * berkali-kali.
+     */
+    public function markOnboardingTutorialSeen(): void
+    {
+        if (! $this->has_seen_onboarding_tutorial) {
+            $this->forceFill(['has_seen_onboarding_tutorial' => true])->save();
+        }
     }
 
     public function progress()

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\Profile\AvatarController;
 use App\Http\Controllers\Api\Profile\FrameController;
+use App\Http\Controllers\Api\Profile\TutorialController;
 
 use App\Http\Controllers\Admin\AdminUser\AdminUserController;
 use App\Http\Controllers\Admin\ContentBlock\ContentBlockController;
@@ -71,6 +72,13 @@ Route::prefix('auth')->group(function () {
         // atas: bukan fitur wajib-verified R-AUTH-03, cukup auth:sanctum.
         // Guard "belum unlocked" ada di UpdateFrameRequest, bukan di sini.
         Route::patch('profile/frame', [FrameController::class, 'update']);
+
+        // Status "sudah lihat tutorial onboarding" level akun — sama
+        // alasan dgn avatar/frame di atas: bukan bagian R-AUTH-03, cukup
+        // auth:sanctum. Dipanggil TutorialTourController (Flutter) begitu
+        // step terakhir tur selesai (menggantikan flag SharedPreferences
+        // murni-lokal yang salah asumsi per-device, bukan per-akun).
+        Route::patch('profile/tutorial-seen', [TutorialController::class, 'markSeen']);
     });
 });
 
