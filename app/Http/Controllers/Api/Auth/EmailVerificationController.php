@@ -40,26 +40,22 @@ class EmailVerificationController extends Controller
      * 1. Middleware 'signed' (cek signature URL belum di-tamper/expired)
      * 2. Validasi hash manual di bawah (cocokkan {hash} dengan email user)
      */
-    public function verify(Request $request, int $id, string $hash): JsonResponse
+    public function verify(Request $request, int $id, string $hash)
     {
         $user = User::findOrFail($id);
 
         if (! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
-            abort(403, 'Link verifikasi tidak valid.');
+            return view('email_verification_result', ['status' => 'error']);
         }
 
         if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'message' => 'Email sudah terverifikasi sebelumnya.',
-            ]);
+            return view('email_verification_result', ['status' => 'already']);
         }
 
         if ($user->markEmailAsVerified()) {
             event(new Verified($user));
         }
 
-        return response()->json([
-            'message' => 'Email berhasil diverifikasi.',
-        ]);
+        return view('email_verification_result', ['status' => 'success']);
     }
 }

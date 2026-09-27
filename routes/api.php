@@ -37,8 +37,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
-    Route::get('google/redirect', [AuthController::class, 'googleRedirect']);
-    Route::get('google/callback', [AuthController::class, 'googleCallback']);
 
     // Dipindah keluar dari group auth:sanctum karena link ini diklik dari email
     // di browser (tidak membawa Sanctum token). Keamanannya dijamin oleh
