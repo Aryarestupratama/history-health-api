@@ -165,7 +165,12 @@ function RoadmapScreen({ data, accent, eraLabel }) {
 }
 
 /* -------------------------------------------------------- Section detail */
-// data: { sectionTitle, headerImageUrl, blocks: [{ id, type: 'text'|'image'|'video'|'pdf', content, resolved_url, caption }] }
+// data: { sectionTitle, headerImageUrl, blocks: [{ id, type: 'text'|'image'|'video'|'pdf', content, resolved_url, caption }], activeBlockId }
+//
+// (Baru, item #1 revisi layout admin) activeBlockId: id blok yang sedang
+// di-expand/diedit admin di ContentBlockEditor -- dipakai untuk highlight
+// blok yang sama di preview ini (border putus-putus warna aksen era),
+// supaya admin langsung tahu "oh saya lagi edit blok yang ini".
 //
 // (Revisi) `sectionTitle` TIDAK LAGI dirender sebagai judul — posisi paling
 // atas sekarang `headerImageUrl` (opsional per section, boleh null). Kalau
@@ -175,6 +180,7 @@ function RoadmapScreen({ data, accent, eraLabel }) {
 function SectionDetailScreen({ data, accent, eraLabel }) {
   const blocks = data?.blocks ?? [];
   const headerImageUrl = data?.headerImageUrl;
+  const activeBlockId = data?.activeBlockId ?? null;
   return (
     <div>
       {eraLabel && (
@@ -204,7 +210,17 @@ function SectionDetailScreen({ data, accent, eraLabel }) {
       )}
       <div className="space-y-3">
         {blocks.map((b, i) => (
-          <BlockPreview key={b.id ?? i} block={b} accent={accent} />
+          <div
+            key={b.id ?? i}
+            className={
+              activeBlockId != null && b.id === activeBlockId
+                ? "-m-1.5 rounded-lg border-2 border-dashed p-1.5 transition"
+                : "rounded-lg border-2 border-transparent p-1.5 transition"
+            }
+            style={activeBlockId != null && b.id === activeBlockId ? { borderColor: accent } : undefined}
+          >
+            <BlockPreview block={b} accent={accent} />
+          </div>
         ))}
       </div>
     </div>

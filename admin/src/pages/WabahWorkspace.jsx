@@ -44,6 +44,11 @@ export default function WabahWorkspace() {
 
   // state khusus per tab, disinkronkan ke PhonePreview secara live
   const [activeSectionId, setActiveSectionId] = useState(null);
+  // (Baru, item #1) blok konten mana yang sedang di-expand/diedit di
+  // ContentBlockEditor -- dipakai untuk highlight blok yang sama di Phone
+  // Preview supaya admin tahu "oh saya lagi edit ini". null = semua blok
+  // collapsed / tidak ada yang sedang diedit.
+  const [activeBlockId, setActiveBlockId] = useState(null);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   // (Baru) poin Rangkuman Interaktif yang sedang diedit/dipreview — sama
   // pola dengan activeQuestionIndex di atas (kuis), tapi selalu 0-6 karena
@@ -234,6 +239,7 @@ export default function WabahWorkspace() {
       return;
     }
     setStatusFor("section", "idle");
+    setActiveBlockId(null);
     setActiveSectionId(id);
   }
 
@@ -253,6 +259,7 @@ export default function WabahWorkspace() {
             sectionTitle: activeSection.title,
             headerImageUrl: activeSection.resolved_header_image_url ?? null,
             blocks: activeSection.content_blocks ?? [],
+            activeBlockId,
           },
         };
       }
@@ -341,7 +348,7 @@ export default function WabahWorkspace() {
     }
 
     return { screen: null, data: null };
-  }, [year, activeTab, activeSectionId, activeQuestionIndex, activeSummaryPointIndex]);
+  }, [year, activeTab, activeSectionId, activeBlockId, activeQuestionIndex, activeSummaryPointIndex]);
 
   if (loading || !year) {
     return <div className="p-8 text-sm text-zinc-400">Memuat workspace…</div>;
@@ -368,14 +375,14 @@ export default function WabahWorkspace() {
         </div>
       </div>
 
-      <div className="grid flex-1 grid-cols-[65%_35%] gap-4 overflow-hidden bg-zinc-50 p-4">
-        <div className="overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          {tabError[activeTab] && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{tabError[activeTab]}</AlertDescription>
-            </Alert>
-          )}
-          {activeTab === "section" && (
+      <div className={`flex-1 overflow-y-auto bg-zinc-50 p-4 ${activeTab === "section" ? "" : "grid grid-cols-[65%_35%] gap-4 overflow-hidden"}`}>
+        {activeTab === "section" ? (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            {tabError.section && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{tabError.section}</AlertDescription>
+              </Alert>
+            )}
             <SectionBlokTab
               year={year}
               setYear={setYear}
@@ -393,56 +400,71 @@ export default function WabahWorkspace() {
               setHeaderImageDirty={setSectionHeaderImageDirty}
               blockDirty={sectionBlockDirty}
               setBlockDirty={setSectionBlockDirty}
+              activeBlockId={activeBlockId}
+              setActiveBlockId={setActiveBlockId}
+              previewScreen={previewProps.screen}
+              previewData={previewProps.data}
+              eraSlug={year.era?.slug}
             />
-          )}
-          {activeTab === "summary" && (
-            <SummaryVaccineTab
-              year={year}
-              setYear={setYear}
-              status={tabStatus.summary}
-              setStatus={(s) => setStatusFor("summary", s)}
-              setError={(m) => setErrorFor("summary", m)}
-              summaryDirty={summaryDirty}
-              setSummaryDirty={setSummaryDirty}
-              summaryPointsDirty={summaryPointsDirty}
-              setSummaryPointsDirty={setSummaryPointsDirty}
-              vaccinesDirty={vaccinesDirty}
-              setVaccinesDirty={setVaccinesDirty}
-              activePointIndex={activeSummaryPointIndex}
-              setActivePointIndex={setActiveSummaryPointIndex}
-            />
-          )}
-          {activeTab === "quiz" && (
-            <QuizTab
-              year={year}
-              setYear={setYear}
-              activeQuestionIndex={activeQuestionIndex}
-              setActiveQuestionIndex={setActiveQuestionIndex}
-              status={tabStatus.quiz}
-              setStatus={(s) => setStatusFor("quiz", s)}
-              setError={(m) => setErrorFor("quiz", m)}
-              dirtyFields={quizFieldDirty}
-              setDirtyFields={setQuizFieldDirty}
-            />
-          )}
-          {activeTab === "case_study" && (
-            <CaseStudyTab
-              year={year}
-              setYear={setYear}
-              status={tabStatus.case_study}
-              setStatus={(s) => setStatusFor("case_study", s)}
-              setError={(m) => setErrorFor("case_study", m)}
-              contentDirty={caseStudyContentDirty}
-              setContentDirty={setCaseStudyContentDirty}
-              optionsDirty={caseStudyOptionsDirty}
-              setOptionsDirty={setCaseStudyOptionsDirty}
-            />
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+              {tabError[activeTab] && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{tabError[activeTab]}</AlertDescription>
+                </Alert>
+              )}
+              {activeTab === "summary" && (
+                <SummaryVaccineTab
+                  year={year}
+                  setYear={setYear}
+                  status={tabStatus.summary}
+                  setStatus={(s) => setStatusFor("summary", s)}
+                  setError={(m) => setErrorFor("summary", m)}
+                  summaryDirty={summaryDirty}
+                  setSummaryDirty={setSummaryDirty}
+                  summaryPointsDirty={summaryPointsDirty}
+                  setSummaryPointsDirty={setSummaryPointsDirty}
+                  vaccinesDirty={vaccinesDirty}
+                  setVaccinesDirty={setVaccinesDirty}
+                  activePointIndex={activeSummaryPointIndex}
+                  setActivePointIndex={setActiveSummaryPointIndex}
+                />
+              )}
+              {activeTab === "quiz" && (
+                <QuizTab
+                  year={year}
+                  setYear={setYear}
+                  activeQuestionIndex={activeQuestionIndex}
+                  setActiveQuestionIndex={setActiveQuestionIndex}
+                  status={tabStatus.quiz}
+                  setStatus={(s) => setStatusFor("quiz", s)}
+                  setError={(m) => setErrorFor("quiz", m)}
+                  dirtyFields={quizFieldDirty}
+                  setDirtyFields={setQuizFieldDirty}
+                />
+              )}
+              {activeTab === "case_study" && (
+                <CaseStudyTab
+                  year={year}
+                  setYear={setYear}
+                  status={tabStatus.case_study}
+                  setStatus={(s) => setStatusFor("case_study", s)}
+                  setError={(m) => setErrorFor("case_study", m)}
+                  contentDirty={caseStudyContentDirty}
+                  setContentDirty={setCaseStudyContentDirty}
+                  optionsDirty={caseStudyOptionsDirty}
+                  setOptionsDirty={setCaseStudyOptionsDirty}
+                />
+              )}
+            </div>
 
-        <div className="flex items-start justify-center overflow-y-auto rounded-2xl border border-zinc-200 bg-zinc-50/60 p-6 shadow-sm">
-          <PhonePreview screen={previewProps.screen} data={previewProps.data} eraSlug={year.era?.slug} />
-        </div>
+            <div className="flex items-start justify-center overflow-y-auto rounded-2xl border border-zinc-200 bg-zinc-50/60 p-6 shadow-sm">
+              <PhonePreview screen={previewProps.screen} data={previewProps.data} eraSlug={year.era?.slug} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -582,6 +604,11 @@ function SectionBlokTab({
   setHeaderImageDirty,
   blockDirty,
   setBlockDirty,
+  activeBlockId,
+  setActiveBlockId,
+  previewScreen,
+  previewData,
+  eraSlug,
 }) {
   const activeSection = year.sections?.find((s) => s.id === activeSectionId);
   const [dragId, setDragId] = useState(null);
@@ -794,19 +821,21 @@ function SectionBlokTab({
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-4xl grid-cols-[220px_1fr] gap-4">
-      {/* Sidebar list section -- kartu tersendiri supaya tidak menyatu
-          dengan panel editor di sebelahnya (poin 3) */}
-      <div className="h-fit rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
+    <div className="w-full space-y-4">
+      {/* (Baru, item #1) Section list dipindah ke ATAS -- strip horizontal
+          full-width, BUKAN lagi sidebar 220px di samping editor. Tujuannya
+          supaya ruang yang berdampingan di bawah cukup lebar untuk cuma
+          Blok editor + Phone Preview (poin #1 revisi layout). */}
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Section</p>
-          <Button size="icon" onClick={addSection} className={`h-9 w-9 rounded-lg ${BTN_DARK}`}>
-            <Plus size={18} />
+          <Button size="icon" onClick={addSection} className={`h-8 w-8 rounded-lg ${BTN_DARK}`}>
+            <Plus size={16} />
           </Button>
         </div>
-        <ul className="space-y-1">
+        <div className="flex flex-wrap gap-2">
           {orderedSections.map((s) => (
-            <li
+            <div
               key={s.id}
               draggable
               onDragStart={() => setDragId(s.id)}
@@ -823,8 +852,8 @@ function SectionBlokTab({
                 setDragId(null);
                 setDragOverId(null);
               }}
-              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-sm transition ${
-                activeSectionId === s.id ? "border-zinc-900 bg-zinc-50" : "border-transparent hover:bg-zinc-50"
+              className={`flex max-w-[220px] items-center gap-1.5 rounded-lg border px-2 py-1.5 text-sm transition ${
+                activeSectionId === s.id ? "border-zinc-900 bg-white" : "border-transparent bg-white hover:bg-zinc-50"
               } ${dragOverId === s.id && dragId !== s.id ? "border-dashed" : ""} ${
                 dragId === s.id ? "opacity-40" : ""
               }`}
@@ -846,20 +875,16 @@ function SectionBlokTab({
               <Badge variant={s.is_published ? "default" : "secondary"} className="shrink-0 text-[10px]">
                 {s.is_published ? "Published" : "Draft"}
               </Badge>
-            </li>
+            </div>
           ))}
-        </ul>
 
-        {/* (Baru — Studi Kasus) Penanda posisi section case_study (selalu
-            order=8) -- BUKAN item draggable/editable di sini, cuma pointer
-            ke tab "Studi Kasus". Kalau belum ada section-nya sama sekali,
-            tampilkan tombol untuk membuatnya (lihat CaseStudyTab utk isi
-            kontennya setelah section ini ada). */}
-        <div className="mt-3 border-t border-dashed border-zinc-200 pt-3">
+          {/* (Studi Kasus) Penanda posisi section case_study (selalu order=8)
+              -- BUKAN item draggable/editable di sini, cuma pointer ke tab
+              "Studi Kasus". Kalau belum ada, tampilkan tombol buat baru. */}
           {caseStudySection ? (
             <button
               onClick={() => setActiveTab?.("case_study")}
-              className="flex w-full items-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 text-left text-sm text-zinc-500 hover:bg-zinc-50"
+              className="flex max-w-[220px] items-center gap-1.5 rounded-lg border border-dashed border-zinc-200 bg-white px-2 py-1.5 text-left text-sm text-zinc-500 hover:bg-zinc-50"
               title="Kelola konten Studi Kasus di tab terpisah"
             >
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-amber-100 text-[10px] font-semibold text-amber-700">
@@ -871,98 +896,105 @@ function SectionBlokTab({
               </Badge>
             </button>
           ) : (
-            <p className="px-2 text-[11px] text-zinc-400">
-              Section Studi Kasus (order 8) belum dibuat — buat lewat tab{" "}
-              <button
-                onClick={() => setActiveTab?.("case_study")}
-                className="font-medium text-zinc-600 underline underline-offset-2"
-              >
-                Studi Kasus
-              </button>
-              .
-            </p>
+            <button
+              onClick={() => setActiveTab?.("case_study")}
+              className="flex items-center rounded-lg border border-dashed border-zinc-200 bg-white px-2 py-1.5 text-left text-[11px] text-zinc-400 hover:bg-zinc-50"
+            >
+              Section Studi Kasus (order 8) belum dibuat — buka tab{" "}
+              <span className="ml-1 font-medium text-zinc-600 underline underline-offset-2">Studi Kasus</span>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Editor section aktif -- kartu tersendiri, dibatasi max-width &
-          jadi scrollable kalau kontennya (blok) makin panjang (poin 5) */}
-      <div className="max-h-[75vh] space-y-4 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-4">
-        {!activeSection ? (
-          <EmptyPanel text="Belum ada section. Tambahkan section baru di sidebar kiri." />
-        ) : (
-          <div className="mx-auto w-full max-w-2xl space-y-4">
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                  Judul Section <span className="normal-case font-normal text-zinc-400">(label admin saja, tidak tampil ke user)</span>
+      {/* (Baru, item #1) Bawah: HANYA Blok editor + Phone Preview
+          berdampingan, lebih lebar dari sebelumnya karena sidebar section
+          sudah pindah ke atas. Blok editor TIDAK dibatasi max-h/overflow
+          tetap lagi -- tumbuh natural mengikuti panjang konten, dan Phone
+          Preview (sticky, sudah built-in di komponennya) mengikuti scroll. */}
+      <div className="grid grid-cols-[1fr_320px] items-start gap-4">
+        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4">
+          {!activeSection ? (
+            <EmptyPanel text="Belum ada section. Tambahkan section baru di atas." />
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Judul Section{" "}
+                    <span className="normal-case font-normal text-zinc-400">(label admin saja, tidak tampil ke user)</span>
+                  </p>
+                  {titleDirty.has(activeSection.id) && <UnsavedFieldBadge />}
+                </div>
+                <Input
+                  value={activeSection.title}
+                  onChange={(e) => editSectionTitle(activeSection.id, e.target.value)}
+                  placeholder="Judul section…"
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Header Gambar <span className="normal-case font-normal text-zinc-400">(opsional)</span>
+                  </p>
+                  {headerImageDirty.has(activeSection.id) && <UnsavedFieldBadge />}
+                </div>
+                <Input
+                  value={activeSection.header_image ?? ""}
+                  onChange={(e) => editSectionHeaderImage(activeSection.id, e.target.value)}
+                  placeholder="Link Google Drive (boleh dikosongkan)…"
+                />
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Tampil di posisi paling atas layar Detail Section, menggantikan judul. Boleh diisi
+                  boleh tidak — kalau kosong, section langsung mulai dari blok konten pertama.
                 </p>
-                {titleDirty.has(activeSection.id) && <UnsavedFieldBadge />}
               </div>
-              <Input
-                value={activeSection.title}
-                onChange={(e) => editSectionTitle(activeSection.id, e.target.value)}
-                placeholder="Judul section…"
+
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Blok Konten</p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => togglePublish(activeSection)} className={BTN_DARK}>
+                    {activeSection.is_published ? "Unpublish" : "Publish"}
+                  </Button>
+                  <Button size="sm" onClick={() => deleteSection(activeSection.id)} className={BTN_RED}>
+                    <Trash2 size={14} /> Hapus section
+                  </Button>
+                </div>
+              </div>
+
+              <ContentBlockEditor
+                section={activeSection}
+                blocks={activeSection.content_blocks ?? []}
+                dirtyBlockIds={blockDirty}
+                markDirty={markBlockDirty}
+                activeBlockId={activeBlockId}
+                setActiveBlockId={setActiveBlockId}
+                onChange={(blocks) =>
+                  setYear({
+                    ...year,
+                    sections: year.sections.map((s) =>
+                      s.id === activeSection.id ? { ...s, content_blocks: blocks } : s
+                    ),
+                  })
+                }
               />
-            </div>
 
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                  Header Gambar <span className="normal-case font-normal text-zinc-400">(opsional)</span>
-                </p>
-                {headerImageDirty.has(activeSection.id) && <UnsavedFieldBadge />}
-              </div>
-              <Input
-                value={activeSection.header_image ?? ""}
-                onChange={(e) => editSectionHeaderImage(activeSection.id, e.target.value)}
-                placeholder="Link Google Drive (boleh dikosongkan)…"
-              />
-              <p className="mt-1 text-[11px] text-zinc-400">
-                Tampil di posisi paling atas layar Detail Section, menggantikan judul. Boleh diisi
-                boleh tidak — kalau kosong, section langsung mulai dari blok konten pertama.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Blok Konten
-              </p>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => togglePublish(activeSection)} className={BTN_DARK}>
-                  {activeSection.is_published ? "Unpublish" : "Publish"}
-                </Button>
-                <Button size="sm" onClick={() => deleteSection(activeSection.id)} className={BTN_RED}>
-                  <Trash2 size={14} /> Hapus section
-                </Button>
+              <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
+                {activeSectionDirty && (
+                  <span className="mr-auto text-[11px] text-zinc-400">
+                    Ada perubahan belum disimpan di section ini
+                  </span>
+                )}
+                <SaveButton status={status} onClick={handleSaveSection} />
               </div>
             </div>
+          )}
+        </div>
 
-            <ContentBlockEditor
-              section={activeSection}
-              blocks={activeSection.content_blocks ?? []}
-              dirtyBlockIds={blockDirty}
-              markDirty={markBlockDirty}
-              onChange={(blocks) =>
-                setYear({
-                  ...year,
-                  sections: year.sections.map((s) =>
-                    s.id === activeSection.id ? { ...s, content_blocks: blocks } : s
-                  ),
-                })
-              }
-            />
-
-            <div className="flex items-center justify-end gap-2 border-t border-zinc-100 pt-3">
-              {activeSectionDirty && (
-                <span className="mr-auto text-[11px] text-zinc-400">
-                  Ada perubahan belum disimpan di section ini
-                </span>
-              )}
-              <SaveButton status={status} onClick={handleSaveSection} />
-            </div>
-          </div>
-        )}
+        <div className="sticky top-4">
+          <PhonePreview screen={previewScreen} data={previewData} eraSlug={eraSlug} />
+        </div>
       </div>
     </div>
   );
@@ -970,11 +1002,30 @@ function SectionBlokTab({
 
 /* ---------------------------------------------------- ContentBlockEditor */
 
-function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChange }) {
+function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, activeBlockId, setActiveBlockId, onChange }) {
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
 
   const orderedBlocks = (blocks ?? []).slice().sort((a, b) => a.order - b.order);
+
+  // (Baru, item #1) Toggle collapse/expand -- klik header blok yang sudah
+  // expand akan menutupnya lagi (collapse semua), klik blok lain langsung
+  // pindah expand ke situ (hanya 1 blok terbuka sekaligus, sesuai
+  // permintaan "yang muncul hanya yang diklik saja").
+  function toggleExpand(id) {
+    setActiveBlockId?.((cur) => (cur === id ? null : id));
+  }
+
+  // (Baru) Cuplikan singkat teks blok untuk ditampilkan saat collapsed --
+  // supaya admin masih bisa sekilas kenali isi blok tanpa harus expand.
+  function blockSnippet(b) {
+    if (b.type === "text") {
+      const text = (b.content ?? "").trim();
+      return text ? (text.length > 70 ? text.slice(0, 70) + "…" : text) : "Teks kosong";
+    }
+    const link = (b.content ?? "").trim();
+    return link ? link : "Link belum diisi";
+  }
 
   // (Baru) Guard client-side maks 2 block 'video' per section -- hint saja,
   // bukan pengganti validasi backend (ContentBlockController::store()/update()
@@ -990,6 +1041,7 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
       content: "",
     });
     onChange([...blocks, data]);
+    setActiveBlockId?.(data.id); // langsung expand blok baru supaya admin lanjut isi
   }
 
   // Isi blok sekarang cuma diubah di state lokal saat mengetik -- dikirim
@@ -1005,6 +1057,7 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
   async function removeBlock(id) {
     await apiClient.delete(`/admin/sections/${section.id}/content-blocks/${id}`);
     onChange(blocks.filter((b) => b.id !== id));
+    if (activeBlockId === id) setActiveBlockId?.(null);
   }
 
   async function reorderBlocks(newOrderedBlocks) {
@@ -1031,9 +1084,10 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {orderedBlocks.map((b) => {
         const isDirty = dirtyBlockIds?.has(b.id);
+        const isExpanded = activeBlockId === b.id;
         return (
           <div
             key={b.id}
@@ -1053,48 +1107,76 @@ function ContentBlockEditor({ section, blocks, dirtyBlockIds, markDirty, onChang
               setDragOverId(null);
             }}
             className={`rounded-lg border p-3 transition ${
-              isDirty ? "border-orange-300" : "border-zinc-100"
+              isExpanded ? "border-zinc-900" : isDirty ? "border-orange-300" : "border-zinc-100"
             } ${dragOverId === b.id && dragId !== b.id ? "border-zinc-900" : ""} ${
               dragId === b.id ? "opacity-40" : ""
             }`}
           >
-            <div className="mb-2 flex items-center justify-between">
-              <span className="flex cursor-grab items-center gap-1.5 active:cursor-grabbing">
-                <GripVertical size={14} className="text-zinc-300" />
-                <Badge variant="secondary">{b.type}</Badge>
+            {/* Header -- SELALU terlihat, klik mana pun di sini toggle
+                expand/collapse. Saat collapsed, cuma ini yang tampil
+                (bersama cuplikan singkat di bawahnya). */}
+            <div
+              className="flex cursor-pointer items-center justify-between gap-2"
+              onClick={() => toggleExpand(b.id)}
+            >
+              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                <GripVertical
+                  size={14}
+                  className="shrink-0 cursor-grab text-zinc-300 active:cursor-grabbing"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                <Badge variant="secondary" className="shrink-0">{b.type}</Badge>
                 {isDirty && <UnsavedFieldBadge />}
+                {!isExpanded && (
+                  <span className="truncate text-xs text-zinc-400">{blockSnippet(b)}</span>
+                )}
               </span>
-              <Button size="icon" onClick={() => removeBlock(b.id)} className={`h-8 w-8 ${BTN_RED}`}>
+              <Button
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeBlock(b.id);
+                }}
+                className={`h-8 w-8 shrink-0 ${BTN_RED}`}
+              >
                 <Trash2 size={14} />
               </Button>
             </div>
-            {b.type === "text" ? (
-              <Textarea
-                defaultValue={b.content}
-                placeholder="Tulis teks konten…"
-                onChange={(e) => updateBlock(b.id, { content: e.target.value })}
-              />
-            ) : (
-              <Input
-                defaultValue={b.content}
-                // (Revisi) Video kini via Google Drive juga, bukan lagi
-                // YouTube (Rules.md R-CMS-06 revisi) -- placeholder sekarang
-                // sama dengan image/pdf, ditambah hint batas ukuran/durasi.
-                placeholder={
-                  b.type === "video" ? "Link Google Drive (maks 50MB, disarankan ≤10 menit)" : "Link Google Drive"
-                }
-                onChange={(e) => updateBlock(b.id, { content: e.target.value })}
-              />
-            )}
-            {/* (Baru) Caption -- OPSIONAL, cuma relevan utk image/video
-                (sumber/keterangan media). Tidak ditampilkan utk text/pdf. */}
-            {(b.type === "image" || b.type === "video") && (
-              <Input
-                className="mt-2"
-                defaultValue={b.caption ?? ""}
-                placeholder="Caption (opsional) — mis. sumber/keterangan gambar atau video…"
-                onChange={(e) => updateBlock(b.id, { caption: e.target.value })}
-              />
+
+            {/* Isi lengkap -- HANYA dirender kalau blok ini sedang expand
+                (item #1: "yang muncul hanya yang di klik saja"). */}
+            {isExpanded && (
+              <div className="mt-2">
+                {b.type === "text" ? (
+                  <Textarea
+                    defaultValue={b.content}
+                    placeholder="Tulis teks konten…"
+                    onChange={(e) => updateBlock(b.id, { content: e.target.value })}
+                  />
+                ) : (
+                  <Input
+                    defaultValue={b.content}
+                    // (Revisi) Video kini via Google Drive juga, bukan lagi
+                    // YouTube (Rules.md R-CMS-06 revisi) -- placeholder sekarang
+                    // sama dengan image/pdf, ditambah hint batas ukuran/durasi.
+                    placeholder={
+                      b.type === "video" ? "Link Google Drive (maks 50MB, disarankan ≤10 menit)" : "Link Google Drive"
+                    }
+                    onChange={(e) => updateBlock(b.id, { content: e.target.value })}
+                  />
+                )}
+                {/* (Baru) Caption -- OPSIONAL, cuma relevan utk image/video
+                    (sumber/keterangan media). Tidak ditampilkan utk text/pdf. */}
+                {(b.type === "image" || b.type === "video") && (
+                  <Input
+                    className="mt-2"
+                    defaultValue={b.caption ?? ""}
+                    placeholder="Caption (opsional) — mis. sumber/keterangan gambar atau video…"
+                    onChange={(e) => updateBlock(b.id, { caption: e.target.value })}
+                  />
+                )}
+              </div>
             )}
           </div>
         );
@@ -1186,18 +1268,6 @@ function SummaryVaccineTab({
     const nextPoints = points.map((p) => {
       if (p.id !== pointId) return p;
       return { ...p, options: p.options.map((o, i) => (i === optionIndex ? { ...o, ...patch } : o)) };
-    });
-    setYear({ ...year, summary: { ...summary, points: nextPoints } });
-    setSummaryPointsDirty((prev) => new Set(prev).add(pointId));
-    setStatus("dirty");
-  }
-
-  // R-SUM-02: tepat 1 opsi ditandai benar per poin — sama pola dengan
-  // OptionsEditor::setCorrect() di tab Kuis.
-  function setCorrectOption(pointId, optionIndex) {
-    const nextPoints = points.map((p) => {
-      if (p.id !== pointId) return p;
-      return { ...p, options: p.options.map((o, i) => ({ ...o, is_correct: i === optionIndex })) };
     });
     setYear({ ...year, summary: { ...summary, points: nextPoints } });
     setSummaryPointsDirty((prev) => new Set(prev).add(pointId));
@@ -1314,34 +1384,60 @@ function SummaryVaccineTab({
               ))}
             </div>
 
-            {activePoint && (
-              <div className="space-y-2 rounded-lg border border-zinc-100 p-4">
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-[11px] font-medium text-zinc-400">
-                    Poin {activePointIndex + 1} — 1 kalimat benar + 2 kalimat pengecoh (mirip, beda sedikit)
-                  </p>
-                  {summaryPointsDirty.has(activePoint.id) && <UnsavedFieldBadge />}
-                </div>
-                {(activePoint.options ?? []).map((option, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      checked={!!option.is_correct}
-                      onChange={() => setCorrectOption(activePoint.id, i)}
-                      title="Tandai sebagai kalimat benar"
-                    />
+            {activePoint && (() => {
+              const opts = activePoint.options ?? [];
+              const correctIdx = opts.findIndex((o) => o.is_correct);
+              const safeCorrectIdx = correctIdx >= 0 ? correctIdx : 0;
+              const wrongIdxs = opts.map((_, i) => i).filter((i) => i !== safeCorrectIdx);
+              return (
+                <div className="space-y-2 rounded-lg border border-zinc-100 p-4">
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="text-[11px] font-medium text-zinc-400">
+                      Poin {activePointIndex + 1} — 1 kalimat benar + 2 kalimat pengecoh (mirip, beda sedikit)
+                    </p>
+                    {summaryPointsDirty.has(activePoint.id) && <UnsavedFieldBadge />}
+                  </div>
+
+                  {/* FIX (konsisten dengan item #2/#3): radio "tandai benar"
+                      dihapus, diganti 2 slot paten berlabel jelas -- admin
+                      tinggal isi teks sesuai label, is_correct dipaksa
+                      mengikuti slot (bukan dipilih manual). Urutan tampil
+                      ke user tetap diacak backend
+                      (YearSummaryService::getPointsForAttempt(), shuffle()). */}
+                  <div>
+                    <p className="mb-1 text-[11px] font-semibold text-emerald-600">Kalimat Benar</p>
                     <Input
-                      value={option.option_text ?? ""}
-                      placeholder={option.is_correct ? "Kalimat benar…" : `Kalimat pengecoh ${i + 1}…`}
-                      onChange={(e) => updatePointOption(activePoint.id, i, { option_text: e.target.value })}
+                      value={opts[safeCorrectIdx]?.option_text ?? ""}
+                      placeholder="Kalimat rangkuman yang benar…"
+                      onChange={(e) =>
+                        updatePointOption(activePoint.id, safeCorrectIdx, {
+                          option_text: e.target.value,
+                          is_correct: true,
+                        })
+                      }
                     />
                   </div>
-                ))}
-                <p className="pt-1 text-[11px] text-zinc-400">
-                  Klik bulatan di kiri untuk menandai opsi mana yang jadi kalimat benar (wajib tepat 1).
-                </p>
-              </div>
-            )}
+                  {wrongIdxs.map((idx, n) => (
+                    <div key={idx}>
+                      <p className="mb-1 text-[11px] font-medium text-zinc-400">Kalimat Pengecoh {n + 1}</p>
+                      <Input
+                        value={opts[idx]?.option_text ?? ""}
+                        placeholder={`Kalimat pengecoh ${n + 1} (mirip, beda sedikit)…`}
+                        onChange={(e) =>
+                          updatePointOption(activePoint.id, idx, {
+                            option_text: e.target.value,
+                            is_correct: false,
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
+                  <p className="pt-1 text-[11px] text-zinc-400">
+                    Tinggal isi kalimat benar di slot pertama — 2 slot lain otomatis jadi pengecoh.
+                  </p>
+                </div>
+              );
+            })()}
           </>
         )}
 
@@ -1459,7 +1555,13 @@ function QuizTab({
       // (lihat Quiz::canPublish() backend).
       explanation_correct: "",
       explanation_incorrect: "",
-      options: [{ option_text: "", is_correct: true }, { option_text: "", is_correct: false }],
+      options: [
+        { option_text: "", is_correct: true },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false },
+      ],
     });
     setYear({ ...year, quiz: { ...quiz, questions: [...questions, data] } });
     setActiveQuestionIndex(questions.length);
@@ -1866,8 +1968,9 @@ function CaseStudyTab({ year, setYear, status, setStatus, setError, contentDirty
               Ruang Keputusan — 5 Opsi (A-E)
             </p>
             <p className="mb-3 text-[11px] text-zinc-400">
-              Tandai tepat 3 opsi sebagai Prioritas 1/2/3 (urutan harus persis ditebak user,
-              penilaian mode HARD) — 2 sisanya otomatis jadi pengecoh.
+              5 slot sudah paten urutannya — isi slot 1-3 dengan 3 langkah pengendalian
+              paling mendesak (urutan harus persis ditebak user, penilaian mode HARD), dan
+              slot 4-5 dengan 2 pengecoh. Urutan tampil ke user tetap diacak sistem.
             </p>
             <CaseStudyOptionsEditor
               options={caseStudy.options ?? []}
@@ -1998,25 +2101,28 @@ const Section_CASE_STUDY_ORDER = 8;
 // "kebenarannya" berupa correct_rank (1/2/3/null), dipilih lewat dropdown
 // "Prioritas 1/2/3/Pengecoh" -- BUKAN tambah/hapus bebas (selalu tepat 5,
 // mengikuti CaseStudy::OPTION_COUNT, tombol tambah/hapus SENGAJA tidak ada).
+// FIX (item #3, ribetnya admin pilih dropdown "Prioritas 1/2/3/Pengecoh"):
+// sekarang 5 slot PATEN sesuai posisi -- slot 1-3 otomatis Prioritas 1/2/3,
+// slot 4-5 otomatis Pengecoh. Admin tinggal urut ISI KONTEN dari atas ke
+// bawah sesuai maksud (paling mendesak di slot Prioritas 1, dst.), tidak
+// perlu lagi pilih dropdown terpisah. correct_rank DIPAKSA mengikuti posisi
+// slot tiap kali admin edit apa pun (title/description) -- bukan dibaca
+// dari nilai correct_rank lama -- supaya data legacy yang sempat ditukar-
+// tukar lewat dropdown versi sebelumnya otomatis ternormalisasi begitu
+// admin menyentuh form ini lagi. Urutan tampil ke user tetap diacak di
+// backend (CaseStudyService::getOptionsForAttempt(), shuffle()), jadi
+// posisi slot di sini aman tidak menentukan urutan yang dilihat user.
+const CASE_STUDY_RANK_BY_SLOT = [1, 2, 3, null, null];
+const CASE_STUDY_SLOT_LABELS = ["Prioritas 1", "Prioritas 2", "Prioritas 3", "Pengecoh 1", "Pengecoh 2"];
+
 function CaseStudyOptionsEditor({ options, onChange, dirty }) {
-  const rankLabel = { 1: "Prioritas 1", 2: "Prioritas 2", 3: "Prioritas 3", "": "Pengecoh" };
-  const letters = ["A", "B", "C", "D", "E"];
-
   function setOption(i, patch) {
-    onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
-  }
-
-  function setRank(i, rawValue) {
-    const nextRank = rawValue === "" ? null : Number(rawValue);
-    // Kalau rank ini sudah dipakai opsi lain, lepas dari opsi lama itu
-    // (jadi pengecoh) supaya tetap tepat 1 opsi per nilai 1/2/3 -- bukan
-    // menolak aksi, cuma "pindahkan" tanda prioritasnya.
     onChange(
-      options.map((o, idx) => {
-        if (idx === i) return { ...o, correct_rank: nextRank };
-        if (nextRank !== null && o.correct_rank === nextRank) return { ...o, correct_rank: null };
-        return o;
-      })
+      options.map((o, idx) => ({
+        ...o,
+        ...(idx === i ? patch : {}),
+        correct_rank: CASE_STUDY_RANK_BY_SLOT[idx],
+      }))
     );
   }
 
@@ -2025,31 +2131,24 @@ function CaseStudyOptionsEditor({ options, onChange, dirty }) {
       {options.map((o, i) => (
         <div key={o.id ?? i} className="rounded-lg border border-zinc-100 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-zinc-900 text-[11px] font-semibold text-white">
-              {letters[i] ?? i + 1}
-            </span>
-            <select
-              value={o.correct_rank ?? ""}
-              onChange={(e) => setRank(i, e.target.value)}
-              className="rounded-md border border-zinc-200 px-2 py-1 text-xs"
+            <span
+              className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
+                i < 3 ? "bg-emerald-100 text-emerald-700" : "bg-zinc-100 text-zinc-500"
+              }`}
             >
-              {[1, 2, 3, ""].map((r) => (
-                <option key={r} value={r}>
-                  {rankLabel[r]}
-                </option>
-              ))}
-            </select>
+              {CASE_STUDY_SLOT_LABELS[i]}
+            </span>
             {dirty?.has(o.id) && <UnsavedFieldBadge />}
           </div>
           <Input
             className="mb-2"
             value={o.title ?? ""}
-            placeholder={`Judul opsi ${letters[i] ?? i + 1}`}
+            placeholder={`Judul ${CASE_STUDY_SLOT_LABELS[i]}`}
             onChange={(e) => setOption(i, { title: e.target.value })}
           />
           <Textarea
             value={o.description ?? ""}
-            placeholder={`Deskripsi opsi ${letters[i] ?? i + 1}`}
+            placeholder={`Deskripsi ${CASE_STUDY_SLOT_LABELS[i]}`}
             onChange={(e) => setOption(i, { description: e.target.value })}
           />
         </div>
@@ -2058,43 +2157,58 @@ function CaseStudyOptionsEditor({ options, onChange, dirty }) {
   );
 }
 
+// FIX (item #2, ribetnya admin pilih radio "mana yang benar"): sekarang
+// fixed 5 slot berlabel jelas -- 1 "Jawaban Benar" + 4 "Jawaban Salah".
+// Admin tinggal ISI TEKS sesuai label, tidak perlu lagi pilih radio/tambah-
+// hapus opsi bebas. is_correct ditentukan otomatis dari slot (bukan
+// dropdown/radio manual). Urutan tampil ke user diacak di backend
+// (UserQuizController::show(), sudah di-shuffle()), jadi posisi input di
+// sini TIDAK menentukan urutan yang dilihat user -- aman "Jawaban Benar"
+// selalu di slot pertama form admin tanpa bocor ke user.
+//
+// Mencari opsi benar lewat is_correct (bukan asumsi index 0) supaya soal
+// LAMA yang jawaban benarnya kebetulan bukan di opsi pertama tetap terbaca
+// benar di slot "Jawaban Benar", bukan malah dianggap salah.
+const WRONG_SLOT_COUNT = 4;
+
 function OptionsEditor({ question, onChange }) {
   const options = question.options ?? [];
-
-  function setOption(i, patch) {
-    onChange(options.map((o, idx) => (idx === i ? { ...o, ...patch } : o)));
+  const correctIndex = options.findIndex((o) => o.is_correct);
+  const correctOption = correctIndex >= 0 ? options[correctIndex] : { option_text: "", is_correct: true };
+  const wrongOptions = options.filter((_, idx) => idx !== correctIndex);
+  while (wrongOptions.length < WRONG_SLOT_COUNT) {
+    wrongOptions.push({ option_text: "", is_correct: false });
   }
 
-  function setCorrect(i) {
-    onChange(options.map((o, idx) => ({ ...o, is_correct: idx === i })));
-  }
-
-  function addOption() {
-    onChange([...options, { option_text: "", is_correct: false }]);
-  }
-
-  function removeOption(i) {
-    onChange(options.filter((_, idx) => idx !== i));
+  function commit(nextCorrect, nextWrongs) {
+    onChange([{ ...nextCorrect, is_correct: true }, ...nextWrongs.slice(0, WRONG_SLOT_COUNT).map((o) => ({ ...o, is_correct: false }))]);
   }
 
   return (
-    <div className="space-y-2">
-      {options.map((o, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <input type="radio" checked={!!o.is_correct} onChange={() => setCorrect(i)} />
+    <div className="space-y-3">
+      <div>
+        <p className="mb-1 text-[11px] font-semibold text-emerald-600">Jawaban Benar</p>
+        <Input
+          value={correctOption.option_text}
+          placeholder="Tulis jawaban yang benar…"
+          onChange={(e) => commit({ ...correctOption, option_text: e.target.value }, wrongOptions)}
+        />
+      </div>
+      {wrongOptions.map((o, i) => (
+        <div key={o.id ?? `wrong-${i}`}>
+          <p className="mb-1 text-[11px] font-medium text-zinc-400">Jawaban Salah {i + 1}</p>
           <Input
             value={o.option_text}
-            placeholder={`Opsi ${i + 1}`}
-            onChange={(e) => setOption(i, { option_text: e.target.value })}
+            placeholder={`Tulis pengecoh ${i + 1}…`}
+            onChange={(e) => {
+              const nextWrongs = wrongOptions.map((w, idx) =>
+                idx === i ? { ...w, option_text: e.target.value } : w
+              );
+              commit(correctOption, nextWrongs);
+            }}
           />
-          <Button size="icon" onClick={() => removeOption(i)} className={`h-8 w-8 ${BTN_RED}`}>
-            <Trash2 size={14} />
-          </Button>
         </div>
       ))}
-      <Button variant="outline" onClick={addOption}>
-        <Plus size={14} /> Opsi
-      </Button>
     </div>
   );
 }
