@@ -11,10 +11,10 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AdminUserSeeder::class,
             EraSeeder::class,
-            ModernSeeder::class,
-            QuizSeeder::class,
-            KolonialSeeder::class,
-            KemerdekaanSeeder::class,
+            // ModernSeeder::class,
+            // QuizSeeder::class,
+            // KolonialSeeder::class,
+            // KemerdekaanSeeder::class,
             SekalaBorderSeeder::class,
         ]);
     }

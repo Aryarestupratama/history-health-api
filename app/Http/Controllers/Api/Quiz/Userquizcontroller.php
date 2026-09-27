@@ -58,6 +58,19 @@ class UserQuizController extends Controller
             $q->select('id', 'quiz_id', 'order', 'question');
         }, 'questions.options:id,quiz_question_id,option_text,order']);
 
+        // FIX: sebelumnya opsi dikirim persis sesuai `order` (urutan admin
+        // input di storeQuestion()/updateQuestion()), sehingga kalau admin
+        // terbiasa naruh jawaban benar di opsi pertama, user selalu melihat
+        // jawaban benar di posisi pertama juga. Diacak di sini per request
+        // (bukan disimpan di DB) — pola identik dengan
+        // YearSummaryService::getPointsForAttempt() &
+        // CaseStudyService::getOptionsForAttempt(). is_correct tidak pernah
+        // ikut ter-load (kolom sengaja tidak di-select di atas), jadi acak
+        // ini aman tidak membocorkan kunci jawaban.
+        $quiz->questions->each(
+            fn ($question) => $question->setRelation('options', $question->options->shuffle()->values())
+        );
+
         return response()->json([
             'quiz' => $quiz,
             'passing_grade' => Quiz::PASSING_GRADE_PERCENTAGE,

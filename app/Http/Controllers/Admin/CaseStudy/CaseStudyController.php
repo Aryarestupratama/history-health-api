@@ -33,9 +33,29 @@ class CaseStudyController extends Controller
             throw new NotFoundHttpException();
         }
 
+        // (Fix, tanpa ubah migration) Kolom teks di case_studies masih
+        // NOT NULL tanpa default (title/description/challenge_text/
+        // reason_description/feedback_correct/feedback_incorrect/
+        // badge_name/badge_image_link). ensureSkeleton() di CaseStudyService
+        // cuma mengisi skeleton 5 opsi, BUKAN kolom-kolom ini — kalau tidak
+        // diisi placeholder di sini, INSERT baris skeleton di bawah gagal
+        // (500) untuk section yang belum pernah punya row case_studies.
+        // String kosong dianggap "belum lengkap" oleh CaseStudy::canPublish()
+        // (memakai blank()), jadi tidak mengubah syarat publish.
+        $blankText = [
+            'title' => '',
+            'description' => '',
+            'challenge_text' => '',
+            'reason_description' => '',
+            'feedback_correct' => '',
+            'feedback_incorrect' => '',
+            'badge_name' => '',
+            'badge_image_link' => '',
+        ];
+
         $caseStudy = CaseStudy::firstOrCreate(
             ['section_id' => $section->id],
-            ['is_published' => false]
+            [...$blankText, 'is_published' => false]
         );
 
         $this->service->ensureSkeleton($caseStudy);
