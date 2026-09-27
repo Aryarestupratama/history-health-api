@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\Year\YearController as AdminYearController;
 use App\Http\Controllers\Admin\YearSummary\YearSummaryController as AdminYearSummaryController;
 use App\Http\Controllers\Admin\CaseStudy\CaseStudyController as AdminCaseStudyController;
 use App\Http\Controllers\Admin\WabahIntro\WabahIntroController as AdminWabahIntroController;
+use App\Http\Controllers\Admin\SekalaBorder\SekalaBorderController as AdminSekalaBorderController;
 
 use App\Http\Controllers\Api\Public\EraController as PublicEraController;
 use App\Http\Controllers\Api\Public\YearController as PublicYearController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\Api\EraQuiz\UserEraQuizController;
 use App\Http\Controllers\Api\YearSummary\UserYearSummaryController;
 use App\Http\Controllers\Api\CaseStudy\CaseStudyController as UserCaseStudyController;
 use App\Http\Controllers\Api\WabahIntro\WabahIntroController;
+use App\Http\Controllers\Api\SekalaBorder\SekalaBorderController as PublicSekalaBorderController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -156,6 +158,13 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // banyak "item", cuma 1 row yang dilihat & diedit admin).
     Route::get('wabah-intro', [AdminWabahIntroController::class, 'show']);
     Route::put('wabah-intro', [AdminWabahIntroController::class, 'update']);
+
+    // Aset Border SEKALA — singleton sama pola dengan wabah-intro di atas
+    // (1 row, bukan apiResource). CUMA soal gambar bordernya; logic kapan
+    // border ter-unlock untuk user (frame_unlocked_at/BorderUnlockService)
+    // tidak disentuh di sini sama sekali.
+    Route::get('sekala-border', [AdminSekalaBorderController::class, 'show']);
+    Route::put('sekala-border', [AdminSekalaBorderController::class, 'update']);
 });
 
 Route::prefix('public')->group(function () {
@@ -167,6 +176,12 @@ Route::prefix('public')->group(function () {
     // guest wajib bisa lihat ini juga sebelum masuk roadmap era manapun
     // (sama prinsip dengan guest tetap bisa baca section pertama, R-YEAR-03).
     Route::get('wabah-intro', [WabahIntroController::class, 'show']);
+
+    // Aset Border SEKALA — publik (tanpa auth:sanctum) supaya guest & user
+    // yang belum unlock pun tetap bisa fetch metadata/gambar border (dipakai
+    // di layar Profil, sama prinsip wabah-intro di atas). Gate is_published
+    // ada di dalam PublicSekalaBorderController::show(), bukan di sini.
+    Route::get('sekala-border', [PublicSekalaBorderController::class, 'show']);
 });
 
 // R-AUTH-03: fitur ini wajib login DAN email terverifikasi.

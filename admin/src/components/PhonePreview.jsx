@@ -11,6 +11,7 @@ import {
   CalendarDays,
   Quote,
   BookOpen,
+  User as UserRoundIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PALETTE, ERA_ACCENTS } from "@/config/branding";
@@ -24,7 +25,7 @@ import { PALETTE, ERA_ACCENTS } from "@/config/branding";
  * lewat prop `data` oleh parent.
  *
  * Props:
- * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "case-study" | "vaccine-detail" | "wabah-intro"
+ * - screen: "roadmap" | "section-detail" | "summary" | "quiz" | "case-study" | "vaccine-detail" | "wabah-intro" | "sekala-border"
  * - data: bentuk berbeda tergantung `screen` — lihat komentar shape di atas
  *   masing-masing screen (SectionDetailScreen sekarang pakai `headerImageUrl`
  *   menggantikan judul, SummaryScreen pakai `points`/`activePointIndex`
@@ -55,6 +56,7 @@ export default function PhonePreview({ screen, data, eraSlug, compact = false })
           {screen === "case-study" && <CaseStudyScreen data={data} accent={accent} />}
           {screen === "vaccine-detail" && <VaccineDetailScreen data={data} accent={accent} />}
           {screen === "wabah-intro" && <WabahIntroScreen data={data} accent={accent} />}
+          {screen === "sekala-border" && <SekalaBorderScreen data={data} accent={accent} />}
           {!screen && <EmptyState />}
         </div>
       </PhoneFrame>
@@ -1190,6 +1192,65 @@ function WabahIntroScreen({ data, accent }) {
       >
         Mengerti
       </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------- Border SEKALA tab */
+// data: { imageUrl }
+//
+// Preview aset Border SEKALA (Fase 3) — disimulasikan sebagai lingkaran
+// border yang "dipasang" di sekeliling avatar profil placeholder, sama
+// posisi visual dengan `ProfileAvatar` di Flutter. Ini CUMA preview aset
+// gambarnya (menyerupai layar Profil, bukan replika penuh) — logic kapan
+// border terbuka/terpasang untuk user tidak disimulasikan di sini.
+
+function SekalaBorderScreen({ data, accent }) {
+  const { imageUrl } = data ?? {};
+
+  return (
+    <div>
+      <span
+        className="mb-4 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
+        style={{ backgroundColor: `${accent}26`, color: accent }}
+      >
+        Border SEKALA
+      </span>
+
+      <div className="flex flex-col items-center gap-3 py-4">
+        <div className="relative flex h-28 w-28 items-center justify-center">
+          {/* Avatar placeholder di tengah — mensimulasikan foto profil user */}
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-100 text-zinc-300">
+            <UserRoundIcon size={30} />
+          </div>
+
+          {/* Border mengelilingi avatar */}
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+            />
+          ) : (
+            <div
+              className="absolute inset-0 rounded-full border-[3px] border-dashed"
+              style={{ borderColor: `${accent}66` }}
+            />
+          )}
+        </div>
+
+        <p className="text-xs text-zinc-400">
+          {imageUrl ? "Simulasi border terpasang di foto profil" : "(Link gambar belum diisi / belum valid)"}
+        </p>
+      </div>
+
+      <div className="mt-2 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-center">
+        <p className="text-[10px] leading-relaxed text-zinc-400">
+          User baru bisa memasang border ini setelah mengumpulkan seluruh badge
+          studi kasus dari year yang published — tidak disimulasikan di preview ini.
+        </p>
+      </div>
     </div>
   );
 }

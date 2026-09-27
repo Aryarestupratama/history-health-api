@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             QuizSeeder::class,
             KolonialSeeder::class,
             KemerdekaanSeeder::class,
+            SekalaBorderSeeder::class,
         ]);
     }
 }

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Layers, Syringe, ShieldCheck, Settings, LogOut, BookOpenText, UserCog } from 'lucide-react';
+import { LayoutDashboard, Layers, Syringe, ShieldCheck, Settings, LogOut, BookOpenText, UserCog, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -15,6 +15,7 @@ import AdminManager from './pages/AdminManager';
 import StudioEraYearPicker from './pages/StudioEraYearPicker';
 import WabahWorkspace from './pages/WabahWorkspace';
 import WabahIntroManager from './pages/WabahIntroManager';
+import SekalaBorderManager from './pages/SekalaBorderManager';
 import AdminProfile from './pages/AdminProfile';
 
 // Revisi Design.md §4: sidebar utama jadi Dashboard / Content Studio / Kelola
@@ -33,6 +34,9 @@ const NAV_ITEMS = [
 const SECONDARY_NAV_ITEMS = [
   { to: '/eras', label: 'Era & Tahun', icon: Settings },
   { to: '/wabah-intro', label: 'Pengenalan Wabah', icon: BookOpenText },
+  // Aset Border SEKALA (baru) -- housekeeping sekunder juga, pola sama
+  // Pengenalan Wabah (singleton, jarang diubah setelah aset final siap).
+  { to: '/sekala-border', label: 'Border SEKALA', icon: Sparkles },
   // Profil (baru) -- satu-satunya tempat admin ganti password akun sendiri,
   // sejak fitur Edit di Kelola Admin dicabut total.
   { to: '/profile', label: 'Profil Saya', icon: UserCog },
@@ -211,6 +215,18 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Layout><WabahIntroManager /></Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Aset Border SEKALA (baru) — housekeeping sekunder, singleton
+              sama pola wabah-intro, biasanya diisi sekali oleh tim desain
+              lalu jarang diubah. */}
+          <Route
+            path="/sekala-border"
+            element={
+              <ProtectedRoute>
+                <Layout><SekalaBorderManager /></Layout>
               </ProtectedRoute>
             }
           />
