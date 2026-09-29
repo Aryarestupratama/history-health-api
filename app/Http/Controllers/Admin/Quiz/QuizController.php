@@ -28,7 +28,7 @@ class QuizController extends Controller
 
     /**
      * PATCH /admin/quizzes/{quiz}/publish — toggle publish.
-     * R-QUIZ-05/06 (revisi): TEPAT 10 soal (bukan lagi "minimal 1") +
+     * R-QUIZ-05/06 (revisi): TEPAT 15 soal (bukan lagi "minimal 1") +
      * years.summary terisi.
      */
     public function publish(Request $request, Quiz $quiz)
@@ -48,8 +48,8 @@ class QuizController extends Controller
 
     /**
      * POST /admin/quizzes/{quiz}/questions
-     * R-QUIZ-06 (revisi): maksimal Quiz::QUESTION_COUNT (10) soal — dulu
-     * cuma maks 5. Publish tetap butuh TEPAT 10 (dicek di Quiz::canPublish()),
+     * R-QUIZ-06 (revisi): maksimal Quiz::QUESTION_COUNT (15) soal — dulu
+     * cuma maks 5. Publish tetap butuh TEPAT 15 (dicek di Quiz::canPublish()),
      * limit di sini cuma mencegah admin bikin soal ke-11 dst.
      * R-QUIZ-07: multiple_choice wajib >=2 opsi dengan tepat satu is_correct.
      */

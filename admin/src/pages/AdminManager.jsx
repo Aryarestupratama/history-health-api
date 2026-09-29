@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, UserPlus, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +15,18 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { useConfirm } from '@/components/confirm-dialog';
+import { Badge } from '@/components/ui/badge';
+import {
+  DataCard,
+  EmptyState,
+  Field,
+  InitialsAvatar,
+  InlineError,
+  PageHeader,
+  PasswordInput,
+  TableSkeleton,
+  primaryButtonClass,
+} from '@/components/page-kit';
 
 // Kelola Admin -- CRUD akun admin, isi langsung tanpa flow invite email.
 // Reuse tabel `users` (role=admin), endpoint /admin/admins (lihat
@@ -28,6 +38,11 @@ import { useConfirm } from '@/components/confirm-dialog';
 // Tambah/Hapus. Ganti nama/email/password akun sendiri pindah ke menu
 // Profil (lihat pages/AdminProfile.jsx), admin tidak bisa lagi mengedit
 // data admin lain (atau akun sendiri) dari sini.
+//
+// REDESIGN: seluruh gaya level-halaman (header, kartu tabel, skeleton,
+// empty state, error, avatar, field, input password) diambil dari
+// `@/components/page-kit` supaya konsisten dengan halaman admin lain.
+// Logic CRUD (fetch/tambah/hapus + guard) TIDAK berubah.
 const EMPTY_FORM = { name: '', email: '', password: '' };
 
 export default function AdminManager() {
@@ -109,70 +124,90 @@ export default function AdminManager() {
 
   const isLastAdmin = admins.length <= 1;
 
+  const addButton = (
+    <Button onClick={openAddForm} className={primaryButtonClass}>
+      <Plus className="h-4 w-4" /> Tambah Admin
+    </Button>
+  );
+
   return (
     <div className="space-y-6">
       {dialog}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Kelola Admin</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tambah atau hapus akun admin. Semua admin punya akses setara, tanpa sub-level. Untuk
-            ganti nama/password akun sendiri, buka menu Profil.
-          </p>
-        </div>
-        <Button onClick={openAddForm} className="bg-gamify text-white hover:bg-gamify/90">
-          <Plus className="h-4 w-4" /> Tambah Admin
-        </Button>
-      </div>
 
-      {error && !showForm && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <PageHeader
+        title="Kelola Admin"
+        count={loading ? null : admins.length}
+        description="Tambah atau hapus akun admin. Semua admin punya akses setara, tanpa sub-level. Untuk ganti nama/password akun sendiri, buka menu Profil."
+        actions={addButton}
+      />
+
+      {error && !showForm && <InlineError message={error} onRetry={fetchAdmins} />}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Memuat...</p>
+        <TableSkeleton rows={3} />
       ) : admins.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Belum ada admin.</p>
+        // Kalau fetch gagal, pesan error di atas sudah cukup -- jangan
+        // tambah "Belum ada admin" yang menyesatkan (data belum tentu kosong).
+        !error && (
+          <EmptyState
+            icon={ShieldCheck}
+            title="Belum ada admin"
+            description="Tambahkan akun admin pertama untuk mulai mengelola konten."
+            action={addButton}
+          />
+        )
       ) : (
-        <div className="rounded-lg border border-l-4 border-l-gamify">
+        <DataCard className="duration-500 animate-in fade-in slide-in-from-bottom-2">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-secondary/40 hover:bg-secondary/40">
                 <TableHead>Nama</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead className="w-16 text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {admins.map((admin) => {
+              {admins.map((admin, index) => {
                 const isSelf = admin.id === currentUser?.id;
                 const disableDelete = isSelf || isLastAdmin;
+                const deleteHint = isSelf
+                  ? 'Tidak bisa menghapus akun sendiri'
+                  : isLastAdmin
+                  ? 'Tidak bisa menghapus admin terakhir'
+                  : 'Hapus';
+
                 return (
-                  <TableRow key={admin.id}>
-                    <TableCell className="font-medium">
-                      {admin.name} {isSelf && <span className="text-xs text-muted-foreground">(Anda)</span>}
+                  <TableRow
+                    key={admin.id}
+                    // Baris muncul berurutan (maks 8 langkah stagger).
+                    style={{ animationDelay: `${Math.min(index, 8) * 40}ms`, animationFillMode: 'backwards' }}
+                    className="duration-300 animate-in fade-in"
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <InitialsAvatar name={admin.name} />
+                        <span className="font-medium">{admin.name}</span>
+                        {isSelf && <Badge variant="gamify">Anda</Badge>}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{admin.email}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive disabled:opacity-30"
-                          disabled={disableDelete}
-                          title={
-                            isSelf
-                              ? 'Tidak bisa menghapus akun sendiri'
-                              : isLastAdmin
-                              ? 'Tidak bisa menghapus admin terakhir'
-                              : 'Hapus'
-                          }
-                          onClick={() => handleDelete(admin)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {/* Tooltip dipasang di <span> pembungkus, bukan di
+                            tombol -- tombol disabled tidak menerima event
+                            hover, jadi `title` di dalamnya tidak andal. */}
+                        <span title={deleteHint} className="inline-flex">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
+                            disabled={disableDelete}
+                            aria-label={`Hapus admin ${admin.name}`}
+                            onClick={() => handleDelete(admin)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </span>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -180,54 +215,62 @@ export default function AdminManager() {
               })}
             </TableBody>
           </Table>
-        </div>
+        </DataCard>
       )}
 
       <Dialog open={showForm} onOpenChange={(open) => !open && resetForm()}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
+            <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-xl bg-gamify/10 text-gamify">
+              <UserPlus className="h-5 w-5" />
+            </div>
             <DialogTitle>Admin Baru</DialogTitle>
             <DialogDescription>
               Buat akun admin baru. Akun langsung aktif tanpa flow invite email.
             </DialogDescription>
           </DialogHeader>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {error && <InlineError message={error} />}
 
           <form id="admin-form" onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Nama</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email</Label>
+            <Field id="admin-name" label="Nama">
               <Input
+                id="admin-name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                autoComplete="off"
+                required
+              />
+            </Field>
+            <Field id="admin-email" label="Email">
+              {/* autoComplete="off": mencegah browser mengisi otomatis email
+                  admin yang sedang login ke form akun BARU. */}
+              <Input
+                id="admin-email"
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                autoComplete="off"
                 required
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Password</Label>
-              <Input
-                type="password"
+            </Field>
+            <Field id="admin-password" label="Password" hint="Minimal 8 karakter.">
+              {/* autoComplete="new-password": password tersimpan admin yang
+                  sedang login tidak boleh terisi otomatis di sini. */}
+              <PasswordInput
+                id="admin-password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Minimal 8 karakter"
+                autoComplete="new-password"
                 required
                 minLength={8}
               />
-            </div>
+            </Field>
           </form>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={resetForm}>Batal</Button>
-            <Button type="submit" form="admin-form" className="bg-gamify text-white hover:bg-gamify/90" disabled={saving}>
+            <Button type="submit" form="admin-form" className={primaryButtonClass} disabled={saving}>
               {saving ? 'Menyimpan...' : 'Tambah Admin'}
             </Button>
           </DialogFooter>

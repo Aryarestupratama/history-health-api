@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Eye } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Eye, Pencil, Plus, Search, Syringe, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../api';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,49 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { useConfirm } from '@/components/confirm-dialog';
-import PhonePreview from "@/components/PhonePreview";
+import PhonePreview from '@/components/PhonePreview';
+import {
+  DataCard,
+  EmptyState,
+  Field,
+  InlineError,
+  PageHeader,
+  TableSkeleton,
+  primaryButtonClass,
+} from '@/components/page-kit';
+
+/**
+ * Kelola Vaksin -- data master collectible card di aplikasi mobile
+ * (Architecture.md §4.8). Field mengikuti migrasi `vaccines`: name, photo,
+ * photo_locked, manufacturer, disease_target, year_introduced, description;
+ * relasi many-to-many `year_vaccine` lewat POST /admin/vaccines/:id/assign-years.
+ *
+ * REDESIGN (relayout total), diselaraskan dengan kit halaman admin:
+ *  - Daftar: kolom pertama kini punya THUMBNAIL foto (fallback ikon kalau
+ *    belum ada/gagal dimuat), "Wabah terkait" jadi chip (maks 3 + "+n"),
+ *    "Belum diassign" jadi lencana peringatan (vaksin yang tidak terkait
+ *    tahun mana pun TIDAK PERNAH ter-unlock user). Ada pencarian (nama,
+ *    penyakit, produsen) dan filter Semua / Belum diassign.
+ *  - Form: dua kolom (data vaksin | foto) + bagian "Wabah terkait" selebar
+ *    penuh. Kolom foto menampilkan pratinjau langsung dari link Drive dan
+ *    peringatan kalau link tidak dikenali. Pilihan tahun jadi chip yang
+ *    dikelompokkan per era dengan "Pilih semua"/"Kosongkan" dan penghitung.
+ *  - Menutup form saat ada isian belum tersimpan meminta konfirmasi.
+ *  - Pratinjau HP: tombol teks diganti `Tabs` Terbuka/Terkunci.
+ *
+ * PERBAIKAN (di luar tampilan):
+ *  - Fetch daftar gagal kini punya <InlineError> + "Coba lagi" (dulu error
+ *    dan `Memuat...` polos); gagal memuat tahun tampil di dalam form dengan
+ *    "Coba lagi", bukan toast yang hilang.
+ *  - BUG duplikat: vaksin BARU berhasil dibuat tapi assign-years gagal ->
+ *    form tetap mode "tambah", admin menekan simpan lagi -> vaksin dibuat
+ *    DUA kali. Sekarang setelah vaksin terbuat form berpindah ke mode edit
+ *    dan pesan error menjelaskan bagian mana yang gagal.
+ *  - Deskripsi halaman yang usang ("assign dilakukan di workspace tahun")
+ *    diperbarui: assign juga bisa dari form ini.
+ * Logic API (GET/POST/PUT/DELETE /admin/vaccines, assign-years, GET
+ * /admin/years) TIDAK berubah.
+ */
 
 // Versi ringan LinkParserService::extractDriveFileId/toDriveImageUrl
 // (backend) khusus dipakai di sisi klien supaya preview HP bisa live
@@ -36,9 +79,6 @@ function resolveDrivePhotoUrl(rawUrl) {
   return null;
 }
 
-// Menggantikan FigureManager.jsx (Architecture.md §4.8 — collectible card:
-// tokoh -> vaksin). Field mengikuti migrasi `vaccines` (progress.md):
-// name, photo, manufacturer, disease_target, year_introduced, description.
 const EMPTY_FORM = {
   name: '',
   photo: '',
@@ -47,27 +87,51 @@ const EMPTY_FORM = {
   disease_target: '',
   year_introduced: '',
   description: '',
-  yearIds: [], // baru — relasi year_vaccine diisi langsung dari sini (assign-years)
+  yearIds: [], // relasi year_vaccine, dikirim lewat assign-years
 };
+
+/** Bandingkan dua isi form (yearIds tidak peduli urutan). */
+function sameForm(a, b) {
+  const { yearIds: ay, ...ar } = a;
+  const { yearIds: by, ...br } = b;
+  if (Object.keys(ar).some((k) => ar[k] !== br[k])) return false;
+  if (ay.length !== by.length) return false;
+  const set = new Set(by);
+  return ay.every((id) => set.has(id));
+}
+
+function errorMessage(err, fallback) {
+  const errors = err?.response?.data?.errors;
+  const first = errors ? Object.values(errors)[0]?.[0] : null;
+  return first || err?.response?.data?.message || fallback;
+}
+
+const yearLabel = (y) => y.year || y.name;
 
 export default function VaccineManager() {
   const { confirm, dialog } = useConfirm();
 
   const [vaccines, setVaccines] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
-  // Daftar semua year (lintas era) untuk pilihan assign — dipakai form,
-  // bukan untuk tabel utama. Dikelompokkan per era saat render (lihat
-  // yearsByEra di bawah), bukan disimpan sudah terkelompok, supaya sumber
-  // datanya tetap flat & gampang di-lookup by id.
+  // Semua year (lintas era) untuk pilihan assign. Disimpan flat, dikelompokkan
+  // per era saat render.
   const [years, setYears] = useState([]);
   const [yearsLoading, setYearsLoading] = useState(true);
+  const [yearsError, setYearsError] = useState(null);
+
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all' | 'unassigned'
 
   const [form, setForm] = useState(EMPTY_FORM);
+  // Snapshot isian saat form dibuka, untuk mendeteksi perubahan belum tersimpan.
+  const [baseForm, setBaseForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState(null);
+
   const [previewVaccine, setPreviewVaccine] = useState(null);
   const [previewLocked, setPreviewLocked] = useState(false);
 
@@ -78,12 +142,12 @@ export default function VaccineManager() {
 
   async function fetchVaccines() {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const res = await api.get('/admin/vaccines');
       setVaccines(res.data);
     } catch (err) {
-      setError('Gagal memuat daftar vaksin.');
+      setLoadError('Gagal memuat daftar vaksin.');
     } finally {
       setLoading(false);
     }
@@ -91,25 +155,73 @@ export default function VaccineManager() {
 
   async function fetchYears() {
     setYearsLoading(true);
+    setYearsError(null);
     try {
       const res = await api.get('/admin/years');
       setYears(res.data);
     } catch (err) {
-      toast.error('Gagal memuat daftar tahun (wabah) untuk pilihan assign.');
+      setYearsError('Gagal memuat daftar tahun (wabah).');
     } finally {
       setYearsLoading(false);
     }
   }
 
-  // Kelompokkan years per era untuk render checklist — dihitung tiap render
-  // dari `years` (bukan disimpan terpisah) supaya selalu konsisten dengan
-  // sumber data flat-nya.
   const yearsByEra = years.reduce((acc, year) => {
     const eraName = year.era?.name || 'Tanpa Era';
     if (!acc[eraName]) acc[eraName] = [];
     acc[eraName].push(year);
     return acc;
   }, {});
+
+  const isDirty = showForm && !sameForm(form, baseForm);
+
+  /* ------------------------------------------------------------ Form */
+
+  function openAddForm() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setBaseForm(EMPTY_FORM);
+    setFormError(null);
+    setShowForm(true);
+  }
+
+  function startEdit(vaccine) {
+    const next = {
+      name: vaccine.name || '',
+      photo: vaccine.photo || '',
+      photo_locked: vaccine.photo_locked || '',
+      manufacturer: vaccine.manufacturer || '',
+      disease_target: vaccine.disease_target || '',
+      year_introduced: vaccine.year_introduced != null ? String(vaccine.year_introduced) : '',
+      description: vaccine.description || '',
+      yearIds: (vaccine.years || []).map((y) => y.id),
+    };
+    setEditingId(vaccine.id);
+    setForm(next);
+    setBaseForm(next);
+    setFormError(null);
+    setShowForm(true);
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setBaseForm(EMPTY_FORM);
+    setShowForm(false);
+    setFormError(null);
+  }
+
+  async function requestClose() {
+    if (saving) return;
+    if (isDirty) {
+      const ok = await confirm({
+        title: 'Buang perubahan?',
+        description: 'Isian yang belum disimpan akan hilang.',
+      });
+      if (!ok) return;
+    }
+    resetForm();
+  }
 
   function toggleYearId(yearId) {
     setForm((prev) => {
@@ -121,15 +233,24 @@ export default function VaccineManager() {
     });
   }
 
-  function openAddForm() {
-    resetForm();
-    setShowForm(true);
+  // Pilih semua / kosongkan seluruh tahun dalam satu era.
+  function setEraYears(eraYears, selected) {
+    const ids = eraYears.map((y) => y.id);
+    setForm((prev) => {
+      const rest = prev.yearIds.filter((id) => !ids.includes(id));
+      return { ...prev, yearIds: selected ? [...rest, ...ids] : rest };
+    });
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError(null);
+    setFormError(null);
     setSaving(true);
+
+    const wasEditing = !!editingId;
+    let vaccineId = editingId;
+
+    // 1) Data vaksin.
     try {
       const payload = {
         name: form.name,
@@ -140,51 +261,55 @@ export default function VaccineManager() {
         year_introduced: form.year_introduced ? Number(form.year_introduced) : null,
         description: form.description,
       };
-      let vaccineId = editingId;
-      if (editingId) {
-        await api.put(`/admin/vaccines/${editingId}`, payload);
+      if (vaccineId) {
+        await api.put(`/admin/vaccines/${vaccineId}`, payload);
       } else {
         const res = await api.post('/admin/vaccines', payload);
         vaccineId = res.data.id;
+        // Vaksin sudah ada di server: pindah ke mode edit supaya percobaan
+        // simpan berikutnya (kalau langkah 2 gagal) tidak membuat duplikat.
+        setEditingId(vaccineId);
       }
+    } catch (err) {
+      setFormError(errorMessage(err, 'Gagal menyimpan vaksin.'));
+      setSaving(false);
+      return;
+    }
 
-      // Assign year selalu dikirim sebagai request terpisah (bukan digabung
-      // ke payload utama) karena endpoint store/update vaksin tidak
-      // menangani relasi many-to-many — sync() lewat assign-years yang jadi
-      // source of truth relasi year_vaccine, baik saat vaksin baru dibuat
-      // maupun diedit.
+    // 2) Relasi tahun -- request terpisah karena store/update vaksin tidak
+    // menangani many-to-many; sync() lewat assign-years jadi sumber kebenaran
+    // relasi year_vaccine, baik vaksin baru maupun diedit.
+    try {
       await api.post(`/admin/vaccines/${vaccineId}/assign-years`, { year_ids: form.yearIds });
+    } catch (err) {
+      setFormError(
+        'Data vaksin sudah tersimpan, tetapi pilihan tahun gagal disimpan. Tekan simpan lagi untuk mencoba ulang.'
+      );
+      fetchVaccines();
+      setSaving(false);
+      return;
+    }
 
-      toast.success(editingId ? 'Vaksin berhasil diupdate' : 'Vaksin baru berhasil ditambahkan');
-      resetForm();
+    toast.success(wasEditing ? 'Vaksin berhasil diupdate' : 'Vaksin baru berhasil ditambahkan');
+    resetForm();
+    fetchVaccines();
+    setSaving(false);
+  }
+
+  async function handleDelete(vaccine) {
+    const ok = await confirm({
+      title: `Hapus vaksin "${vaccine.name}"?`,
+      description:
+        'Ini juga akan melepas relasinya dari semua tahun (wabah) terkait. Tindakan ini tidak bisa dibatalkan.',
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/admin/vaccines/${vaccine.id}`);
+      toast.success(`Vaksin "${vaccine.name}" berhasil dihapus`);
       fetchVaccines();
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyimpan vaksin.');
-    } finally {
-      setSaving(false);
+      toast.error(err.response?.data?.message || 'Gagal menghapus vaksin.');
     }
-  }
-
-  function startEdit(vaccine) {
-    setEditingId(vaccine.id);
-    setForm({
-      name: vaccine.name || '',
-      photo: vaccine.photo || '',
-      photo_locked: vaccine.photo_locked || '',
-      manufacturer: vaccine.manufacturer || '',
-      disease_target: vaccine.disease_target || '',
-      year_introduced: vaccine.year_introduced != null ? String(vaccine.year_introduced) : '',
-      description: vaccine.description || '',
-      yearIds: (vaccine.years || []).map((y) => y.id),
-    });
-    setShowForm(true);
-  }
-
-  function resetForm() {
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-    setShowForm(false);
-    setError(null);
   }
 
   function openPreview(vaccine) {
@@ -197,242 +322,381 @@ export default function VaccineManager() {
     setPreviewLocked(false);
   }
 
-  async function handleDelete(vaccine) {
-    const ok = await confirm({
-      title: `Hapus vaksin "${vaccine.name}"?`,
-      description: 'Ini juga akan melepas relasinya dari semua tahun (wabah) terkait. Tindakan ini tidak bisa dibatalkan.',
-    });
-    if (!ok) return;
-    try {
-      await api.delete(`/admin/vaccines/${vaccine.id}`);
-      toast.success(`Vaksin "${vaccine.name}" berhasil dihapus`);
-      fetchVaccines();
-    } catch (err) {
-      toast.error('Gagal menghapus vaksin.');
-    }
-  }
+  /* ------------------------------------------------------- Turunan daftar */
+
+  const isUnassigned = (v) => !v.years || v.years.length === 0;
+  const unassignedCount = vaccines.filter(isUnassigned).length;
+
+  const needle = search.trim().toLowerCase();
+  const visible = vaccines.filter((v) => {
+    if (filter === 'unassigned' && !isUnassigned(v)) return false;
+    if (!needle) return true;
+    return [v.name, v.disease_target, v.manufacturer].some((f) => (f || '').toLowerCase().includes(needle));
+  });
+
+  const addButton = (
+    <Button onClick={openAddForm} className={primaryButtonClass}>
+      <Plus className="h-4 w-4" /> Tambah Vaksin
+    </Button>
+  );
 
   return (
     <div className="space-y-6">
       {dialog}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Kelola Vaksin</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Data vaksin untuk collectible card di aplikasi mobile. Assign ke tahun (wabah) dilakukan
-            di halaman workspace tahun.
-          </p>
-        </div>
-        <Button onClick={openAddForm} className="bg-gamify text-white hover:bg-gamify/90">
-          <Plus className="h-4 w-4" /> Tambah Vaksin
-        </Button>
-      </div>
 
-      {error && !showForm && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <PageHeader
+        title="Kelola Vaksin"
+        count={loading || loadError ? null : vaccines.length}
+        description="Data vaksin untuk collectible card di aplikasi mobile. Vaksin ter-unlock otomatis begitu user menyelesaikan tahun (wabah) yang terkait, jadi pastikan tiap vaksin sudah diassign."
+        actions={addButton}
+      />
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Memuat...</p>
+      {loadError ? (
+        <InlineError message={loadError} onRetry={fetchVaccines} />
+      ) : loading ? (
+        <TableSkeleton rows={4} />
       ) : vaccines.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Belum ada vaksin.</p>
+        <EmptyState
+          icon={Syringe}
+          title="Belum ada vaksin"
+          description="Tambahkan vaksin pertama, lalu hubungkan ke tahun (wabah) supaya bisa dikoleksi user."
+          action={addButton}
+        />
       ) : (
-        <div className="rounded-lg border border-l-4 border-l-gamify">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama Vaksin</TableHead>
-                <TableHead>Penyakit Target</TableHead>
-                <TableHead>Produsen</TableHead>
-                <TableHead>Tahun</TableHead>
-                <TableHead>Tahun (Wabah) Terkait</TableHead>
-                <TableHead className="w-24 text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {vaccines.map((vaccine) => (
-                <TableRow key={vaccine.id}>
-                  <TableCell className="font-medium">
-                    {vaccine.name}
-                    {vaccine.description && (
-                      <p className="mt-0.5 line-clamp-1 text-xs font-normal text-muted-foreground">
-                        {vaccine.description}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{vaccine.disease_target}</TableCell>
-                  <TableCell className="text-muted-foreground">{vaccine.manufacturer || '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">{vaccine.year_introduced || '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {vaccine.years && vaccine.years.length > 0
-                      ? vaccine.years.map((y) => y.year || y.name).join(', ')
-                      : <span className="italic">Belum diassign</span>}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPreview(vaccine)}>
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(vaccine)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(vaccine)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-4 duration-500 animate-in fade-in">
+          {/* Toolbar: pencarian + filter status assign */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-xs">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari nama, penyakit, atau produsen"
+                aria-label="Cari vaksin"
+                className="pl-9"
+              />
+            </div>
+            <Tabs value={filter} onValueChange={setFilter}>
+              <TabsList>
+                <TabsTrigger value="all">Semua ({vaccines.length})</TabsTrigger>
+                <TabsTrigger value="unassigned">Belum diassign ({unassignedCount})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {visible.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="Tidak ada vaksin yang cocok"
+              description={
+                filter === 'unassigned' && !needle
+                  ? 'Semua vaksin sudah terhubung ke minimal satu tahun.'
+                  : 'Coba kata kunci lain atau ubah filter.'
+              }
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearch('');
+                    setFilter('all');
+                  }}
+                >
+                  Reset pencarian
+                </Button>
+              }
+            />
+          ) : (
+            <DataCard>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-secondary/40 hover:bg-secondary/40">
+                    <TableHead>Vaksin</TableHead>
+                    <TableHead>Penyakit target</TableHead>
+                    <TableHead>Produsen</TableHead>
+                    <TableHead>Wabah terkait</TableHead>
+                    <TableHead className="w-28 text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visible.map((vaccine, index) => (
+                    <TableRow
+                      key={vaccine.id}
+                      style={{ animationDelay: `${Math.min(index, 8) * 40}ms`, animationFillMode: 'backwards' }}
+                      className="duration-300 animate-in fade-in"
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <VaccineThumb url={resolveDrivePhotoUrl(vaccine.photo)} />
+                          <div className="min-w-0">
+                            <p className="font-medium leading-tight">{vaccine.name}</p>
+                            {vaccine.description && (
+                              <p className="mt-0.5 line-clamp-1 max-w-64 text-xs text-muted-foreground">
+                                {vaccine.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{vaccine.disease_target}</TableCell>
+                      <TableCell>
+                        <p className="text-muted-foreground">{vaccine.manufacturer || '\u2014'}</p>
+                        {vaccine.year_introduced ? (
+                          <p className="mt-0.5 text-xs tabular-nums text-muted-foreground/80">
+                            sejak {vaccine.year_introduced}
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <YearChips years={vaccine.years} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Preview ${vaccine.name}`}
+                            title="Preview"
+                            onClick={() => openPreview(vaccine)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Edit ${vaccine.name}`}
+                            title="Edit"
+                            onClick={() => startEdit(vaccine)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={`Hapus ${vaccine.name}`}
+                            title="Hapus"
+                            onClick={() => handleDelete(vaccine)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </DataCard>
+          )}
         </div>
       )}
 
-      <Dialog open={showForm} onOpenChange={(open) => !open && resetForm()}>
-        <DialogContent className="max-w-3xl">
+      {/* ------------------------------------------------------ Dialog form */}
+      <Dialog open={showForm} onOpenChange={(open) => !open && requestClose()}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
+            <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-xl bg-gamify/10 text-gamify">
+              <Syringe className="h-5 w-5" />
+            </div>
             <DialogTitle>{editingId ? 'Edit Vaksin' : 'Vaksin Baru'}</DialogTitle>
             <DialogDescription>
               Data ini dipakai sebagai collectible card di aplikasi mobile.
             </DialogDescription>
           </DialogHeader>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {formError && <InlineError message={formError} />}
 
-          <form id="vaccine-form" onSubmit={handleSubmit} className="grid grid-cols-2 gap-x-6 gap-y-4">
-            {/* Kolom kiri — identitas & data dasar vaksin */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Nama Vaksin</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <form id="vaccine-form" onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+              {/* Kiri: data vaksin */}
+              <div className="space-y-4">
+                <Field id="vaccine-name" label="Nama vaksin">
+                  <Input
+                    id="vaccine-name"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                  />
+                </Field>
+                <Field id="vaccine-disease" label="Penyakit target">
+                  <Input
+                    id="vaccine-disease"
+                    value={form.disease_target}
+                    onChange={(e) => setForm({ ...form, disease_target: e.target.value })}
+                    required
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field id="vaccine-manufacturer" label="Produsen">
+                    <Input
+                      id="vaccine-manufacturer"
+                      value={form.manufacturer}
+                      onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
+                    />
+                  </Field>
+                  <Field id="vaccine-year" label="Tahun diperkenalkan">
+                    <Input
+                      id="vaccine-year"
+                      type="number"
+                      value={form.year_introduced}
+                      onChange={(e) => setForm({ ...form, year_introduced: e.target.value })}
+                      placeholder="mis. 1955"
+                      className="tabular-nums"
+                    />
+                  </Field>
+                </div>
+                <Field id="vaccine-description" label="Peran dalam sejarah kesehatan">
+                  <Textarea
+                    id="vaccine-description"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={5}
+                    className="resize-y leading-relaxed"
+                    required
+                  />
+                </Field>
               </div>
-              <div className="space-y-1.5">
-                <Label>Foto (link Google Drive)</Label>
-                <Input
+
+              {/* Kanan: foto */}
+              <div className="space-y-4">
+                <PhotoField
+                  id="vaccine-photo"
+                  label="Foto (link Google Drive)"
+                  hint='Gunakan link "Share" Google Drive. Tampil di kartu setelah vaksin ter-unlock.'
                   value={form.photo}
-                  onChange={(e) => setForm({ ...form, photo: e.target.value })}
-                  placeholder="https://drive.google.com/file/d/FILE_ID/view..."
+                  onChange={(v) => setForm({ ...form, photo: v })}
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Foto Siluet / Terkunci (link Google Drive)</Label>
-                <Input
+                <PhotoField
+                  id="vaccine-photo-locked"
+                  label="Foto siluet / terkunci (link Google Drive)"
+                  hint="Tampil sebelum vaksin ter-unlock, dan dipakai Flutter untuk animasi reveal saat unlock."
                   value={form.photo_locked}
-                  onChange={(e) => setForm({ ...form, photo_locked: e.target.value })}
-                  placeholder="https://drive.google.com/file/d/FILE_ID/view..."
-                />
-                <p className="text-xs text-muted-foreground">
-                  Ditampilkan sebelum vaksin ter-unlock user (siluet/placeholder). Dipakai Flutter untuk
-                  animasi reveal saat unlock.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Produsen</Label>
-                  <Input
-                    value={form.manufacturer}
-                    onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Tahun Diperkenalkan</Label>
-                  <Input
-                    type="number"
-                    value={form.year_introduced}
-                    onChange={(e) => setForm({ ...form, year_introduced: e.target.value })}
-                    placeholder="mis. 1955"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Penyakit Target</Label>
-                <Input
-                  value={form.disease_target}
-                  onChange={(e) => setForm({ ...form, disease_target: e.target.value })}
-                  required
+                  onChange={(v) => setForm({ ...form, photo_locked: v })}
                 />
               </div>
             </div>
 
-            {/* Kolom kanan — deskripsi & assign tahun (elemen yang lebih tinggi) */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Deskripsi Peran dalam Sejarah Kesehatan</Label>
-                <Textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  rows={4}
-                  required
-                />
+            {/* Bawah: assign tahun */}
+            <section className="space-y-3 border-t pt-5" aria-labelledby="vaccine-years-title">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="vaccine-years-title" className="text-sm font-medium">
+                    Wabah terkait
+                  </h3>
+                  <p className="mt-0.5 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                    Vaksin ter-unlock begitu user menyelesaikan salah satu tahun yang dipilih. Satu
+                    vaksin boleh terkait lebih dari satu tahun. Bisa juga diatur dari tab "Rangkuman
+                    &amp; Vaksin" di Workspace Wabah.
+                  </p>
+                </div>
+                <Badge variant={form.yearIds.length ? 'gamify' : 'secondary'}>
+                  {form.yearIds.length} dipilih
+                </Badge>
               </div>
 
-              <div className="space-y-1.5">
-                <Label>Tahun (Wabah) Terkait</Label>
-                <p className="text-xs text-muted-foreground">
-                  Vaksin ini otomatis ter-unlock user begitu status "year completed" tercapai pada
-                  tahun yang dicentang di bawah (relasi many-to-many, satu vaksin boleh terkait
-                  lebih dari satu tahun). Ini alternatif cepat dari assign lewat tab "Rangkuman &amp;
-                  Vaksin" di Workspace Wabah per-tahun.
+              {yearsLoading ? (
+                <p className="text-sm text-muted-foreground" role="status">
+                  Memuat daftar tahun...
                 </p>
-                {yearsLoading ? (
-                  <p className="text-sm text-muted-foreground">Memuat daftar tahun...</p>
-                ) : years.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Belum ada data tahun (wabah).</p>
-                ) : (
-                  <div className="max-h-48 space-y-3 overflow-y-auto rounded-md border p-3">
-                    {Object.entries(yearsByEra).map(([eraName, eraYears]) => (
-                      <div key={eraName} className="space-y-1.5">
-                        <p className="text-xs font-semibold uppercase text-muted-foreground">{eraName}</p>
-                        <div className="space-y-1">
-                          {eraYears.map((year) => (
-                            <label key={year.id} className="flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={form.yearIds.includes(year.id)}
-                                onChange={() => toggleYearId(year.id)}
-                                className="h-4 w-4 rounded border-input accent-gamify"
-                              />
-                              {year.year || year.name}
-                            </label>
-                          ))}
+              ) : yearsError ? (
+                <InlineError message={yearsError} onRetry={fetchYears} />
+              ) : years.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  Belum ada data tahun (wabah). Buat dulu lewat Content Studio.
+                </p>
+              ) : (
+                <div className="max-h-64 space-y-4 overflow-y-auto rounded-lg border bg-secondary/30 p-4">
+                  {Object.entries(yearsByEra).map(([eraName, eraYears]) => {
+                    const selectedInEra = eraYears.filter((y) => form.yearIds.includes(y.id)).length;
+                    const allSelected = selectedInEra === eraYears.length;
+                    return (
+                      <div key={eraName} className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {eraName}
+                            <span className="ml-1.5 tabular-nums text-muted-foreground/70">
+                              {selectedInEra}/{eraYears.length}
+                            </span>
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setEraYears(eraYears, !allSelected)}
+                            className="rounded px-1.5 py-0.5 text-xs font-medium text-gamify hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {allSelected ? 'Kosongkan' : 'Pilih semua'}
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {eraYears.map((year) => {
+                            const on = form.yearIds.includes(year.id);
+                            return (
+                              <button
+                                key={year.id}
+                                type="button"
+                                aria-pressed={on}
+                                title={year.title ? `${yearLabel(year)}: ${year.title}` : undefined}
+                                onClick={() => toggleYearId(year.id)}
+                                className={cn(
+                                  'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none',
+                                  on
+                                    ? 'border-gamify bg-gamify/10 font-medium text-gamify'
+                                    : 'bg-background hover:bg-accent'
+                                )}
+                              >
+                                {on && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                                {yearLabel(year)}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           </form>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={resetForm}>Batal</Button>
-            <Button type="submit" form="vaccine-form" className="bg-gamify text-white hover:bg-gamify/90" disabled={saving}>
-              {saving ? 'Menyimpan...' : editingId ? 'Update Vaksin' : 'Tambah Vaksin'}
-            </Button>
+          <DialogFooter className="items-center gap-2 sm:justify-between">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+              {isDirty && (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden="true" />
+                  Ada perubahan yang belum disimpan
+                </>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={requestClose} disabled={saving}>
+                Batal
+              </Button>
+              <Button type="submit" form="vaccine-form" className={primaryButtonClass} disabled={saving}>
+                {saving ? 'Menyimpan...' : editingId ? 'Update Vaksin' : 'Tambah Vaksin'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* ---------------------------------------------------- Dialog preview */}
       <Dialog open={!!previewVaccine} onOpenChange={(open) => !open && closePreview()}>
-        <DialogContent className="max-h-[85vh] max-w-sm overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-sm overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Preview: {previewVaccine?.name || 'Vaksin'}</DialogTitle>
+            <DialogDescription>Tampilan kartu vaksin di aplikasi mobile.</DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setPreviewLocked((v) => !v)}
-              className="self-end text-xs font-medium text-gamify hover:underline"
-            >
-              {previewLocked ? 'Lihat versi terbuka' : 'Simulasikan versi terkunci'}
-            </button>
+          <div className="flex flex-col items-center gap-4">
+            <Tabs value={previewLocked ? 'locked' : 'open'} onValueChange={(v) => setPreviewLocked(v === 'locked')}>
+              <TabsList>
+                <TabsTrigger value="open">Terbuka</TabsTrigger>
+                <TabsTrigger value="locked">Terkunci</TabsTrigger>
+              </TabsList>
+            </Tabs>
             {previewVaccine && (
               <PhonePreview
                 screen="vaccine-detail"
@@ -453,5 +717,103 @@ export default function VaccineManager() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/* ----------------------------------------------------------------- Bagian */
+
+/** Thumbnail foto vaksin di tabel; ikon kalau belum ada / gagal dimuat. */
+function VaccineThumb({ url }) {
+  const [failed, setFailed] = useState(false);
+
+  // Link berubah (mis. setelah edit) -> coba muat lagi.
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
+  return (
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-secondary text-muted-foreground">
+      {url && !failed ? (
+        <img
+          src={url}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <Syringe className="h-4 w-4" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
+/** Tahun terkait sebagai chip (maks 3, sisanya "+n"); peringatan kalau kosong. */
+function YearChips({ years }) {
+  if (!years || years.length === 0) {
+    return <Badge variant="warning">Belum diassign</Badge>;
+  }
+  const shown = years.slice(0, 3);
+  const rest = years.slice(3);
+  return (
+    <div className="flex flex-wrap gap-1">
+      {shown.map((y) => (
+        <Badge key={y.id} variant="outline" className="tabular-nums">
+          {yearLabel(y)}
+        </Badge>
+      ))}
+      {rest.length > 0 && (
+        <Badge variant="secondary" title={rest.map(yearLabel).join(', ')}>
+          +{rest.length}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+/** Input link Drive + pratinjau gambar langsung + peringatan link tidak dikenali. */
+function PhotoField({ id, label, hint, value, onChange }) {
+  const trimmed = value.trim();
+  const url = resolveDrivePhotoUrl(trimmed);
+  const invalid = trimmed !== '' && !url;
+
+  return (
+    <Field id={id} label={label} hint={invalid ? undefined : hint}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Input
+            id={id}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="https://drive.google.com/file/d/..."
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {invalid && (
+            <p role="status" className="text-xs text-warning">
+              Link tidak dikenali sebagai link file Google Drive, foto tidak akan tampil.
+            </p>
+          )}
+        </div>
+        <div
+          className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-secondary text-muted-foreground"
+          aria-hidden="true"
+        >
+          {url ? (
+            <img
+              key={url}
+              src={url}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Syringe className="h-5 w-5" />
+          )}
+        </div>
+      </div>
+    </Field>
   );
 }

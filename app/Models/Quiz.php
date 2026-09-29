@@ -10,10 +10,10 @@ class Quiz extends Model
     use HasFactory;
 
     /**
-     * R-QUIZ-06 (revisi): jumlah soal kini FIX 10 per kuis year — tidak
+     * R-QUIZ-06 (revisi): jumlah soal kini FIX 15 per kuis year — tidak
      * boleh kurang maupun lebih (beda dari versi lama yang cuma maks 5).
      */
-    public const QUESTION_COUNT = 10;
+    public const QUESTION_COUNT = 15;
 
     /**
      * R-QUIZ-11 (baru): nilai minimum kelulusan untuk kuis formatif, dalam
@@ -55,7 +55,7 @@ class Quiz extends Model
     /**
      * R-QUIZ-05: syarat publish = years.summary terisi.
      * R-QUIZ-06 (revisi): ditambah/diubah syarat jumlah soal — sekarang
-     * wajib TEPAT 10 soal (bukan lagi "minimal 1"), karena kuis formatif
+     * wajib TEPAT 15 soal (bukan lagi "minimal 1"), karena kuis formatif
      * kini punya skor & passing grade sehingga jumlah soal harus konsisten
      * antar year supaya adil (tidak ada year dengan soal lebih sedikit
      * jadi "lebih gampang lulus").

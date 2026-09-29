@@ -27,7 +27,7 @@ class UserQuizController extends Controller
      * sekali — endpoint ini ada di grup middleware auth:sanctum + verified.
      *
      * R-QUIZ-11 (baru): response sekarang menyertakan `passing_grade` (75)
-     * & `question_count` (Quiz::QUESTION_COUNT, 10) supaya Flutter bisa
+     * & `question_count` (Quiz::QUESTION_COUNT, 15) supaya Flutter bisa
      * tampilkan layar info "Nilai minimum kelulusan: 75%" SEBELUM user
      * masuk ke soal pertama — ditampilkan di layar ini, bukan endpoint
      * terpisah, supaya Flutter cukup 1x call sebelum render layar mulai.

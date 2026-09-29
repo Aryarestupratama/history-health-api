@@ -1543,10 +1543,10 @@ function QuizTab({
 
   async function addQuestion() {
     if (!quiz) return;
-    // R-QUIZ-06 (revisi): batas sekarang 10 (dulu 5) — TAPI publish tetap
-    // butuh TEPAT 10, bukan "sampai 10 boleh kurang" (lihat Quiz::canPublish()
-    // backend & label "Soal (n/10)" di bawah).
-    if (questions.length >= 10) return toast.error("Maksimal 10 soal per kuis (R-QUIZ-06).");
+    // R-QUIZ-06 (revisi): batas sekarang 15 (dulu 10, awalnya 5) — TAPI publish tetap
+    // butuh TEPAT 15, bukan "sampai 15 boleh kurang" (lihat Quiz::canPublish()
+    // backend & label "Soal (n/15)" di bawah).
+    if (questions.length >= 15) return toast.error("Maksimal 15 soal per kuis (R-QUIZ-06).");
     const { data } = await apiClient.post(`/admin/quizzes/${quiz.id}/questions`, {
       question: "",
       // R-QUIZ-04/R-QUIZ-10 (revisi terbaru — feedback kuis 2 kolom): sama
@@ -1609,7 +1609,7 @@ function QuizTab({
     } catch (e) {
       toast.error(
         e?.response?.data?.message ??
-          "Gagal publish (butuh TEPAT 10 soal + rangkuman terisi). Kuis kini berskor, passing grade 75% (tetap, tidak bisa diubah admin)."
+          "Gagal publish (butuh TEPAT 15 soal + rangkuman terisi). Kuis kini berskor, passing grade 75% (tetap, tidak bisa diubah admin)."
       );
     }
   }
@@ -1663,18 +1663,18 @@ function QuizTab({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            Soal ({questions.length}/10)
+            Soal ({questions.length}/15)
           </p>
           {/* R-QUIZ-11 (baru): passing grade fixed 75%, tidak bisa diubah
               admin — info-only supaya admin tahu kenapa publish butuh TEPAT
-              10 soal (bukan sekadar "boleh kurang"), dan kenapa user bisa
+              15 soal (bukan sekadar "boleh kurang"), dan kenapa user bisa
               mengerjakan ulang kalau nilainya di bawah 75%. */}
           <p className="text-[11px] text-zinc-400">
             Berskor · passing grade 75% · boleh dikerjakan ulang user sampai lulus
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={addQuestion} disabled={questions.length >= 10}>
+          <Button variant="outline" onClick={addQuestion} disabled={questions.length >= 15}>
             <Plus size={14} /> Soal
           </Button>
           <Button onClick={togglePublish} className={BTN_DARK}>

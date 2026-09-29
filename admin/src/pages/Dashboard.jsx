@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Landmark, Layers, ShieldCheck, Syringe, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 // Route disamakan dengan App.jsx (Design.md §4): /sections & /quizzes lama
 // sudah digantikan /studio (Content Studio, 3 tab). Warna dibedakan per
@@ -38,36 +38,62 @@ const SHORTCUTS = [
   },
 ];
 
+// Sapaan sesuai jam -- ambang waktu disamakan dengan HomeScreen di app mobile.
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'Selamat pagi';
+  if (hour < 15) return 'Selamat siang';
+  if (hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Halo, {user?.name} 👋</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      {/* Hero sapaan. Animasi masuk pakai tailwindcss-animate (sudah
+          terpasang di tailwind.config.js). */}
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-gamify/15 via-background to-background p-6 duration-500 animate-in fade-in slide-in-from-bottom-2 md:p-8">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-gamify/10 blur-2xl" />
+        <p className="text-sm font-medium text-muted-foreground">{greeting()} 👋</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">{user?.name}</h1>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
           Selamat datang di panel admin. Pilih menu di bawah untuk mulai mengelola konten.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SHORTCUTS.map(({ to, icon: Icon, title, description, accent }) => (
-          <Link key={to} to={to}>
-            <Card className="group h-full transition-shadow hover:shadow-md">
-              <CardHeader>
-                <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${accent}`}>
-                  <Icon className="h-4.5 w-4.5" />
-                </div>
-                <CardTitle className="flex items-center justify-between">
-                  {title}
-                  <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                </CardTitle>
-                <CardDescription>{description}</CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+          Menu cepat
+        </h2>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {SHORTCUTS.map(({ to, icon: Icon, title, description, accent }, index) => (
+            <Link
+              key={to}
+              to={to}
+              // Muncul berurutan (stagger) -- fillMode 'backwards' supaya
+              // kartu tetap tersembunyi selama menunggu delay-nya.
+              style={{ animationDelay: `${120 + index * 70}ms`, animationFillMode: 'backwards' }}
+              className="block rounded-xl duration-500 animate-in fade-in slide-in-from-bottom-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Card className="group h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                <CardHeader>
+                  <div className={`mb-2 flex h-10 w-10 items-center justify-center rounded-xl ${accent}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <CardTitle className="flex items-center justify-between">
+                    {title}
+                    <ArrowRight className="h-4 w-4 -translate-x-1 text-muted-foreground opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+                  </CardTitle>
+                  <CardDescription>{description}</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

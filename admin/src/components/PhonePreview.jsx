@@ -17,6 +17,80 @@ import { useEffect, useState } from "react";
 import { PALETTE, ERA_ACCENTS } from "@/config/branding";
 
 /**
+ * Padanan `RichBodyText` (Flutter, shared/widgets/rich_body_text.dart):
+ * baris kosong = jarak paragraf, `1.`/`2)` (1-2 digit) = list bernomor,
+ * `- `/`* `/`• ` = bullet, baris berawal spasi = lanjutan item.
+ * Aturan parse HARUS tetap sama dengan versi Flutter supaya preview = hasil.
+ */
+function parseRichBody(raw) {
+  const lines = String(raw ?? "").replace(/\r\n?/g, "\n").trim().split("\n");
+  const blocks = [];
+  let para = [];
+  let list = null;
+  const flushPara = () => {
+    if (para.length) blocks.push({ kind: "p", text: para.join("\n") });
+    para = [];
+  };
+  const flushList = () => {
+    if (list) blocks.push({ kind: "list", items: list });
+    list = null;
+  };
+  for (const line of lines) {
+    if (!line.trim()) {
+      flushPara();
+      flushList();
+      continue;
+    }
+    const ordered = line.match(/^\s*(\d{1,2})[.)]\s+(.*)$/);
+    const bullet = ordered ? null : line.match(/^\s*[-*•]\s+(.*)$/);
+    if (ordered || bullet) {
+      flushPara();
+      list = list ?? [];
+      list.push(
+        ordered
+          ? { marker: `${ordered[1]}.`, text: ordered[2].trim() }
+          : { marker: "•", text: bullet[1].trim() }
+      );
+      continue;
+    }
+    if (list && /^[ \t]/.test(line)) {
+      const last = list[list.length - 1];
+      last.text = `${last.text} ${line.trim()}`;
+      continue;
+    }
+    flushList();
+    para.push(line.trimEnd());
+  }
+  flushPara();
+  flushList();
+  return blocks;
+}
+
+function RichBodyText({ text, className = "", empty = null }) {
+  if (!text || !String(text).trim()) return <div className={className}>{empty}</div>;
+  return (
+    <div className={`space-y-2.5 ${className}`}>
+      {parseRichBody(text).map((b, i) =>
+        b.kind === "p" ? (
+          <p key={i} className="whitespace-pre-line">
+            {b.text}
+          </p>
+        ) : (
+          <div key={i} className="space-y-1">
+            {b.items.map((it, j) => (
+              <div key={j} className="flex gap-1.5">
+                <span className="shrink-0 tabular-nums">{it.marker}</span>
+                <span className="min-w-0 flex-1">{it.text}</span>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/**
  * <PhonePreview screen="roadmap" data={...} />
  *
  * Preview HP live untuk Content Studio (Design.md §4.3). Dipakai di dalam
@@ -237,9 +311,11 @@ function BlockPreview({ block, accent }) {
   switch (block.type) {
     case "text":
       return (
-        <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-700">
-          {block.content || <span className="text-zinc-300">Teks kosong</span>}
-        </p>
+        <RichBodyText
+          text={block.content}
+          className="text-sm leading-relaxed text-zinc-700"
+          empty={<span className="text-zinc-300">Teks kosong</span>}
+        />
       );
     case "image":
       return resolvedUrl ? (
@@ -623,9 +699,11 @@ function QuizScreen({ data, accent }) {
       </div>
 
       <div className="rounded-xl p-3">
-        <p className="mb-3 text-sm font-medium leading-relaxed text-zinc-900">
-          {question.question || <span className="text-zinc-300">Teks soal kosong</span>}
-        </p>
+        <RichBodyText
+          text={question.question}
+          className="mb-3 text-sm font-medium leading-relaxed text-zinc-900"
+          empty={<span className="text-zinc-300">Teks soal kosong</span>}
+        />
 
         <div className="space-y-2">
           {options.length === 0 && (
@@ -684,13 +762,10 @@ function QuizScreen({ data, accent }) {
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide">
               {feedbackMode === "correct" ? "Benar! 🎉" : "Kurang tepat"}
             </p>
-            <p>
-              {feedbackMode === "correct" ? (
-                question.explanation_correct || <span className="italic text-zinc-300">Belum diisi</span>
-              ) : (
-                question.explanation_incorrect || <span className="italic text-zinc-300">Belum diisi</span>
-              )}
-            </p>
+            <RichBodyText
+              text={feedbackMode === "correct" ? question.explanation_correct : question.explanation_incorrect}
+              empty={<span className="italic text-zinc-300">Belum diisi</span>}
+            />
           </div>
         )}
       </div>
@@ -770,9 +845,14 @@ function EraQuizRecapScreen({ data, accent }) {
       <div className="space-y-4">
         {questions.map((item, qi) => (
           <div key={qi} className="rounded-xl border border-zinc-100 p-3">
-            <p className="mb-2 text-sm font-medium leading-relaxed text-zinc-900">
-              {qi + 1}. {item.question || <span className="text-zinc-300">Teks soal kosong</span>}
-            </p>
+            <div className="mb-2 flex gap-1.5 text-sm font-medium leading-relaxed text-zinc-900">
+              <span className="shrink-0">{qi + 1}.</span>
+              <RichBodyText
+                text={item.question}
+                className="min-w-0 flex-1"
+                empty={<span className="text-zinc-300">Teks soal kosong</span>}
+              />
+            </div>
             <div className="space-y-2">
               {(item.options ?? []).map((opt) => {
                 const isCorrectOpt = opt.id === item.correct_option_id;
@@ -805,7 +885,10 @@ function EraQuizRecapScreen({ data, accent }) {
                 item.is_correct ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
               }`}
             >
-              {item.explanation || <span className="italic text-zinc-300">Belum diisi</span>}
+              <RichBodyText
+                text={item.explanation}
+                empty={<span className="italic text-zinc-300">Belum diisi</span>}
+              />
             </div>
           </div>
         ))}
@@ -1174,12 +1257,13 @@ function VaccineDetailScreen({ data, accent }) {
 /* --------------------------------------------------------- Wabah intro tab */
 // data: { resolvedImageUrl }
 //
-// Preview konten singleton "Apa itu Wabah" (INTRO-02/03) — HANYA infografis,
-// tanpa caption/teks pendukung (field caption sudah dihapus total dari
-// spec). Satu-satunya entry point di app aslinya adalah ikon info di
-// header roadmap era, yang membuka ini sebagai bottom sheet — preview di
-// sini menyederhanakan jadi konten dalam frame HP biasa (bukan simulasi
-// bottom sheet), cukup untuk mengecek infografis tampil benar.
+// Preview konten singleton "Apa itu Wabah" (INTRO-02/03) — teks penjelasan
+// (field `content`), di-render lewat RichBodyText (paragraf + list
+// bernomor/bullet) sama seperti wabah_intro_modal.dart di Flutter.
+// Satu-satunya entry point di app aslinya adalah ikon info di header
+// roadmap era, yang membuka ini sebagai bottom sheet — preview di sini
+// menyederhanakan jadi konten dalam frame HP biasa (bukan simulasi
+// bottom sheet), cukup untuk mengecek teks tampil benar.
 
 function WabahIntroScreen({ data, accent }) {
   const { content } = data ?? {};
@@ -1194,7 +1278,7 @@ function WabahIntroScreen({ data, accent }) {
       </span>
 
       {content ? (
-        <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-600">{content}</p>
+        <RichBodyText text={content} className="text-sm leading-relaxed text-zinc-600" />
       ) : (
         <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-200 text-zinc-300">
           <FileText size={28} />
